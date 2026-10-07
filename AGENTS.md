@@ -28,6 +28,10 @@ Si una tarea ya decidida abre una elección nueva que no estaba contemplada, tam
 
 Lo que el agente dijo o propuso en una conversación no es una decisión hasta que el equipo la confirma. Solo vale como decidido lo que está registrado en el repo.
 
+## Versionado
+
+Las reglas de ramas, commits y pull requests están en [docs/reglas-de-versionado.md](docs/reglas-de-versionado.md). El agente trabaja en una rama propia, no sube a `main` y no mergea por su cuenta.
+
 ## Contexto
 
 - El enunciado analizado está en [docs/enunciado-tp-integrador.md](docs/enunciado-tp-integrador.md).

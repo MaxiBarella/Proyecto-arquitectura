@@ -24,4 +24,4 @@ npx bmad-method@latest install
 
 ## Forma de trabajo
 
-`main` es la rama común. Cada integrante trabaja en su propia rama y abre un pull request hacia `main`.
+`main` es la rama común. Cada funcionalidad se trabaja en una rama propia y entra a `main` por un pull request que revisa, aprueba y mergea otro integrante. El detalle está en [docs/reglas-de-versionado.md](docs/reglas-de-versionado.md).
