@@ -7,7 +7,9 @@ Proyecto de la materia Arquitectura de Software, trabajado con [BMAD Method](htt
 - `_bmad/` — instalación de BMAD (módulos `core` y `bmm`). No se edita a mano; las personalizaciones del equipo van en `_bmad/custom/`.
 - `.claude/skills/` — skills de BMAD para Claude Code.
 - `_bmad-output/` — artefactos que generan los agentes (brief, PRD, arquitectura, historias).
-- `docs/` — conocimiento del proyecto que los agentes toman como contexto.
+- `docs/` — conocimiento del proyecto que los agentes toman como contexto. El punto de partida es [docs/enunciado-tp-integrador.md](docs/enunciado-tp-integrador.md), el enunciado del práctico analizado.
+
+Las reglas para los agentes de IA están en [AGENTS.md](AGENTS.md): toda decisión la toma el equipo.
 
 ## Cómo empezar
 

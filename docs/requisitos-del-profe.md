@@ -7,6 +7,8 @@ Fuentes:
 
 Lo marcado con **(a confirmar)** hay que chequearlo contra la consigna escrita.
 
+> La consigna escrita ya está analizada en [enunciado-tp-integrador.md](enunciado-tp-integrador.md). Si algo de acá la contradice, manda la consigna; las diferencias están listadas al final de ese documento.
+
 ## Requisitos técnicos
 
 | Tema | Qué pide |
