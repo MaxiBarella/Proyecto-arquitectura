@@ -8,7 +8,9 @@ info:
     Devuelve las condiciones actuales de un aeropuerto y si se puede operar en él
     según umbrales propios.
 
-    - **Aeropuertos atendidos:** `SACO`, `SABE`, `SAEZ`, `SAME` y `SAZS` (códigos ICAO).
+    - **Aeropuerto atendido:** Córdoba, `SACO` (código ICAO). El código va en la ruta
+      para poder sumar aeropuertos más adelante sin romper el contrato.
+    - **Datos:** siempre son observaciones reales de Open-Meteo.
     - **Autenticación:** una clave por consumidor, en el header `X-API-Key`.
     - **Límite:** 60 pedidos por minuto por clave. Al pasarlo se responde `429` con `Retry-After`.
     - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio.
@@ -82,8 +84,8 @@ paths:
                   summary: Aeropuerto no apto por viento y ráfagas
                   value:
                     airport:
-                      icao: SAZS
-                      name: Aeropuerto Internacional Teniente Luis Candelaria
+                      icao: SACO
+                      name: Aeropuerto Internacional Ingeniero Aeronáutico Ambrosio Taravella
                     observed_at: '2026-10-09T14:00:00Z'
                     conditions:
                       temperature_c: 6.1
@@ -121,8 +123,8 @@ components:
       in: path
       required: true
       description: |
-        Código ICAO del aeropuerto, en mayúsculas. Se atienden `SACO`, `SABE`, `SAEZ`,
-        `SAME` y `SAZS`. Un código con formato válido que no está en la lista devuelve `404`.
+        Código ICAO del aeropuerto, en mayúsculas. Hoy se atiende solo `SACO`.
+        Un código con formato válido que no sea `SACO` devuelve `404`.
       schema:
         type: string
         pattern: '^[A-Z]{4}$'
@@ -306,7 +308,7 @@ components:
                 code: INVALID_API_KEY
 
     AirportNotSupported:
-      description: El código es válido pero el aeropuerto no está en la lista atendida. **No reintentar.**
+      description: El código es válido pero el aeropuerto no está atendido. **No reintentar.**
       content:
         application/problem+json:
           schema:
@@ -315,7 +317,7 @@ components:
             type: /problems/airport-not-supported
             title: Aeropuerto no atendido
             status: 404
-            detail: SAWH no está entre los aeropuertos atendidos.
+            detail: SAWH no es un aeropuerto atendido. Hoy solo se atiende SACO.
             instance: /v1/airports/SAWH/conditions
             code: AIRPORT_NOT_SUPPORTED
 
