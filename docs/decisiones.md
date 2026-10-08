@@ -114,6 +114,19 @@ Con Usuarios, los microservicios pasan de tres a **cuatro**, más el API gateway
 | Formato de los ADR | **A** | Formato simple: título, fecha, estado, contexto, alternativas evaluadas, decisión, consecuencias aceptadas y a cuál reemplaza. |
 | Cómo se mergea | **A** | Con commit de merge, conservando los commits de la rama. |
 
+## Reparto de la Entrega 1
+
+Decidido el 8/10/2026. La Entrega 1 vence el viernes 9/10. Cada paquete se trabaja en una rama propia y entra por pull request.
+
+| Paquete | Quién | Qué produce | Decisiones de las que sale | Lo revisa |
+|---|---|---|---|---|
+| **Alcance** | Maxi | Documento de alcance (roles, funcionalidades, reglas de negocio, estados, criterios de aceptación) y `README.md` | 1 y 2.1 a 2.7 | Male |
+| **Arquitectura** | Carola | `docs/ARCHITECTURE.md`, diagramas de contexto y de contenedores, ADR D1 | 3.1 a 3.3 | Salvador |
+| **Clima hacia afuera** | Male | Contrato OpenAPI, su documentación con ejemplos y errores, el mock, ADR D8 | 6.1 a 6.6 | Maxi |
+| **Datos, comunicación y esqueleto** | Salvador | ADR D3, ADR D5 y las carpetas iniciales de los cuatro servicios | 4.1 a 4.4, 5.1, 5.2 y 7 | Carola |
+
+Los pares de revisión son una sugerencia; el equipo todavía no los confirmó.
+
 ## Lo que estas decisiones dejan abierto
 
 Elecciones que aparecen por lo que se decidió y que todavía nadie tomó:
