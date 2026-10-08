@@ -127,6 +127,8 @@ Decidido el 8/10/2026. La Entrega 1 vence el viernes 9/10. Cada paquete se traba
 
 Los pares de revisión son una sugerencia; el equipo todavía no los confirmó.
 
+El detalle de qué tiene que hacer cada uno está en [entrega-1.md](entrega-1.md).
+
 ## Lo que estas decisiones dejan abierto
 
 Elecciones que aparecen por lo que se decidió y que todavía nadie tomó:
