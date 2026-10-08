@@ -28,6 +28,13 @@ Si una tarea ya decidida abre una elección nueva que no estaba contemplada, tam
 
 Lo que el agente dijo o propuso en una conversación no es una decisión hasta que el equipo la confirma. Solo vale como decidido lo que está registrado en el repo.
 
+## Si te preguntan "¿qué tengo que hacer?"
+
+1. Identificá quién es la persona: mirá `git config user.name` o su usuario de GitHub. Si no queda claro, preguntale el nombre.
+2. Abrí [docs/entrega-1.md](docs/entrega-1.md), buscá su paquete en la tabla y contale lo que dice su sección: qué produce, de qué decisiones sale, qué falta decidir y quién lo revisa.
+3. Decile también lo que vale para todos: rama propia, pull request y no tocar los archivos de otro paquete.
+4. No arranques a escribir nada hasta que te lo pida. Si su paquete tiene cosas sin decidir, avisale que hay que llevarlas al grupo.
+
 ## Versionado
 
 Las reglas de ramas, commits y pull requests están en [docs/reglas-de-versionado.md](docs/reglas-de-versionado.md). El agente trabaja en una rama propia, no sube a `main` y no mergea por su cuenta.
@@ -35,6 +42,7 @@ Las reglas de ramas, commits y pull requests están en [docs/reglas-de-versionad
 ## Contexto
 
 - Lo que el equipo ya decidió está en [docs/decisiones.md](docs/decisiones.md). Antes de proponer algo, verificar que no esté decidido ahí.
+- El trabajo de cada integrante para la entrega en curso está en [docs/entrega-1.md](docs/entrega-1.md).
 - El enunciado analizado está en [docs/enunciado-tp-integrador.md](docs/enunciado-tp-integrador.md).
 - Lo que se vio en la materia está en [docs/contenido-de-la-materia.md](docs/contenido-de-la-materia.md).
 - Las notas de la clase del 2/10 están en [docs/requisitos-del-profe.md](docs/requisitos-del-profe.md).
