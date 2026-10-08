@@ -1,0 +1,97 @@
+# Arranque local del sistema: los cuatro servicios y sus dependencias.
+# Uso: copiar .env.example como .env y correr `docker compose up --build`.
+
+services:
+  vuelos:
+    build: ./services/vuelos
+    environment:
+      PORT: "8080"
+    ports:
+      - "8081:8080"
+    depends_on:
+      - mysql-vuelos
+      - rabbitmq
+      - solr
+
+  pistas:
+    build: ./services/pistas
+    environment:
+      PORT: "8080"
+    ports:
+      - "8082:8080"
+    depends_on:
+      - mysql-pistas
+      - rabbitmq
+
+  clima:
+    build: ./services/clima
+    environment:
+      PORT: "8080"
+    ports:
+      - "8083:8080"
+    depends_on:
+      - mongo-clima
+      - rabbitmq
+
+  usuarios:
+    build: ./services/usuarios
+    environment:
+      PORT: "8080"
+    ports:
+      - "8084:8080"
+    depends_on:
+      - mysql-usuarios
+
+  mysql-vuelos:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: vuelos
+      MYSQL_ROOT_PASSWORD: ${MYSQL_VUELOS_ROOT_PASSWORD:?falta en .env}
+    volumes:
+      - mysql-vuelos-data:/var/lib/mysql
+
+  mysql-pistas:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: pistas
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PISTAS_ROOT_PASSWORD:?falta en .env}
+    volumes:
+      - mysql-pistas-data:/var/lib/mysql
+
+  mysql-usuarios:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: usuarios
+      MYSQL_ROOT_PASSWORD: ${MYSQL_USUARIOS_ROOT_PASSWORD:?falta en .env}
+    volumes:
+      - mysql-usuarios-data:/var/lib/mysql
+
+  mongo-clima:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_CLIMA_USER:?falta en .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_CLIMA_PASSWORD:?falta en .env}
+    volumes:
+      - mongo-clima-data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?falta en .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?falta en .env}
+    ports:
+      - "15672:15672"
+
+  solr:
+    image: solr:9
+    ports:
+      - "8983:8983"
+    volumes:
+      - solr-data:/var/solr
+
+volumes:
+  mysql-vuelos-data:
+  mysql-pistas-data:
+  mysql-usuarios-data:
+  mongo-clima-data:
+  solr-data:
