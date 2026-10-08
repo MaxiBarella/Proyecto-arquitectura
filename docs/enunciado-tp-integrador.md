@@ -25,7 +25,7 @@ Reglas del enunciado:
 
 Estado del grupo (7/10/2026): el dominio es **aeropuertos** y el recorte elegido es **arribos y despegues, con gestión de vuelos, asignación de pista y clima**. El clima es la capacidad que se publica para los otros grupos; el profe ya había sugerido este recorte. Queda excluido todo lo relacionado con ventas.
 
-Decidido el 7/10/2026: son **tres microservicios, Clima, Vuelos y Pistas**, más el API gateway. Las responsabilidades de cada uno, la propiedad de los datos y el flujo entre ellos todavía no están decididos; cuando se cierren van al ADR de D1.
+Las decisiones del equipo sobre usuarios, reglas de negocio, servicios, comunicación, datos, contrato y tecnologías están en [decisiones.md](decisiones.md).
 
 ### Qué tiene que permitir el recorte que elijamos
 

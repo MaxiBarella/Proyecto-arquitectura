@@ -34,6 +34,8 @@ Las reglas de ramas, commits y pull requests están en [docs/reglas-de-versionad
 
 ## Contexto
 
+- Lo que el equipo ya decidió está en [docs/decisiones.md](docs/decisiones.md). Antes de proponer algo, verificar que no esté decidido ahí.
 - El enunciado analizado está en [docs/enunciado-tp-integrador.md](docs/enunciado-tp-integrador.md).
+- Lo que se vio en la materia está en [docs/contenido-de-la-materia.md](docs/contenido-de-la-materia.md).
 - Las notas de la clase del 2/10 están en [docs/requisitos-del-profe.md](docs/requisitos-del-profe.md).
 - La defensa final es individual: cada integrante tiene que poder explicar y justificar cada decisión. Por eso las explicaciones tienen que alcanzar para que el equipo entienda lo que elige.
