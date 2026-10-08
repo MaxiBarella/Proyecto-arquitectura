@@ -19,11 +19,10 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 2. **Trabajá en una rama propia** y abrí un pull request hacia `main`, como dice [reglas-de-versionado.md](reglas-de-versionado.md).
 3. **No toques los archivos de otro paquete.** Cada uno tiene los suyos, justamente para no pisarse.
 4. **Si aparece algo sin decidir, frená y llevalo al grupo.** Más abajo está la lista de lo que ya se sabe que falta.
-5. **Formato de los ADR** (decidido): título, fecha, estado, contexto, alternativas evaluadas, decisión, consecuencias aceptadas y a qué ADR reemplaza. Cada ADR es un archivo en `docs/adr/`.
+5. **Los ADR se escriben con la plantilla.** Copiá [adr/PLANTILLA.md](adr/PLANTILLA.md) como `ADR-XXX.md` dentro de `docs/adr/`, sin cambiar los títulos ni el orden de las secciones. El número que te toca y las reglas están en [adr/README.md](adr/README.md): `ADR-001` para D1, `ADR-003` para D3, `ADR-005` para D5 y `ADR-008` para D8.
 
-### Dos cosas a acordar entre los cuatro antes de crear archivos
+### Una cosa a acordar entre los cuatro antes de crear archivos
 
-- **Cómo se numeran los ADR.** Tres personas van a crear ADR al mismo tiempo, así que hay que evitar que dos usen el mismo número. Propuesta: usar el número de la decisión del enunciado (`ADR-001` para D1, `ADR-003` para D3, `ADR-005` para D5, `ADR-008` para D8). Está registrada en [decisiones.md](decisiones.md#forma-de-trabajo) y se confirma en el pull request de Clima.
 - **Con qué se hacen los diagramas.** Tienen que poder verse desde el repo.
 
 ---
@@ -44,9 +43,11 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 
 **De dónde sale.** Decisiones 1 y 2.1 a 2.7.
 
+**Dónde va.** El alcance es el `SPEC.md` de la raíz (decidido el 8/10).
+
 **Qué falta decidir**
 
-- Dónde vive el documento de alcance: un `SPEC.md` o los artefactos de BMAD en `_bmad-output/`. El enunciado acepta las dos formas.
+- Los catorce puntos de la sección "Pendiente de definir" del `SPEC.md`.
 
 **Ojo con**
 

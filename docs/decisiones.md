@@ -135,7 +135,8 @@ Las decisiones 6.7 a 6.19 surgieron al preparar el contrato de Clima. Las tomó 
 |---|---|---|
 | Formato de los ADR | **A** | Formato simple: título, fecha, estado, contexto, alternativas evaluadas, decisión, consecuencias aceptadas y a cuál reemplaza. |
 | Cómo se mergea | **A** | Con commit de merge, conservando los commits de la rama. |
-| Numeración de los ADR | **Por decisión del enunciado** | `ADR-001` para D1, `ADR-003` para D3, `ADR-005` para D5, `ADR-008` para D8. Así no se repiten números aunque varios escriban ADR a la vez. Propuesta por Male el 8/10/2026; el equipo la revisa en el pull request. |
+| Dónde vive el alcance | `SPEC.md` en la raíz | Un solo archivo con funcionalidades, reglas de negocio y criterios de aceptación. Es el documento que manda. Decidido el 8/10/2026. |
+| Uso de BMAD | Al empezar a programar | Para la Entrega 1 la documentación se escribe directo. Cuando arranque el desarrollo, se le pasa a BMAD todo lo producido (`SPEC.md`, decisiones, arquitectura y ADR) y su spec se genera a partir de eso. Si algo cambia, se cambia primero el documento original y se vuelve a generar el de BMAD; nunca al revés. Propuesto por Maxi el 8/10/2026; falta que lo confirme el resto del equipo. |
 
 ## Reparto de la Entrega 1
 
