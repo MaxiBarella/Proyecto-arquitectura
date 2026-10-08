@@ -113,6 +113,8 @@ Con Usuarios, los microservicios pasan de tres a **cuatro**, más el API gateway
 |---|---|---|
 | Formato de los ADR | **A** | Formato simple: título, fecha, estado, contexto, alternativas evaluadas, decisión, consecuencias aceptadas y a cuál reemplaza. |
 | Cómo se mergea | **A** | Con commit de merge, conservando los commits de la rama. |
+| Dónde vive el alcance | `SPEC.md` en la raíz | Un solo archivo con funcionalidades, reglas de negocio y criterios de aceptación. Es el documento que manda. Decidido el 8/10/2026. |
+| Uso de BMAD | Al empezar a programar | Para la Entrega 1 la documentación se escribe directo. Cuando arranque el desarrollo, se le pasa a BMAD todo lo producido (`SPEC.md`, decisiones, arquitectura y ADR) y su spec se genera a partir de eso. Si algo cambia, se cambia primero el documento original y se vuelve a generar el de BMAD; nunca al revés. Propuesto por Maxi el 8/10/2026; falta que lo confirme el resto del equipo. |
 
 ## Reparto de la Entrega 1
 

@@ -44,9 +44,11 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 
 **De dónde sale.** Decisiones 1 y 2.1 a 2.7.
 
+**Dónde va.** El alcance es el `SPEC.md` de la raíz (decidido el 8/10).
+
 **Qué falta decidir**
 
-- Dónde vive el documento de alcance: un `SPEC.md` o los artefactos de BMAD en `_bmad-output/`. El enunciado acepta las dos formas.
+- Los catorce puntos de la sección "Pendiente de definir" del `SPEC.md`.
 
 **Ojo con**
 
