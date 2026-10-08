@@ -50,7 +50,25 @@ El detalle, con los diagramas, va en `docs/ARCHITECTURE.md` (en preparación).
 
 ## Cómo ejecutarlo localmente
 
-Todavía no hay sistema para ejecutar. Esta sección va a describir el procedimiento único y automatizado que levanta todos los servicios y sus dependencias.
+Hace falta tener Docker instalado y en marcha.
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+El primer comando crea el archivo de configuración local a partir del ejemplo; conviene cambiar las contraseñas. El segundo levanta los cuatro servicios y sus dependencias: tres MySQL, MongoDB, RabbitMQ y Solr.
+
+Por ahora los servicios son la estructura inicial: arrancan y responden `GET /health`, sin lógica.
+
+| Servicio | Dirección local |
+|---|---|
+| Vuelos | <http://localhost:8081/health> |
+| Pistas | <http://localhost:8082/health> |
+| Clima | <http://localhost:8083/health> |
+| Usuarios | <http://localhost:8084/health> |
+
+El código de cada servicio está en [services/](services/).
 
 ## Cómo acceder a lo desplegado
 
