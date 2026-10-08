@@ -12,7 +12,7 @@ Cuando el trabajo llega a un punto donde hay que elegir:
 2. **Presentar las opciones posibles**, con qué implica cada una, sus ventajas y sus costos, y cómo se relaciona con el enunciado.
 3. Se puede **dar una recomendación**, marcada como tal. La elección es del equipo.
 4. **Esperar la respuesta.** No seguir como si la opción recomendada ya estuviera elegida.
-5. Una vez decidido, **registrarlo** donde corresponda (ADR en `docs/adr/`, documentación de alcance o arquitectura).
+5. Una vez decidido, **registrarlo** donde corresponda (ADR en `docs/adr/`, documentación de alcance o arquitectura). Los ADR se escriben copiando [docs/adr/PLANTILLA.md](docs/adr/PLANTILLA.md), sin cambiar sus secciones, y con el número que indica [docs/adr/README.md](docs/adr/README.md).
 
 Cuenta como decisión, entre otras cosas:
 

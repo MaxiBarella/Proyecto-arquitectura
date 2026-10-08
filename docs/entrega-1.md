@@ -19,11 +19,10 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 2. **Trabajá en una rama propia** y abrí un pull request hacia `main`, como dice [reglas-de-versionado.md](reglas-de-versionado.md).
 3. **No toques los archivos de otro paquete.** Cada uno tiene los suyos, justamente para no pisarse.
 4. **Si aparece algo sin decidir, frená y llevalo al grupo.** Más abajo está la lista de lo que ya se sabe que falta.
-5. **Formato de los ADR** (decidido): título, fecha, estado, contexto, alternativas evaluadas, decisión, consecuencias aceptadas y a qué ADR reemplaza. Cada ADR es un archivo en `docs/adr/`.
+5. **Los ADR se escriben con la plantilla.** Copiá [adr/PLANTILLA.md](adr/PLANTILLA.md) como `ADR-XXX.md` dentro de `docs/adr/`, sin cambiar los títulos ni el orden de las secciones. El número que te toca y las reglas están en [adr/README.md](adr/README.md): `ADR-001` para D1, `ADR-003` para D3, `ADR-005` para D5 y `ADR-008` para D8.
 
-### Dos cosas a acordar entre los cuatro antes de crear archivos
+### Una cosa a acordar entre los cuatro antes de crear archivos
 
-- **Cómo se numeran los ADR.** Tres personas van a crear ADR al mismo tiempo, así que hay que evitar que dos usen el mismo número. Propuesta sin confirmar: usar el número de la decisión del enunciado (`ADR-001` para D1, `ADR-003` para D3, `ADR-005` para D5, `ADR-008` para D8).
 - **Con qué se hacen los diagramas.** Tienen que poder verse desde el repo.
 
 ---
