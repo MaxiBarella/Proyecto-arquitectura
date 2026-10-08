@@ -23,7 +23,7 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 
 ### Dos cosas a acordar entre los cuatro antes de crear archivos
 
-- **Cómo se numeran los ADR.** Tres personas van a crear ADR al mismo tiempo, así que hay que evitar que dos usen el mismo número. Propuesta sin confirmar: usar el número de la decisión del enunciado (`ADR-001` para D1, `ADR-003` para D3, `ADR-005` para D5, `ADR-008` para D8).
+- **Cómo se numeran los ADR.** Tres personas van a crear ADR al mismo tiempo, así que hay que evitar que dos usen el mismo número. Propuesta: usar el número de la decisión del enunciado (`ADR-001` para D1, `ADR-003` para D3, `ADR-005` para D5, `ADR-008` para D8). Está registrada en [decisiones.md](decisiones.md#forma-de-trabajo) y se confirma en el pull request de Clima.
 - **Con qué se hacen los diagramas.** Tienen que poder verse desde el repo.
 
 ---
