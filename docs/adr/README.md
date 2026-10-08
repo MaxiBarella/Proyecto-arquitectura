@@ -27,9 +27,9 @@ No se inventan decisiones al escribir un ADR. Si falta algo por decidir, se llev
 |---|---|---|---|---|---|---|
 | ADR-001 | D1. Límites de los servicios | Criterios para separar responsabilidades, relaciones entre servicios y propiedad de los datos. | 3.1 a 3.3 | Carola | Entrega 1 | Sin escribir |
 | ADR-002 | D2. Arquitectura interna de los servicios | Estilos o patrones elegidos, dependencias internas y por qué cada uno se adecua a su servicio. | 7.3 | A asignar | Entrega 2 | Sin escribir |
-| ADR-003 | D3. Persistencia | Almacenamiento de cada servicio, patrones de acceso que soporta y limitaciones aceptadas. | 5.1, 5.2, 7.2 | Salvador | Entrega 1, versión inicial | Sin escribir |
+| [ADR-003](ADR-003.md) | D3. Persistencia | Almacenamiento de cada servicio, patrones de acceso que soporta y limitaciones aceptadas. | 5.1, 5.2, 7.2 | Salvador | Entrega 1, versión inicial | Versión inicial |
 | ADR-004 | D4. Consistencia y concurrencia | Operaciones con garantías especiales, y tratamiento de concurrencia, duplicación, pérdida y fallas parciales. | 2.3, 2.7, 4.4 | A asignar | Sin entrega asignada | Sin escribir |
-| ADR-005 | D5. Comunicación entre servicios | Interacciones síncronas y asíncronas, timeouts, reintentos, eventos e idempotencia. | 4.1 a 4.4 | Salvador | Entrega 1, versión inicial | Sin escribir |
+| [ADR-005](ADR-005.md) | D5. Comunicación entre servicios | Interacciones síncronas y asíncronas, timeouts, reintentos, eventos e idempotencia. | 4.1 a 4.4 | Salvador | Entrega 1, versión inicial | Versión inicial |
 | ADR-006 | D6. Búsqueda | Qué se indexa, criterios de consulta, actualización o reconstrucción del índice y retraso aceptable. | 3.2 | A asignar | Entrega 2 | Sin escribir |
 | ADR-007 | D7. Caché | Qué se guarda, invalidación, vigencia, comportamiento ante fallas y criterios de medición. | Sin decidir | A asignar | Entrega 2 | Sin escribir |
 | ADR-008 | D8. Contrato propio | Diseño, publicación, compatibilidad y estrategia de versionado de la capacidad que se ofrece. | 6.1 a 6.6 | Male | Entrega 1 | Sin escribir |
