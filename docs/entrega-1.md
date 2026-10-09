@@ -41,18 +41,19 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
   - criterios de aceptación para cada regla.
 - `README.md`: dominio, objetivo, flujo principal, cómo ejecutar el sistema y dónde está el resto de la documentación.
 
-**De dónde sale.** Decisiones 1 y 2.1 a 2.7.
+**De dónde sale.** Decisiones 1 y 2.1 a 2.9.
 
 **Dónde va.** El alcance es el `SPEC.md` de la raíz (decidido el 8/10).
 
+**Estado.** Mergeado. El `SPEC.md` va por la versión 0.2, que incorpora las decisiones 2.8, 2.9, 6.7, 6.18 y 6.19.
+
 **Qué falta decidir**
 
-- Los catorce puntos de la sección "Pendiente de definir" del `SPEC.md`.
+- Los puntos abiertos de la sección "Pendiente de definir" del `SPEC.md`.
 
 **Ojo con**
 
 - La prioridad de los arribos (2.7) es la regla más delicada: describí con un ejemplo qué pasa cuando un arribo pide un slot que tiene un despegue.
-- El README de hoy describe la instalación de BMAD, no el proyecto. Hay que reescribirlo sin perder la sección de forma de trabajo.
 
 ---
 
@@ -72,11 +73,12 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 **Qué falta decidir**
 
 - Con qué se hace el API gateway: está pendiente de una consulta al profe. En el diagrama alcanza con una caja "API gateway".
-- Qué base usa el servicio Usuarios.
+
+La base del servicio Usuarios ya está decidida: MySQL, con instancia propia (5.3).
 
 **Ojo con**
 
-- Los diagramas y el ADR D1 tienen que decir lo mismo que los ADR de Salvador (bases y comunicación). Por eso se propone que se revisen entre ustedes.
+- Los diagramas y el ADR D1 tienen que decir lo mismo que el [ADR-003](adr/ADR-003.md) y el [ADR-005](adr/ADR-005.md) de Salvador (bases y comunicación), que ya están mergeados. El ADR-003 cita al ADR-001.
 - Todavía no se sabe qué capacidad nos toca consumir de otro grupo: en el diagrama de contexto va como "proveedor externo, a asignar".
 
 ---
@@ -92,7 +94,9 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 - **El mock**, generado a partir del archivo del contrato.
 - **ADR D8, contrato propio:** diseño, publicación, compatibilidad y estrategia de versionado.
 
-**De dónde sale.** Decisiones 6.1 a 6.6:
+**Estado.** Mergeado: contrato, guía, mock y ADR-008. Al prepararlo se tomaron las decisiones 6.7 a 6.19, que están en [decisiones.md](decisiones.md).
+
+**De dónde sale.** Decisiones 6.1 a 6.19. Las iniciales:
 
 - ofrece condiciones actuales por aeropuerto y aptitud operativa (6.1);
 - datos reales, con posibilidad de forzar una condición (6.2);
@@ -103,11 +107,8 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 
 **Qué falta decidir**
 
-- Si la aptitud es una sola o separada para aterrizar y para despegar. Cambia la forma de la respuesta.
-- Si la fuente real es Open-Meteo, la del práctico de la clase 7. Define qué datos se pueden devolver.
-- Los umbrales de aptitud: con qué viento o visibilidad se considera que no se puede operar.
-- Si el mock se publica en internet para el viernes, y en qué hosting.
-- Con qué herramienta se genera el mock.
+- Si el mock se publica en internet, y en qué hosting (6.17).
+- Si el límite de pedidos se implementa en Clima o en el gateway (6.15, 7.4).
 
 **Ojo con**
 
@@ -127,7 +128,9 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 - **ADR D5, comunicación (versión inicial):** qué va por llamada directa y qué por eventos, con timeouts, reintentos, eventos e idempotencia.
 - **La estructura inicial** de los cuatro servicios y sus dependencias, sin lógica.
 
-**De dónde sale.** Decisiones 4.1 a 4.4, 5.1, 5.2 y 7:
+**Estado.** Mergeado: ADR-003, ADR-005, las carpetas de los cuatro servicios y el `docker-compose.yml`. Al prepararlo se tomaron las decisiones 4.5 a 4.9, 5.3 a 5.5 y 7.5 a 7.7, que están en [decisiones.md](decisiones.md).
+
+**De dónde sale.** Decisiones 4.1 a 4.9, 5.1 a 5.5 y 7. Las iniciales:
 
 - Vuelos y Pistas en MySQL, Clima en MongoDB, una instancia por servicio (5.1, 5.2);
 - asignación de slot en dos pasos, llamada más evento (4.1);
@@ -139,9 +142,7 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 
 **Qué falta decidir**
 
-- Qué base usa el servicio Usuarios y con qué patrón se organiza.
-- La estructura de carpetas: cómo se llama cada carpeta y cómo se ordena por dentro cada servicio según su patrón.
-- Los valores concretos de timeouts y reintentos. En esta versión inicial pueden quedar como "a definir".
+- Cómo valida el gateway los tokens contra Usuarios (7.4).
 - La caché (Redis o Memcached) no entra en esta entrega.
 
 **Ojo con**
@@ -154,14 +155,15 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 
 ## Cuándo está terminada la entrega
 
-- [ ] `README.md`, primera versión
-- [ ] Documento de alcance, primera versión
+- [x] `README.md`, primera versión
+- [x] Documento de alcance, primera versión
 - [ ] `docs/ARCHITECTURE.md`, primera versión
 - [ ] Diagrama de contexto
 - [ ] Diagrama de contenedores
 - [ ] Límites de los servicios, responsabilidades y propiedad de los datos
-- [ ] Capacidad propia documentada, con contrato y mock
-- [ ] Estructura inicial de los servicios y sus dependencias
-- [ ] ADR D1 y D8
-- [ ] ADR D3 y D5, versión inicial
+- [x] Capacidad propia documentada, con contrato y mock
+- [x] Estructura inicial de los servicios y sus dependencias
+- [ ] ADR D1
+- [x] ADR D8
+- [x] ADR D3 y D5, versión inicial
 - [ ] Todo mergeado en `main` y el tag `entrega-1`

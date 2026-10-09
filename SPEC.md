@@ -2,13 +2,13 @@
 
 Alcance, reglas de negocio y criterios de aceptación del sistema.
 
-- **Versión:** 0.1, primera versión para la Entrega 1 (9/10/2026).
-- **De dónde sale:** de las decisiones del equipo registradas en [docs/decisiones.md](docs/decisiones.md), puntos 1 y 2.1 a 2.7. Este documento las desarrolla; no agrega decisiones nuevas.
+- **Versión:** 0.2, para la Entrega 1 (9/10/2026).
+- **De dónde sale:** de las decisiones del equipo registradas en [docs/decisiones.md](docs/decisiones.md), puntos 1, 2.1 a 2.9, 6.7, 6.18 y 6.19. Este documento las desarrolla; no agrega decisiones nuevas.
 - **Qué no cubre:** cómo se construye. Los servicios, las bases de datos y la comunicación están en `docs/ARCHITECTURE.md` y en los ADR de `docs/adr/`.
 
 ## 1. Propósito
 
-El sistema administra el uso de las pistas de **un aeropuerto**. Las aerolíneas publican sus vuelos y piden, para cada uno, un turno de pista; el aeropuerto administra las pistas; cualquier persona puede consultar el tablero de arribos y partidas.
+El sistema administra el uso de las pistas de **un aeropuerto**, el de Córdoba. Las aerolíneas publican sus vuelos y piden, para cada uno, un turno de pista; el aeropuerto administra las pistas; cualquier persona puede consultar el tablero de arribos y partidas.
 
 La pista es un recurso escaso: en un mismo momento, una pista admite un solo avión. El problema central del sistema es **asignar ese recurso sin que dos vuelos queden con el mismo turno**, incluso cuando varios lo piden a la vez, y resolver qué pasa cuando el clima obliga a cerrar una pista.
 
@@ -25,7 +25,8 @@ No es un sistema de altas, bajas y consultas: la acción principal, pedir un slo
 | **Pista** | Recurso físico donde se aterriza y se despega. Puede estar abierta o cerrada. |
 | **Bloque** | Cada una de las partes iguales en que se divide el día de una pista. |
 | **Slot** | El derecho de un vuelo a usar una pista durante un bloque. Sirve igual para aterrizar que para despegar. |
-| **Aptitud operativa** | Lo que informa el servicio de clima: si las condiciones permiten operar o no. |
+| **Aptitud operativa** | Lo que informa el servicio de clima: si las condiciones permiten operar o no. Es una sola para todo el aeropuerto, y vale igual para aterrizar que para despegar. |
+| **Aeropuerto alternativo** | Aeropuerto cercano al que va un arribo desviado. |
 | **Tablero** | La vista pública de arribos y partidas. |
 
 ## 3. Roles
@@ -33,7 +34,7 @@ No es un sistema de altas, bajas y consultas: la acción principal, pedir un slo
 | Rol | Inicia sesión | Qué hace |
 |---|---|---|
 | **Aerolínea** | Sí | Publica sus arribos y despegues, y pide un slot para cada uno. |
-| **Operador del aeropuerto** | Sí | Administra las pistas: las da de alta, las cierra y las reabre. |
+| **Operador del aeropuerto** | Sí | Administra las pistas: las da de alta, las cierra y las reabre. Indica qué aeropuertos alternativos están disponibles. |
 | **Visitante** | No | Consulta el tablero de arribos y partidas. Es el caso del pasajero. |
 
 No existe una cuenta de pasajero: quien quiere saber de un vuelo lo busca en el tablero.
@@ -60,7 +61,9 @@ No existe una cuenta de pasajero: quien quiere saber de un vuelo lo busca en el 
 | F-09 | Dar de alta una pista. |
 | F-10 | Cerrar una pista a mano. |
 | F-11 | Reabrir una pista. |
-| F-12 | Forzar una condición climática, para probar y demostrar el cierre de pistas. |
+| F-12 | Forzar una condición climática, para probar y demostrar el cierre de pistas. Afecta solo a nuestro sistema: no cambia lo que se publica a otros grupos. |
+| F-20 | Marcar un aeropuerto alternativo como no disponible, y volver a habilitarlo. |
+| F-21 | Ver un aviso cuando el servicio de clima no puede obtener los datos. |
 
 ### Visitante
 
@@ -74,7 +77,7 @@ No existe una cuenta de pasajero: quien quiere saber de un vuelo lo busca en el 
 | ID | Funcionalidad |
 |---|---|
 | F-15 | Cerrar una pista cuando el clima deja de permitir la operación, y reabrirla cuando vuelve a permitirla. |
-| F-16 | Demorar los despegues y desviar los arribos afectados por el cierre de una pista. |
+| F-16 | Demorar los despegues y desviar los arribos afectados por el cierre de una pista, indicando a qué aeropuerto alternativo va cada arribo. |
 | F-17 | Mantener el tablero al día con cada cambio de estado de un vuelo. |
 
 ### Hacia otros grupos
@@ -90,7 +93,7 @@ No existe una cuenta de pasajero: quien quiere saber de un vuelo lo busca en el 
 
 | ID | Regla |
 |---|---|
-| RN-01 | El sistema administra las pistas de un solo aeropuerto. |
+| RN-01 | El sistema administra las pistas de un solo aeropuerto: el de Córdoba, código ICAO `SACO`. |
 | RN-02 | Las pistas se cargan como datos; el sistema arranca con dos. |
 | RN-03 | El día de cada pista se divide en bloques fijos, todos de la misma duración. |
 | RN-04 | Un slot es una pista más un bloque. **Un slot admite un solo vuelo.** |
@@ -119,11 +122,19 @@ No existe una cuenta de pasajero: quien quiere saber de un vuelo lo busca en el 
 
 | ID | Regla |
 |---|---|
-| RN-15 | Una pista se cierra sola cuando el clima informa que no se puede operar. |
+| RN-15 | Cuando el clima informa que no se puede operar, se cierran solas todas las pistas, para arribos y para despegues. La aptitud es una sola para todo el aeropuerto. |
 | RN-16 | El operador también puede cerrar una pista a mano, por cualquier motivo. |
 | RN-17 | Cuando se cierra una pista, los **despegues** afectados pierden su slot y pasan a demorado. |
-| RN-18 | Cuando se cierra una pista, los **arribos** afectados pasan a desviado: aterrizan en otro aeropuerto y dejan de ser una operación del nuestro. |
+| RN-18 | Cuando se cierra una pista, los **arribos** afectados pasan a desviado: aterrizan en un aeropuerto alternativo (RN-25) y dejan de ser una operación del nuestro. |
 | RN-19 | Un vuelo demorado vuelve a quedar programado cuando la aerolínea le consigue un slot nuevo, con las mismas reglas de asignación. |
+| RN-24 | Si el servicio de clima no puede obtener los datos, las pistas no se cierran ni se reabren solas: el operador ve un aviso y decide a mano. |
+
+### Desvíos
+
+| ID | Regla |
+|---|---|
+| RN-25 | Hay una lista de aeropuertos alternativos ordenada por distancia. Un arribo desviado va al primero de la lista que esté disponible. |
+| RN-26 | El operador puede marcar un aeropuerto alternativo como no disponible, y entonces se saltea. El sistema no consulta el estado de los otros aeropuertos. |
 
 ### Vuelos
 
@@ -142,7 +153,7 @@ No existe una cuenta de pasajero: quien quiere saber de un vuelo lo busca en el 
 | **Programado** | Tiene un slot asignado. | No |
 | **Demorado** | Tenía slot y lo perdió. Espera uno nuevo. | No |
 | **Finalizado** | La operación ocurrió. En el tablero se muestra como "Despegó" o "Aterrizó". | Sí |
-| **Desviado** | El arribo no pudo aterrizar acá y fue a otro aeropuerto. | Sí |
+| **Desviado** | El arribo no pudo aterrizar acá y fue a un aeropuerto alternativo. | Sí |
 | **Cancelado** | El vuelo no se va a realizar. | Sí |
 
 ### Transiciones válidas
@@ -193,11 +204,14 @@ Cada criterio indica la regla que comprueba.
 
 | ID | Regla | Criterio |
 |---|---|---|
-| CA-10 | RN-15 | Dada una pista abierta, cuando el clima pasa a no permitir la operación, entonces la pista queda cerrada sin que intervenga el operador. |
+| CA-10 | RN-15 | Dadas las pistas abiertas, cuando el clima pasa a no permitir la operación, entonces todas quedan cerradas sin que intervenga el operador. |
 | CA-11 | RN-16 | Dada una pista abierta, cuando el operador la cierra a mano, entonces la pista queda cerrada aunque el clima permita operar. |
 | CA-12 | RN-17 | Dada una pista con un despegue programado, cuando la pista se cierra, entonces el despegue pasa a "Demorado" y su slot queda libre. |
 | CA-13 | RN-18 | Dada una pista con un arribo programado, cuando la pista se cierra, entonces el arribo pasa a "Desviado". |
 | CA-14 | RN-19 | Dado un despegue demorado, cuando la aerolínea le pide un slot libre, entonces vuelve a "Programado". |
+| CA-20 | RN-24 | Dado que el servicio de clima no puede obtener los datos, entonces ninguna pista cambia de estado sola, el operador ve un aviso y puede cerrar o reabrir pistas a mano. |
+| CA-21 | RN-25 | Dado un arribo que pasa a "Desviado" con todos los alternativos disponibles, entonces se le asigna el más cercano de la lista. |
+| CA-22 | RN-26 | Dado que el operador marcó como no disponible el alternativo más cercano, cuando un arribo pasa a "Desviado", entonces se le asigna el siguiente de la lista. |
 
 ### Estados y roles
 
@@ -213,7 +227,7 @@ Cada criterio indica la regla que comprueba.
 
 - **Ventas:** pasajes, reservas, pagos y cualquier cosa relacionada.
 - **Pasajeros con cuenta:** no hay registro ni inicio de sesión de pasajeros, ni avisos personalizados.
-- **Más de un aeropuerto:** no se coordinan slots con el aeropuerto del otro extremo del vuelo.
+- **Más de un aeropuerto:** no se coordinan slots con el aeropuerto del otro extremo del vuelo, ni se consulta el estado ni el clima de los aeropuertos alternativos.
 - **Reasignación automática:** el sistema no le busca un slot nuevo a un vuelo demorado; lo pide la aerolínea.
 - **Operación del día del vuelo:** embarque, puertas, rodaje, equipaje y control de tráfico aéreo.
 - **Slots de duración variable** según el tipo de avión o de operación.
@@ -236,8 +250,11 @@ Puntos que las decisiones tomadas no resuelven. Cada uno necesita una decisión 
 | 10 | Cómo se crean las cuentas de aerolínea y de operador. | F-01, F-08 |
 | 11 | Qué filtros y qué orden ofrece la búsqueda del tablero. El enunciado exige paginación, filtros y al menos un orden. | F-14 |
 | 12 | Qué datos exactos lleva un vuelo además de tipo, aerolínea, origen, destino, horario y estado. | F-02 |
-| 13 | Si la aptitud operativa es una sola o distingue aterrizaje de despegue. | RN-15, F-18 |
+| 13 | **Resuelto en la versión 0.2:** la aptitud operativa es una sola (decisión 6.7). | RN-15, F-18 |
 | 14 | Qué capacidad del grupo proveedor se consume y en qué flujo entra. Depende de la asignación de la cátedra. | F-19 |
+| 15 | Qué aeropuertos forman la lista de alternativos y qué servicio la guarda. | RN-25, F-20 |
+| 16 | Qué pasa con un arribo desviado si ningún alternativo está disponible. | RN-25, RN-26 |
+| 17 | Cómo se entera el sistema de que el servicio de clima no tiene datos, y qué pasa con una condición forzada mientras dura. | RN-24, F-12, F-21 |
 
 ## 10. Historial de cambios
 
@@ -246,3 +263,4 @@ Cuando una regla cambia, no se borra: se agrega una fila acá que dice qué camb
 | Versión | Fecha | Cambio |
 |---|---|---|
 | 0.1 | 8/10/2026 | Primera versión, a partir de las decisiones del equipo del 7/10/2026. |
+| 0.2 | 8/10/2026 | Incorpora las decisiones que entraron con el contrato de Clima. El aeropuerto es Córdoba (2.8, RN-01). La aptitud es una sola y cierra todas las pistas (6.7, RN-15, CA-10). Los arribos desviados van al alternativo más cercano disponible (2.9, RN-18, RN-25, RN-26, F-20). Si Clima no tiene datos, decide el operador (6.19, RN-24, F-21). El clima forzado no sale hacia otros grupos (6.18, F-12). Se cierra el pendiente 13 y se abren el 15, el 16 y el 17. |
