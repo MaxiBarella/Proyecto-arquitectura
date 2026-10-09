@@ -32,7 +32,7 @@ Un sistema para administrar los arribos y despegues de un aeropuerto. Las aerol�
 | 2.8 | Nuestro aeropuerto | **Córdoba** | El sistema maneja el aeropuerto de Córdoba (`SACO`). |
 | 2.9 | Destino de un arribo desviado | **El alternativo más cercano disponible** | Hay una lista de aeropuertos cercanos ordenada por distancia. El arribo desviado va al primero que esté disponible. El operador puede marcar un aeropuerto de la lista como "no disponible" para que se saltee; el sistema no consulta el estado de los otros aeropuertos. |
 
-Las decisiones 2.8 y 2.9 las tomó Male el 8/10/2026, al preparar el contrato de Clima. El equipo las revisa en el pull request de ese paquete; la 2.9 tiene que entrar en el documento de alcance.
+Las decisiones 2.8 y 2.9 las tomó Male el 8/10/2026, al preparar el contrato de Clima. Quedaron confirmadas al mergearse el pull request #7, y están desarrolladas en el [SPEC.md](../SPEC.md).
 
 ## 3. Servicios
 
@@ -60,6 +60,13 @@ Con Usuarios, los microservicios pasan de tres a **cuatro**, más el API gateway
 | 4.2 | Cómo se entera Pistas del clima | **B** | Clima publica un evento cuando cambia la aptitud. Pistas guarda el último valor y lo usa; no consulta a Clima al asignar. |
 | 4.3 | Eventos | Lista del documento | Incluye "slot cedido a un arribo", por la decisión 2.7. Ver tabla. |
 | 4.4 | Publicar sin perder eventos | **B** | Transactional Outbox con relay por sondeo. |
+| 4.5 | Valores iniciales | Los del ADR-005 | Timeout del pedido de slot: 2 segundos. Reintentos del pedido: hasta 2, con espera creciente desde 200 ms, solo ante fallas transitorias y solo desde Vuelos. Sondeo del relay: cada 1 segundo. Reintentos de un consumidor: hasta 3; después, a la cola de mensajes fallidos. Atraso aceptado del aviso de clima en Pistas: hasta 30 segundos. Son el punto de partida; se ajustan con las pruebas de carga. |
+| 4.6 | Idempotencia del pedido de slot | **Por restricción única** | Un vuelo tiene a lo sumo un slot, y lo garantiza la base de Pistas. Repetir el pedido para el mismo vuelo y el mismo slot devuelve el resultado ya guardado. No se envía una clave de idempotencia. |
+| 4.7 | Dónde se aplica el Outbox | **En los tres servicios que publican** | Pistas y Vuelos guardan el evento en una tabla de outbox, en la misma transacción de MySQL. Clima guarda el evento pendiente dentro del documento de aptitud, en la misma escritura. |
+| 4.8 | Mensajes | **JSON, un exchange topic** | Cada mensaje lleva identificador único, tipo, versión, fecha, identificador de correlación, datos y un número de versión del dato. Se publican en un único exchange de tipo topic; cada consumidor tiene su cola durable y su cola de mensajes fallidos. |
+| 4.9 | Consumidores | **Idempotentes** | Confirman el mensaje después de guardar su efecto, y guardan el identificador del mensaje en la misma transacción para no aplicarlo dos veces. |
+
+Las decisiones 4.5 a 4.9 las tomó Salvador el 8/10/2026, al escribir el [ADR-005](adr/ADR-005.md). Quedaron confirmadas al mergearse el pull request #8.
 
 | Evento | Quién lo publica | Quién lo recibe y para qué |
 |---|---|---|
@@ -76,6 +83,11 @@ Con Usuarios, los microservicios pasan de tres a **cuatro**, más el API gateway
 |---|---|---|---|
 | 5.1 | Tipo de base por servicio | **A** | Vuelos y Pistas, relacional. Clima, no relacional. |
 | 5.2 | Cuántas bases | **A** | Instancia separada: cada servicio levanta su propio servidor de base de datos. |
+| 5.3 | Base del servicio Usuarios | **MySQL, instancia propia** | Con una restricción única sobre el nombre de usuario. Las contraseñas se guardan hasheadas. |
+| 5.4 | Acceso a las bases | **GORM y driver oficial** | Vuelos, Pistas y Usuarios acceden a MySQL con GORM. Clima usa el driver oficial de MongoDB para Go. |
+| 5.5 | Estructuras iniciales | Las del ADR-003 | Pistas: pistas, slots con restricción única sobre pista y bloque, outbox y mensajes procesados. Vuelos: vuelos, outbox y mensajes procesados. Clima: observaciones y un documento de aptitud por aeropuerto. Usuarios: usuarios. |
+
+Las decisiones 5.3 a 5.5 las tomó Salvador el 8/10/2026, al escribir el [ADR-003](adr/ADR-003.md). Quedaron confirmadas al mergearse el pull request #8.
 
 ## 6. Clima hacia afuera
 
@@ -88,7 +100,7 @@ Con Usuarios, los microservicios pasan de tres a **cuatro**, más el API gateway
 | 6.5 | Versionado | **A** | La versión va en la dirección (`/v1/...`). Los cambios compatibles no cambian la versión; los que rompen crean una nueva y la anterior se mantiene. |
 | 6.6 | Mock | **A** | Generado a partir del archivo del contrato. |
 
-Las decisiones 6.7 a 6.19 surgieron al preparar el contrato de Clima. Las tomó Male el 8/10/2026 y el equipo las revisa en el pull request de ese paquete.
+Las decisiones 6.7 a 6.19 surgieron al preparar el contrato de Clima. Las tomó Male el 8/10/2026 y quedaron confirmadas al mergearse el pull request #7.
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
@@ -114,6 +126,11 @@ Las decisiones 6.7 a 6.19 surgieron al preparar el contrato de Clima. Las tomó 
 | 7.2 | Las piezas | Las sugeridas en la tabla | Ver abajo. |
 | 7.3 | Patrones internos | **B** | Pistas, Hexagonal. Vuelos, CQRS. Clima, en capas. |
 | 7.4 | API gateway | **Pendiente** | Se le pregunta al profe. |
+| 7.5 | Patrón interno de Usuarios | **Capas** | Igual que Clima: controllers, services, repositories y models. |
+| 7.6 | Estructura de carpetas | `services/<nombre>` | Cada servicio tiene `cmd/api` como punto de entrada y su código en `internal/`, ordenado según su patrón. Un módulo de Go por servicio. |
+| 7.7 | Arranque local | **Un `docker-compose.yml` en la raíz** | Puertos locales: Vuelos 8081, Pistas 8082, Clima 8083 y Usuarios 8084. Imágenes: MySQL 8.4, MongoDB 7, RabbitMQ 3.13 y Solr 9. Las contraseñas salen de un `.env` que no se sube. |
+
+Las decisiones 7.5 a 7.7 las tomó Salvador el 8/10/2026, al armar la estructura inicial. Quedaron confirmadas al mergearse el pull request #9.
 
 | Pieza | Elegido |
 |---|---|
@@ -147,7 +164,7 @@ Decidido el 8/10/2026. La Entrega 1 vence el viernes 9/10. Cada paquete se traba
 | **Alcance** | Maxi | Documento de alcance (roles, funcionalidades, reglas de negocio, estados, criterios de aceptación) y `README.md` | 1 y 2.1 a 2.7 | Male |
 | **Arquitectura** | Carola | `docs/ARCHITECTURE.md`, diagramas de contexto y de contenedores, ADR D1 | 3.1 a 3.3 | Salvador |
 | **Clima hacia afuera** | Male | Contrato OpenAPI, su documentación con ejemplos y errores, el mock, ADR D8 | 6.1 a 6.19 | Maxi |
-| **Datos, comunicación y esqueleto** | Salvador | ADR D3, ADR D5 y las carpetas iniciales de los cuatro servicios | 4.1 a 4.4, 5.1, 5.2 y 7 | Carola |
+| **Datos, comunicación y esqueleto** | Salvador | ADR D3, ADR D5 y las carpetas iniciales de los cuatro servicios | 4.1 a 4.9, 5.1 a 5.5 y 7 | Carola |
 
 Los pares de revisión son una sugerencia; el equipo todavía no los confirmó.
 
@@ -162,16 +179,17 @@ Elecciones que aparecen por lo que se decidió y que todavía nadie tomó:
 3. **API gateway:** con qué se hace; depende de la respuesta del profe (7.4).
 4. **Clima sin datos:** cómo se entera Pistas de que Clima no puede obtener el clima, por ejemplo con un evento nuevo (6.19, D5).
 5. **Aeropuertos alternativos:** cuáles forman la lista de la 2.9 y dónde se guarda.
-6. **Servicio Usuarios:** qué tipo de base usa y con qué patrón interno se organiza. No estaba en las decisiones 5.1 ni 7.3 porque el servicio surgió de la 3.3.
-7. **Valores:** duración del slot, timeouts, reintentos, vigencia de la caché y retraso tolerable del índice.
-8. **Para la Entrega 2:** qué se cachea (D7), qué servicio se balancea (D12), qué mecanismo de resiliencia se implementa (D10), observabilidad (D11) y los bonus.
+6. **Valores:** duración del slot, vigencia de la caché y retraso tolerable del índice. Los timeouts y reintentos tienen valores iniciales (4.5) que se ajustan con las pruebas de carga.
+7. **Límite de pedidos de Clima:** si se implementa en Clima o en el gateway (6.15, 7.4).
+8. **Mensajes fallidos:** quién revisa la cola y con qué alerta; se define con la observabilidad (D11).
+9. **Para la Entrega 2:** qué se cachea (D7), qué servicio se balancea (D12), qué mecanismo de resiliencia se implementa (D10), observabilidad (D11) y los bonus.
 
 ## Puntos a cuidar
 
 Consecuencias de lo elegido que conviene tener presentes al diseñar:
 
 - **La prioridad de los arribos (2.7) complica la operación crítica.** Asignar un slot a un arribo puede quitárselo a un despegue. Sacar un vuelo y poner otro tiene que ocurrir como una sola operación, aun con pedidos simultáneos, y generar el evento "slot cedido a un arribo" sin perderlo. Es el centro del ADR D4.
-- **Pistas trabaja con el último clima conocido (4.2).** Si un aviso de Clima se demora, Pistas puede asignar un slot en una pista que debería estar cerrada. Hay que definir cuánto atraso se acepta.
+- **Pistas trabaja con el último clima conocido (4.2).** Si un aviso de Clima se demora, Pistas puede asignar un slot en una pista que debería estar cerrada. El atraso aceptado es de hasta 30 segundos, como valor inicial (4.5).
 - **Instancia separada (5.2) suma servidores.** Con MySQL para Vuelos, MySQL para Pistas, MongoDB para Clima y la base de Usuarios, más Solr, RabbitMQ y la caché, el arranque local levanta muchos contenedores. Conviene verificar que las computadoras del equipo lo soporten.
 - **Vuelos reúne varias cosas:** guarda vuelos, mantiene el índice de búsqueda y aplica CQRS. Es el servicio con más piezas.
 
@@ -191,9 +209,9 @@ Consecuencias de lo elegido que conviene tener presentes al diseñar:
 | ADR | Tema | Decisiones que lo alimentan | Vence |
 |---|---|---|---|
 | D1 | Límites de los servicios | 3.1, 3.2, 3.3 | Entrega 1 |
-| D8 | Contrato propio | 6.1 a 6.6 | Entrega 1 |
-| D3 | Persistencia | 5.1, 5.2, 7.2 | Entrega 1, versión inicial |
-| D5 | Comunicación entre servicios | 4.1 a 4.4 | Entrega 1, versión inicial |
-| D2 | Arquitectura interna | 7.3 | Entrega 2 |
+| D8 | Contrato propio | 6.1 a 6.19 | Entrega 1 |
+| D3 | Persistencia | 5.1 a 5.5, 7.2 | Entrega 1, versión inicial |
+| D5 | Comunicación entre servicios | 4.1 a 4.9 | Entrega 1, versión inicial |
+| D2 | Arquitectura interna | 7.3, 7.5, 7.6 | Entrega 2 |
 | D4 | Consistencia y concurrencia | 2.3, 2.7, 4.4 | Sin entrega asignada |
 | D6 | Búsqueda | 3.2 | Entrega 2 |

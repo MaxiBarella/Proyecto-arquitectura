@@ -4,13 +4,13 @@ Práctico Integrador 2026 de Arquitectura de Software, Facultad de Ingeniería, 
 
 **Integrantes:** Maximo Barella, Salvador Solana, Malena Griffi y Carola Jalil.
 
-> **Estado: Entrega 1, diseño y contrato con mock (9/10/2026).** Todavía no hay sistema ejecutable. Este repositorio contiene el alcance, las decisiones y el diseño.
+> **Estado: Entrega 1, diseño y contrato con mock (9/10/2026).** Este repositorio contiene el alcance, las decisiones, el diseño, el contrato de la capacidad publicada con su mock, y la estructura inicial de los servicios, todavía sin lógica.
 
 ## El dominio
 
 Un aeropuerto tiene pocas pistas y muchos vuelos que quieren usarlas. Cada vuelo necesita un turno de pista, un **slot**, para aterrizar o para despegar, y en un mismo momento una pista admite un solo avión.
 
-El sistema administra las pistas de **un aeropuerto**. Participan tres tipos de usuario:
+El sistema administra las pistas de **un aeropuerto**, el de Córdoba. Participan tres tipos de usuario:
 
 - La **aerolínea** publica sus vuelos, que pueden ser arribos o despegues, y pide un slot para cada uno.
 - El **operador del aeropuerto** administra las pistas: las da de alta, las cierra y las reabre.
@@ -31,7 +31,7 @@ Asignar las pistas sin que dos vuelos queden nunca con el mismo slot, aun cuando
 Cuando el clima deja de permitir la operación, o cuando el operador lo decide, **la pista se cierra**:
 
 - los despegues afectados quedan **demorados**, y la aerolínea les pide un slot nuevo;
-- los arribos afectados pasan a **desviados** a otro aeropuerto.
+- los arribos afectados pasan a **desviados** al aeropuerto alternativo más cercano que esté disponible.
 
 Las reglas completas, los estados de un vuelo y los criterios de aceptación están en [SPEC.md](SPEC.md).
 
@@ -74,15 +74,18 @@ El código de cada servicio está en [services/](services/).
 
 Todavía no hay nada desplegado. Acá va a figurar la dirección pública del servicio de Clima, que es la capacidad que consume otro grupo.
 
+Mientras tanto, esa capacidad se puede probar con su mock, que corre local. Los pasos están en [docs/contracts/README.md](docs/contracts/README.md).
+
 ## Documentación
 
 | Documento | Qué contiene | Estado |
 |---|---|---|
-| [SPEC.md](SPEC.md) | Alcance: funcionalidades, reglas de negocio, estados y criterios de aceptación. | Primera versión |
+| [SPEC.md](SPEC.md) | Alcance: funcionalidades, reglas de negocio, estados y criterios de aceptación. | Versión 0.2 |
 | [docs/decisiones.md](docs/decisiones.md) | Lo que el equipo decidió y lo que quedó sin cerrar. | Al día |
 | `docs/ARCHITECTURE.md` | Arquitectura general, con diagramas de contexto y de contenedores. | En preparación |
-| `docs/adr/` | Decisiones de arquitectura, una por archivo. | En preparación |
-| `docs/contracts/` | Contrato y documentación de la capacidad publicada, el servicio de Clima. | En preparación |
+| [docs/adr/](docs/adr/README.md) | Decisiones de arquitectura, una por archivo. | Escritos: [ADR-003](docs/adr/ADR-003.md) (persistencia), [ADR-005](docs/adr/ADR-005.md) (comunicación) y [ADR-008](docs/adr/ADR-008.md) (contrato propio). Falta el ADR-001. |
+| [docs/contracts/](docs/contracts/README.md) | Contrato OpenAPI ([clima-v1.yaml](docs/contracts/clima-v1.yaml)), guía de uso y mock de la capacidad publicada, el servicio de Clima. | Versión 1.0.0 |
+| [services/](services/) | Estructura inicial de los cuatro servicios. | Sin lógica |
 | `docs/POSTMORTEM.md` | Informe de la caída provocada. | Entregas posteriores |
 | [docs/entrega-1.md](docs/entrega-1.md) | Qué produce cada integrante para la Entrega 1. | Al día |
 | [docs/enunciado-tp-integrador.md](docs/enunciado-tp-integrador.md) | El enunciado del práctico, analizado. | Al día |
