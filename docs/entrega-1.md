@@ -68,6 +68,8 @@ Los pares de revisión son una propuesta que el equipo todavía no confirmó.
 - **Diagrama de contenedores:** el frontend, el gateway, los cuatro servicios (Vuelos, Pistas, Clima, Usuarios), sus bases de datos, el motor de búsqueda y la mensajería.
 - **ADR D1, límites de los servicios:** con qué criterio se separaron, cómo se relacionan y quién es dueño de cada dato.
 
+**Estado.** Mergeado (pull request #11): [ARCHITECTURE.md](ARCHITECTURE.md), los diagramas en [diagramas/](diagramas/) y el [ADR-001](adr/ADR-001.md). Al prepararlo se eligió draw.io para los diagramas y que el grupo consumidor entre directo a Clima en la nube, sin pasar por el gateway; las dos quedan para que el equipo las confirme.
+
 **De dónde sale.** Decisiones 3.1 a 3.3. Para dibujar las flechas y las bases, también las 4.1, 4.2, 5.1, 5.2 y 7.2.
 
 **Qué falta decidir**
@@ -157,13 +159,13 @@ La base del servicio Usuarios ya está decidida: MySQL, con instancia propia (5.
 
 - [x] `README.md`, primera versión
 - [x] Documento de alcance, primera versión
-- [ ] `docs/ARCHITECTURE.md`, primera versión
-- [ ] Diagrama de contexto
-- [ ] Diagrama de contenedores
-- [ ] Límites de los servicios, responsabilidades y propiedad de los datos
+- [x] `docs/ARCHITECTURE.md`, primera versión
+- [x] Diagrama de contexto
+- [x] Diagrama de contenedores
+- [x] Límites de los servicios, responsabilidades y propiedad de los datos
 - [x] Capacidad propia documentada, con contrato y mock
 - [x] Estructura inicial de los servicios y sus dependencias
-- [ ] ADR D1
+- [x] ADR D1
 - [x] ADR D8
 - [x] ADR D3 y D5, versión inicial
-- [ ] Todo mergeado en `main` y el tag `entrega-1`
+- [x] Todo mergeado en `main` y el tag `entrega-1`
