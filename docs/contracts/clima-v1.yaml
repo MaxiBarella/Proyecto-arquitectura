@@ -1,0 +1,356 @@
+openapi: 3.1.0
+
+info:
+  title: Clima API
+  version: 1.0.0
+  summary: Condiciones meteorológicas actuales y aptitud operativa de aeropuertos.
+  description: |
+    Devuelve las condiciones actuales de un aeropuerto y si se puede operar en él
+    según umbrales propios.
+
+    - **Aeropuerto atendido:** Córdoba, `SACO` (código ICAO). El código va en la ruta
+      para poder sumar aeropuertos más adelante sin romper el contrato.
+    - **Datos:** siempre son observaciones reales de Open-Meteo.
+    - **Autenticación:** una clave por consumidor, en el header `X-API-Key`.
+    - **Límite:** 60 pedidos por minuto por clave. Al pasarlo se responde `429` con `Retry-After`.
+    - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio.
+    - **Versionado:** la versión mayor va en la ruta (`/v1`). Los cambios compatibles
+      no la cambian; los que rompen crean `/v2` y `/v1` se sigue manteniendo.
+
+    La guía de uso con ejemplos está en `docs/contracts/README.md`.
+
+servers:
+  - url: http://localhost:4010
+    description: Mock local generado con Prism a partir de este archivo.
+
+security:
+  - apiKey: []
+
+tags:
+  - name: Condiciones
+    description: Clima actual y aptitud operativa.
+
+paths:
+  /v1/airports/{icao}/conditions:
+    get:
+      operationId: getAirportConditions
+      tags: [Condiciones]
+      summary: Condiciones actuales y aptitud operativa de un aeropuerto
+      description: |
+        Devuelve la última observación disponible del aeropuerto y si se puede operar.
+
+        Un aeropuerto **no es apto** si se cumple al menos una de estas condiciones:
+
+        | Condición | Umbral | Motivo en `operability.reasons` |
+        |---|---|---|
+        | Viento sostenido | más de 50 km/h | `HIGH_WIND` |
+        | Ráfagas | más de 65 km/h | `HIGH_GUSTS` |
+        | Visibilidad | menos de 800 m | `LOW_VISIBILITY` |
+        | Tormenta eléctrica | presente | `THUNDERSTORM` |
+
+        La aptitud vale para todo el aeropuerto, para aterrizar y para despegar.
+      parameters:
+        - $ref: '#/components/parameters/Icao'
+      responses:
+        '200':
+          description: Condiciones del aeropuerto.
+          headers:
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AirportConditions'
+              examples:
+                operable:
+                  summary: Aeropuerto apto
+                  value:
+                    airport:
+                      icao: SACO
+                      name: Aeropuerto Internacional Ingeniero Aeronáutico Ambrosio Taravella
+                    observed_at: '2026-10-09T14:00:00Z'
+                    conditions:
+                      temperature_c: 22.4
+                      wind_speed_kmh: 18.0
+                      wind_gust_kmh: 27.5
+                      wind_direction_deg: 340
+                      visibility_m: 10000
+                      precipitation_mm: 0.0
+                      thunderstorm: false
+                    operability:
+                      operable: true
+                      reasons: []
+                not_operable:
+                  summary: Aeropuerto no apto por viento y ráfagas
+                  value:
+                    airport:
+                      icao: SACO
+                      name: Aeropuerto Internacional Ingeniero Aeronáutico Ambrosio Taravella
+                    observed_at: '2026-10-09T14:00:00Z'
+                    conditions:
+                      temperature_c: 6.1
+                      wind_speed_kmh: 58.3
+                      wind_gust_kmh: 81.0
+                      wind_direction_deg: 270
+                      visibility_m: 6000
+                      precipitation_mm: 1.2
+                      thunderstorm: false
+                    operability:
+                      operable: false
+                      reasons: [HIGH_WIND, HIGH_GUSTS]
+        '400':
+          $ref: '#/components/responses/InvalidAirportCode'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/AirportNotSupported'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '503':
+          $ref: '#/components/responses/WeatherSourceUnavailable'
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clave entregada a cada grupo consumidor. Se envía en todos los pedidos.
+
+  parameters:
+    Icao:
+      name: icao
+      in: path
+      required: true
+      description: |
+        Código ICAO del aeropuerto, en mayúsculas. Hoy se atiende solo `SACO`.
+        Un código con formato válido que no sea `SACO` devuelve `404`.
+      schema:
+        type: string
+        pattern: '^[A-Z]{4}$'
+      example: SACO
+
+  headers:
+    Retry-After:
+      description: Segundos que conviene esperar antes de reintentar.
+      schema:
+        type: integer
+        minimum: 1
+      example: 30
+    X-RateLimit-Remaining:
+      description: Pedidos que le quedan a la clave en el minuto en curso.
+      schema:
+        type: integer
+        minimum: 0
+      example: 59
+
+  schemas:
+    AirportConditions:
+      type: object
+      required: [airport, observed_at, conditions, operability]
+      properties:
+        airport:
+          $ref: '#/components/schemas/Airport'
+        observed_at:
+          type: string
+          format: date-time
+          description: Momento de la observación, en UTC. Sirve para saber qué tan nuevo es el dato.
+        conditions:
+          $ref: '#/components/schemas/Conditions'
+        operability:
+          $ref: '#/components/schemas/Operability'
+
+    Airport:
+      type: object
+      required: [icao, name]
+      properties:
+        icao:
+          type: string
+          pattern: '^[A-Z]{4}$'
+          example: SACO
+        name:
+          type: string
+          example: Aeropuerto Internacional Ingeniero Aeronáutico Ambrosio Taravella
+
+    Conditions:
+      type: object
+      required:
+        - temperature_c
+        - wind_speed_kmh
+        - wind_gust_kmh
+        - wind_direction_deg
+        - visibility_m
+        - precipitation_mm
+        - thunderstorm
+      properties:
+        temperature_c:
+          type: number
+          description: Temperatura a 2 m, en grados Celsius.
+          example: 22.4
+        wind_speed_kmh:
+          type: number
+          minimum: 0
+          description: Viento sostenido a 10 m, en km/h.
+          example: 18.0
+        wind_gust_kmh:
+          type: number
+          minimum: 0
+          description: Ráfagas a 10 m, en km/h.
+          example: 27.5
+        wind_direction_deg:
+          type: integer
+          minimum: 0
+          maximum: 360
+          description: Dirección de la que viene el viento, en grados (0 = norte).
+          example: 340
+        visibility_m:
+          type: number
+          minimum: 0
+          description: Visibilidad horizontal, en metros.
+          example: 10000
+        precipitation_mm:
+          type: number
+          minimum: 0
+          description: Precipitación de la última hora, en milímetros.
+          example: 0.0
+        thunderstorm:
+          type: boolean
+          description: Si hay tormenta eléctrica.
+          example: false
+
+    Operability:
+      type: object
+      required: [operable, reasons]
+      properties:
+        operable:
+          type: boolean
+          description: Si se puede operar en el aeropuerto, tanto para aterrizar como para despegar.
+          example: true
+        reasons:
+          type: array
+          description: Motivos por los que no se puede operar. Vacío si `operable` es `true`.
+          items:
+            type: string
+            enum: [HIGH_WIND, HIGH_GUSTS, LOW_VISIBILITY, THUNDERSTORM]
+          example: []
+
+    Problem:
+      type: object
+      description: Error en formato Problem Details (RFC 9457).
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: Identifica el tipo de error.
+        title:
+          type: string
+          description: Resumen del error, igual para todos los casos del mismo tipo.
+        status:
+          type: integer
+          description: Código HTTP de la respuesta.
+        detail:
+          type: string
+          description: Explicación de este caso en particular.
+        instance:
+          type: string
+          description: Ruta del pedido que falló.
+        code:
+          type: string
+          description: Código propio del error, estable entre versiones compatibles.
+          enum:
+            - INVALID_AIRPORT_CODE
+            - MISSING_API_KEY
+            - INVALID_API_KEY
+            - AIRPORT_NOT_SUPPORTED
+            - RATE_LIMIT_EXCEEDED
+            - WEATHER_SOURCE_UNAVAILABLE
+
+  responses:
+    InvalidAirportCode:
+      description: El código no tiene formato ICAO (cuatro letras mayúsculas). **No reintentar.**
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/invalid-airport-code
+            title: Código de aeropuerto inválido
+            status: 400
+            detail: "'cor' no es un código ICAO: se esperan cuatro letras mayúsculas."
+            instance: /v1/airports/cor/conditions
+            code: INVALID_AIRPORT_CODE
+
+    Unauthorized:
+      description: Falta la clave o no es válida. **No reintentar** sin corregir la clave.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            missing:
+              summary: Sin clave
+              value:
+                type: /problems/missing-api-key
+                title: Falta la clave
+                status: 401
+                detail: El pedido no incluye el header X-API-Key.
+                instance: /v1/airports/SACO/conditions
+                code: MISSING_API_KEY
+            invalid:
+              summary: Clave inválida
+              value:
+                type: /problems/invalid-api-key
+                title: Clave inválida
+                status: 401
+                detail: La clave enviada no corresponde a ningún consumidor.
+                instance: /v1/airports/SACO/conditions
+                code: INVALID_API_KEY
+
+    AirportNotSupported:
+      description: El código es válido pero el aeropuerto no está atendido. **No reintentar.**
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/airport-not-supported
+            title: Aeropuerto no atendido
+            status: 404
+            detail: SAWH no es un aeropuerto atendido. Hoy solo se atiende SACO.
+            instance: /v1/airports/SAWH/conditions
+            code: AIRPORT_NOT_SUPPORTED
+
+    RateLimitExceeded:
+      description: Se pasó el límite de 60 pedidos por minuto. **Reintentar** después de `Retry-After`.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/rate-limit-exceeded
+            title: Límite de pedidos superado
+            status: 429
+            detail: La clave superó los 60 pedidos por minuto.
+            instance: /v1/airports/SACO/conditions
+            code: RATE_LIMIT_EXCEEDED
+
+    WeatherSourceUnavailable:
+      description: No se pudo obtener el clima de la fuente. **Reintentar** después de `Retry-After`.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/weather-source-unavailable
+            title: Fuente de clima no disponible
+            status: 503
+            detail: La fuente de datos meteorológicos no respondió a tiempo.
+            instance: /v1/airports/SACO/conditions
+            code: WEATHER_SOURCE_UNAVAILABLE

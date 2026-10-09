@@ -29,6 +29,10 @@ Un sistema para administrar los arribos y despegues de un aeropuerto. Las aerol�
 | 2.5 | Vuelos de una pista cerrada | **D** | Los **despegues** quedan demorados y la aerolínea pide un slot nuevo. Los **arribos** pasan a "desviado". |
 | 2.6 | Estados de un vuelo | **B** | Pendiente de slot → Programado → (Demorado → Programado) → Finalizado. Cancelado se alcanza desde cualquiera salvo Finalizado. Desviado es un estado final que solo vale para arribos. |
 | 2.7 | Arribos y despegues | **B** | **Los arribos tienen prioridad.** Si un arribo pide un slot ocupado por un despegue, se lo queda, y el despegue pasa a "demorado". Entre dos arribos, o entre dos despegues, gana el primero. |
+| 2.8 | Nuestro aeropuerto | **Córdoba** | El sistema maneja el aeropuerto de Córdoba (`SACO`). |
+| 2.9 | Destino de un arribo desviado | **El alternativo más cercano disponible** | Hay una lista de aeropuertos cercanos ordenada por distancia. El arribo desviado va al primero que esté disponible. El operador puede marcar un aeropuerto de la lista como "no disponible" para que se saltee; el sistema no consulta el estado de los otros aeropuertos. |
+
+Las decisiones 2.8 y 2.9 las tomó Male el 8/10/2026, al preparar el contrato de Clima. El equipo las revisa en el pull request de ese paquete; la 2.9 tiene que entrar en el documento de alcance.
 
 ## 3. Servicios
 
@@ -84,6 +88,24 @@ Con Usuarios, los microservicios pasan de tres a **cuatro**, más el API gateway
 | 6.5 | Versionado | **A** | La versión va en la dirección (`/v1/...`). Los cambios compatibles no cambian la versión; los que rompen crean una nueva y la anterior se mantiene. |
 | 6.6 | Mock | **A** | Generado a partir del archivo del contrato. |
 
+Las decisiones 6.7 a 6.19 surgieron al preparar el contrato de Clima. Las tomó Male el 8/10/2026 y el equipo las revisa en el pull request de ese paquete.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 6.7 | Forma de la aptitud | **Una por aeropuerto** | Clima informa si se puede operar o no, sin separar aterrizaje de despegue ni distinguir pistas. Si no se puede, se cierran todas las pistas para las dos cosas (2.2, 2.4 y 2.5). |
+| 6.8 | Fuente real | **Open-Meteo** | La del práctico de la clase 7. Trabaja con coordenadas, así que Clima guarda la latitud y longitud de nuestro aeropuerto. Forzar una condición (6.2) sirve para probar el cierre de pistas. |
+| 6.9 | Aeropuertos atendidos | **Solo el nuestro** | La API atiende únicamente Córdoba (`SACO`, decisión 2.8). Los aeropuertos alternativos de la 2.9 no pasan por Clima. |
+| 6.10 | Identificador del aeropuerto | **Código ICAO** | Por ejemplo `SACO`. |
+| 6.11 | Umbrales de aptitud | **Simplificados** | No se opera con viento sostenido de más de 50 km/h, ráfagas de más de 65 km/h, visibilidad de menos de 800 m o tormenta eléctrica. |
+| 6.12 | Rutas | **Un endpoint** | `GET /v1/airports/{icao}/conditions` devuelve las condiciones y la aptitud juntas. Forzar una condición es una ruta interna que no se publica. |
+| 6.13 | Envío de la clave | **Header `X-API-Key`** | La clave no va en la URL para que no quede en los logs. |
+| 6.14 | Formato de los errores | **Problem Details (RFC 9457)** | Con un campo `code` propio. No se reintentan 400, 401 y 404; se reintentan 429 y 503, con `Retry-After`. |
+| 6.15 | Límite de pedidos | **60 por minuto por clave** | Al pasarlo se responde 429 con `Retry-After`. Protege a Clima, y a Open-Meteo detrás, de las pruebas de carga de otros grupos. El valor se puede ajustar. |
+| 6.16 | Campos y unidades | **Inglés y métricas** | La unidad va en el nombre del campo (`wind_speed_kmh`). Toda respuesta incluye `observed_at`. |
+| 6.17 | Herramienta y publicación del mock | **Prism, local** | El mock se levanta desde el archivo del contrato y corre local, con un `Dockerfile` listo para publicarlo. Si se publica o no se decide después. |
+| 6.18 | Alcance del clima forzado | **Solo nuestro sistema** | Forzar una condición afecta únicamente a Pistas. La API pública devuelve siempre el dato real de Open-Meteo, para no alterar las pruebas del grupo consumidor. |
+| 6.19 | Si Open-Meteo no responde | **Aviso y operación manual** | Hacia afuera, la API responde `503` con `Retry-After`. Adentro, las pistas no se cierran ni se reabren solas: se muestra un aviso en pantalla y el operador decide a mano (2.4). |
+
 ## 7. Tecnologías
 
 | # | Decisión | Elegido | Qué significa |
@@ -124,7 +146,7 @@ Decidido el 8/10/2026. La Entrega 1 vence el viernes 9/10. Cada paquete se traba
 |---|---|---|---|---|
 | **Alcance** | Maxi | Documento de alcance (roles, funcionalidades, reglas de negocio, estados, criterios de aceptación) y `README.md` | 1 y 2.1 a 2.7 | Male |
 | **Arquitectura** | Carola | `docs/ARCHITECTURE.md`, diagramas de contexto y de contenedores, ADR D1 | 3.1 a 3.3 | Salvador |
-| **Clima hacia afuera** | Male | Contrato OpenAPI, su documentación con ejemplos y errores, el mock, ADR D8 | 6.1 a 6.6 | Maxi |
+| **Clima hacia afuera** | Male | Contrato OpenAPI, su documentación con ejemplos y errores, el mock, ADR D8 | 6.1 a 6.19 | Maxi |
 | **Datos, comunicación y esqueleto** | Salvador | ADR D3, ADR D5 y las carpetas iniciales de los cuatro servicios | 4.1 a 4.4, 5.1, 5.2 y 7 | Carola |
 
 Los pares de revisión son una sugerencia; el equipo todavía no los confirmó.
@@ -136,14 +158,13 @@ El detalle de qué tiene que hacer cada uno está en [entrega-1.md](entrega-1.md
 Elecciones que aparecen por lo que se decidió y que todavía nadie tomó:
 
 1. **Caché:** Redis o Memcached (7.2).
-2. **Hosting de Clima:** qué proveedor (7.2).
+2. **Hosting de Clima y del mock:** qué proveedor (7.2) y si el mock se publica (6.17).
 3. **API gateway:** con qué se hace; depende de la respuesta del profe (7.4).
-4. **Aptitud de Clima:** una sola, o separada para aterrizar y para despegar (6.1).
-5. **Fuente real del clima:** el documento sugería Open-Meteo, la que se usó en el práctico de la clase 7; falta confirmarla (6.2).
+4. **Clima sin datos:** cómo se entera Pistas de que Clima no puede obtener el clima, por ejemplo con un evento nuevo (6.19, D5).
+5. **Aeropuertos alternativos:** cuáles forman la lista de la 2.9 y dónde se guarda.
 6. **Servicio Usuarios:** qué tipo de base usa y con qué patrón interno se organiza. No estaba en las decisiones 5.1 ni 7.3 porque el servicio surgió de la 3.3.
-7. **Publicación del mock:** si se sube a internet para el viernes 9/10 (6.6).
-8. **Valores:** duración del slot, timeouts, reintentos, vigencia de la caché, retraso tolerable del índice y umbrales de clima.
-9. **Para la Entrega 2:** qué se cachea (D7), qué servicio se balancea (D12), qué mecanismo de resiliencia se implementa (D10), observabilidad (D11) y los bonus.
+7. **Valores:** duración del slot, timeouts, reintentos, vigencia de la caché y retraso tolerable del índice.
+8. **Para la Entrega 2:** qué se cachea (D7), qué servicio se balancea (D12), qué mecanismo de resiliencia se implementa (D10), observabilidad (D11) y los bonus.
 
 ## Puntos a cuidar
 
