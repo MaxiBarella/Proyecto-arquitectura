@@ -57,7 +57,7 @@ Son cuatro, más el API gateway. Ningún servicio lee ni escribe la base de otro
 | **Clima** | Informar las condiciones y si se puede operar. Es lo que se publica. | Observaciones de clima y umbrales de aptitud. | Nada. | Capas |
 | **Usuarios** | Guardar los usuarios y entregar los tokens. | Usuarios y credenciales. | Nada. | Capas |
 
-Las organizaciones internas de Vuelos, Pistas y Clima son la decisión 7.3. La de Usuarios está en el esqueleto del servicio ([services/usuarios](../services/usuarios/README.md)) pero no en `decisiones.md`; ver [Pendiente](#pendiente). Las carpetas de cada servicio están descritas en el `README.md` de su carpeta en [services/](../services/).
+Las organizaciones internas son las decisiones 7.3 (Vuelos, Pistas y Clima) y 7.5 (Usuarios). Las carpetas de cada servicio están descritas en el `README.md` de su carpeta en [services/](../services/).
 
 ## Datos
 
@@ -68,7 +68,7 @@ Cada servicio levanta su propio servidor de base de datos (5.2). El detalle est�
 | Vuelos | MySQL | Estados y transiciones con estructura fija. |
 | Pistas | MySQL | "Un slot, un solo vuelo" se apoya en una restricción única de la base. |
 | Clima | MongoDB | Muchas observaciones, sin relaciones entre sí. |
-| Usuarios | MySQL | Forma fija y nombre de usuario que no se puede repetir. |
+| Usuarios | MySQL (5.3) | Forma fija y nombre de usuario que no se puede repetir. |
 
 Solr guarda una copia derivada de los vuelos para el tablero; no es fuente de verdad. Entre servicios no hay claves foráneas: lo que un servicio sabe de otro (por ejemplo, el slot de un vuelo) le llega por eventos, y puede estar desactualizado por un momento.
 
@@ -116,7 +116,6 @@ Si Pistas no responde, el vuelo queda "pendiente de slot" y la aerolínea puede 
 - **Punto de entrada único:** confirmar con el profe que la API pública de Clima puede no pasar por el gateway (enunciado, 2.1).
 - **Clima en la nube y el resto local:** si el Clima de la nube es el mismo que usa nuestro sistema o una copia aparte, y cómo le llega a Pistas el evento "aptitud cambió" en cada caso.
 - **Hosting de Clima:** qué proveedor (7.2).
-- **Usuarios:** su organización interna (capas) está en el esqueleto, pero falta registrarla como decisión.
 - **Grupo proveedor:** qué capacidad consumimos, desde qué servicio y en qué flujo (F-19).
 - **Caché:** Redis o Memcached, y dónde va (7.2, D7).
 - **Balanceo:** qué servicio (D12).
