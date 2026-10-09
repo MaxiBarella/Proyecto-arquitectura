@@ -25,7 +25,7 @@ No se inventan decisiones al escribir un ADR. Si falta algo por decidir, se llev
 
 | ADR | Decisión | Qué tiene que quedar justificado | Sale de | Responsable | Vence | Estado |
 |---|---|---|---|---|---|---|
-| ADR-001 | D1. Límites de los servicios | Criterios para separar responsabilidades, relaciones entre servicios y propiedad de los datos. | 3.1 a 3.3 | Carola | Entrega 1 | Sin escribir |
+| [ADR-001](ADR-001.md) | D1. Límites de los servicios | Criterios para separar responsabilidades, relaciones entre servicios y propiedad de los datos. | 3.1 a 3.3 | Carola | Entrega 1 | Aceptado |
 | ADR-002 | D2. Arquitectura interna de los servicios | Estilos o patrones elegidos, dependencias internas y por qué cada uno se adecua a su servicio. | 7.3 | A asignar | Entrega 2 | Sin escribir |
 | [ADR-003](ADR-003.md) | D3. Persistencia | Almacenamiento de cada servicio, patrones de acceso que soporta y limitaciones aceptadas. | 5.1, 5.2, 7.2 | Salvador | Entrega 1, versión inicial | Versión inicial |
 | ADR-004 | D4. Consistencia y concurrencia | Operaciones con garantías especiales, y tratamiento de concurrencia, duplicación, pérdida y fallas parciales. | 2.3, 2.7, 4.4 | A asignar | Sin entrega asignada | Sin escribir |
