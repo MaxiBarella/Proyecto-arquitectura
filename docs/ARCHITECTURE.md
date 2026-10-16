@@ -33,16 +33,19 @@ Las piezas que corren por separado y cómo se conectan. Las líneas punteadas so
 
 | Contenedor | Tecnología | Para qué está |
 |---|---|---|
-| Frontend web | React | La interfaz de la aerolínea, el operador y el visitante. Todo lo que hacen pasa por acá. |
-| API gateway | A definir (7.4) | Punto de entrada único del frontend: autenticación, direccionamiento y control de tráfico. Valida los tokens que entrega Usuarios (3.3). |
-| Vuelos | Go con Gin | Ver [Servicios](#servicios). |
+| Frontend web | React | La interfaz de la aerolínea, el operador y el visitante. Todo lo que hacen pasa por acá. Lo sirve el mismo NGINX (15.7). |
+| API gateway y balanceador | NGINX (15.1) | Un solo contenedor con dos archivos de configuración, uno por rol (15.3). Como gateway es el punto de entrada único de nuestros usuarios: verifica el token, dirige cada pedido a su servicio y limita el tráfico. Como balanceador reparte los pedidos entre las dos instancias de Vuelos. Ver [API gateway](#api-gateway). |
+| Vuelos, dos instancias | Go con Gin | Ver [Servicios](#servicios). Corre en dos instancias detrás de NGINX (12.1). |
 | Pistas | Go con Gin | Ver [Servicios](#servicios). |
-| Clima | Go con Gin | Ver [Servicios](#servicios). |
+| Clima, copia local | Go con Gin | Ver [Servicios](#servicios). Le avisa a Pistas por RabbitMQ (9.3). |
+| Clima, copia pública | Go con Gin, en Render | El mismo código que la copia local, publicado para el grupo consumidor. No usa RabbitMQ (9.3, 9.4). |
 | Usuarios | Go con Gin | Ver [Servicios](#servicios). |
 | MySQL de Vuelos, de Pistas y de Usuarios | MySQL | Una instancia por servicio (5.2, ADR-003). |
-| MongoDB de Clima | MongoDB | Observaciones y aptitud del aeropuerto (ADR-003). |
-| Índice del tablero | Solr | Búsqueda del tablero. Lo mantiene Vuelos a partir de eventos (3.2). |
+| MongoDB de Clima | MongoDB | Observaciones y aptitud del aeropuerto (ADR-003). La copia pública usa MongoDB Atlas, plan gratuito (9.7). |
+| Índice del tablero | Solr | Búsqueda del tablero. Lo mantiene Vuelos a partir de eventos (3.2, 14). |
+| Caché del tablero | Memcached | Guarda las consultas del tablero durante 60 segundos. La comparten las dos instancias de Vuelos (10). |
 | Mensajería | RabbitMQ | Eventos de dominio entre servicios (ADR-005). |
+| Observabilidad | Grafana (`grafana/otel-lgtm`) | Recibe los logs, las métricas y las trazas de todos los servicios, enviados con OpenTelemetry (11.1). Para no cargar el diagrama, no se dibujan esas flechas. |
 
 Los diagramas son archivos `.drawio.svg`: GitHub los muestra como imagen y se editan abriéndolos con [draw.io](https://app.diagrams.net) o con la extensión "Draw.io Integration" de VS Code.
 
@@ -70,7 +73,7 @@ Cada servicio levanta su propio servidor de base de datos (5.2). El detalle est�
 | Clima | MongoDB | Muchas observaciones, sin relaciones entre sí. |
 | Usuarios | MySQL (5.3) | Forma fija y nombre de usuario que no se puede repetir. |
 
-Solr guarda una copia derivada de los vuelos para el tablero; no es fuente de verdad. Entre servicios no hay claves foráneas: lo que un servicio sabe de otro (por ejemplo, el slot de un vuelo) le llega por eventos, y puede estar desactualizado por un momento.
+Solr y Memcached guardan copias derivadas de los vuelos para el tablero; no son fuente de verdad. Entre servicios no hay claves foráneas: lo que un servicio sabe de otro (por ejemplo, el slot de un vuelo) le llega por eventos, y puede estar desactualizado por un momento.
 
 ## Comunicación
 
@@ -87,36 +90,53 @@ El detalle, con timeouts, reintentos e idempotencia, está en el [ADR-005](adr/A
 | Slot cedido a un arribo | Pistas | Vuelos |
 | Pista cerrada / reabierta | Pistas | Vuelos |
 | Aptitud operativa cambió | Clima | Pistas |
+| Clima sin datos | Clima | Pistas |
 | Vuelo cancelado | Vuelos | Pistas |
 
-**Hacia afuera.** El grupo consumidor llama a Clima con `GET /v1/airports/{icao}/conditions` y su clave en `X-API-Key` (ADR-008). Cuando consumamos la capacidad del grupo proveedor, la llamada va a salir del servicio dueño de la funcionalidad que la usa, nunca del frontend ni del gateway (enunciado, sección 4).
+"Clima sin datos" se suma en la Entrega 2 (pendiente 17 de la sección 18): avisa que Clima no puede obtener el clima, para que Pistas muestre el aviso y el operador decida a mano (6.19).
+
+**Hacia afuera.** El grupo consumidor llama directo a la copia pública de Clima, en Render, con `GET /v1/airports/{icao}/conditions` y su clave en `X-API-Key` (ADR-008). No pasa por nuestro gateway (9.9). Cuando consumamos la capacidad del grupo proveedor, la llamada va a salir del servicio dueño de la funcionalidad que la usa, nunca del frontend ni del gateway (enunciado, sección 4).
 
 ### Flujo principal: publicar un vuelo
 
-1. La aerolínea publica un vuelo desde el frontend. El pedido pasa por el gateway, que valida su token, y llega a Vuelos.
+1. La aerolínea publica un vuelo desde el frontend. El pedido llega a NGINX, que verifica su token y lo manda a una de las dos instancias de Vuelos.
 2. Vuelos guarda el vuelo como "pendiente de slot".
 3. Vuelos le pide a Pistas el slot elegido, con una llamada directa.
 4. Pistas lo asigna si está libre y guarda el evento "slot asignado" en la misma transacción.
 5. El relay de Pistas publica el evento en RabbitMQ.
 6. Vuelos lo consume, pasa el vuelo a "programado" y actualiza el índice del tablero.
 
-Si Pistas no responde, el vuelo queda "pendiente de slot" y la aerolínea puede volver a pedir.
+Si Pistas no responde, el vuelo queda "pendiente de slot" y la aerolínea puede volver a pedir. Si Pistas viene fallando seguido, el circuit breaker de Vuelos deja de llamarla durante un rato y los vuelos nuevos quedan directamente en "pendiente de slot" (13.1).
+
+## API gateway
+
+El gateway es el mismo NGINX que balancea (15.1). El profe recomendó separar los dos roles en dos archivos de configuración (15.3): `gateway.conf` y `balanceo.conf`, en la carpeta `nginx/` (20.2).
+
+- **Rutas por prefijo (15.7).** `/api/vuelos/`, `/api/pistas/`, `/api/usuarios/` y `/api/clima/` van a cada servicio. Sin token pasan solo el inicio de sesión y el tablero. Solo NGINX expone un puerto hacia afuera.
+- **Tokens (15.2, 15.4, 15.5).** Usuarios entrega un JWT que dura 1 hora y lleva el usuario, su rol, su aerolínea si es una, y el vencimiento. NGINX verifica la firma y el vencimiento con un script njs, sin preguntarle a Usuarios: si Usuarios se cae, las sesiones abiertas siguen funcionando.
+- **Identidad hacia los servicios (15.6).** Después de verificar el token, NGINX manda `X-User-Id`, `X-User-Role` y `X-Airline`, y pisa los que vengan del cliente con esos nombres. El gateway autentica; cada servicio decide qué puede hacer ese usuario.
+- **Control de tráfico (15.8).** 20 pedidos por segundo por IP, con ráfagas de hasta 40. Al pasarlo responde `429`.
+
+La copia pública de Clima no está detrás de este gateway: tiene su propia clave y su propio límite de 60 pedidos por minuto (9.6).
 
 ## Distribución
 
-**Arranque local.** Todo el sistema se levanta con Docker Compose ([docker-compose.yml](../docker-compose.yml)): los cuatro servicios, tres MySQL, un MongoDB, Solr y RabbitMQ. El frontend y el gateway todavía no están en el archivo.
+**Arranque local.** Todo el sistema se levanta con Docker Compose ([docker-compose.yml](../docker-compose.yml)): los cuatro servicios, tres MySQL, un MongoDB, Solr y RabbitMQ. En la Entrega 2 se suma Grafana (11.1). NGINX, la segunda instancia de Vuelos, Memcached y el frontend llegan en noviembre ([entrega-2.md](entrega-2.md)).
 
-**Clima en la nube.** El enunciado pide que la capacidad publicada esté en la nube con una URL pública. El grupo consumidor entra **directo a Clima**, sin pasar por nuestro gateway: Clima ya autentica con su propia clave y tiene su propio límite de pedidos (ADR-008), y así no hace falta desplegar el gateway en la nube. El gateway queda como punto de entrada único de nuestros usuarios. *Decidido por Carola el 8/10/2026; el equipo lo confirma en el pull request de este documento.*
+**Clima en la nube.** El enunciado pide que la capacidad publicada esté en la nube con una URL pública. Clima corre en dos copias del mismo código (9.3):
 
-**Balanceo.** El balanceador es NGINX (7.2). Qué servicio se balancea se decide en la Entrega 2 (D12), por eso no figura en el diagrama.
+- la **copia pública**, en Render con MongoDB Atlas (9.4, 9.7), atiende al grupo consumidor y no usa RabbitMQ;
+- la **copia local**, en el Docker Compose, es la que le avisa a Pistas por eventos.
+
+Así no se sube a la nube más de lo necesario. Las dos consultan a Open-Meteo cada 15 minutos por su cuenta (9.1, 9.2), así que pueden mostrar datos distintos durante unos minutos. No rompe nada, porque cada una atiende a un público distinto.
+
+El grupo consumidor entra **directo a la copia pública**, sin pasar por nuestro gateway (9.9): Clima ya autentica con su propia clave y tiene su propio límite de pedidos (ADR-008), y así no hace falta desplegar el gateway en la nube. El gateway queda como punto de entrada único de nuestros usuarios. En el plan gratuito, Render duerme el servicio cuando no se usa, y el primer pedido después de un rato tarda cerca de un minuto (9.4).
+
+**Balanceo.** NGINX reparte los pedidos por turnos entre dos instancias de Vuelos (12.1, 12.2). Se eligió Vuelos porque es el que más tráfico recibe y tiene el tablero cacheado, así que el balanceo y la caché se muestran sobre el mismo flujo. Por eso Vuelos no puede guardar nada importante en la memoria de una sola instancia, y la caché es un Memcached compartido (10.2).
 
 ## Pendiente
 
-- **API gateway:** con qué se hace (7.4, consultado al profe).
-- **Punto de entrada único:** confirmar con el profe que la API pública de Clima puede no pasar por el gateway (enunciado, 2.1).
-- **Clima en la nube y el resto local:** si el Clima de la nube es el mismo que usa nuestro sistema o una copia aparte, y cómo le llega a Pistas el evento "aptitud cambió" en cada caso.
-- **Hosting de Clima:** qué proveedor (7.2).
-- **Grupo proveedor:** qué capacidad consumimos, desde qué servicio y en qué flujo (F-19).
-- **Caché:** Redis o Memcached, y dónde va (7.2, D7).
-- **Balanceo:** qué servicio (D12).
+- **Punto de entrada único:** confirmar con el profe que la API pública de Clima puede no pasar por el gateway (9.9, enunciado 2.1).
+- **Grupo proveedor:** qué capacidad consumimos, desde qué servicio y en qué flujo (F-19). Lo asigna la cátedra.
+- **Grupo consumidor:** qué grupo usa nuestro Clima. Lo asigna la cátedra.
 - **Limitaciones conocidas y deuda técnica aceptada:** sección que se agrega para la presentación.
