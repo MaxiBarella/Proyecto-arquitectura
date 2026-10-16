@@ -88,6 +88,7 @@ Mientras tanto, esa capacidad se puede probar con su mock, que corre local. Los 
 | [services/](services/) | Estructura inicial de los cuatro servicios. | Sin lógica |
 | `docs/POSTMORTEM.md` | Informe de la caída provocada. | Entregas posteriores |
 | [docs/entrega-1.md](docs/entrega-1.md) | Qué produce cada integrante para la Entrega 1. | Al día |
+| [docs/entrega-2.md](docs/entrega-2.md) | Qué produce cada pareja para la Entrega 2. | Al día |
 | [docs/enunciado-tp-integrador.md](docs/enunciado-tp-integrador.md) | El enunciado del práctico, analizado. | Al día |
 | [docs/contenido-de-la-materia.md](docs/contenido-de-la-materia.md) | Herramientas y temas vistos en la materia. | Al día |
 
