@@ -26,18 +26,19 @@ No se inventan decisiones al escribir un ADR. Si falta algo por decidir, se llev
 | ADR | Decisión | Qué tiene que quedar justificado | Sale de | Responsable | Vence | Estado |
 |---|---|---|---|---|---|---|
 | [ADR-001](ADR-001.md) | D1. Límites de los servicios | Criterios para separar responsabilidades, relaciones entre servicios y propiedad de los datos. | 3.1 a 3.3 | Carola | Entrega 1 | Aceptado |
-| ADR-002 | D2. Arquitectura interna de los servicios | Estilos o patrones elegidos, dependencias internas y por qué cada uno se adecua a su servicio. | 7.3, 7.5, 7.6 | A asignar | Entrega 2 | Sin escribir |
+| ADR-002 | D2. Arquitectura interna de los servicios | Estilos o patrones elegidos, dependencias internas y por qué cada uno se adecua a su servicio. | 7.3, 7.5, 7.6, 20 | Carola | Entrega 2 | Sin escribir |
 | [ADR-003](ADR-003.md) | D3. Persistencia | Almacenamiento de cada servicio, patrones de acceso que soporta y limitaciones aceptadas. | 5.1 a 5.5, 7.2 | Salvador | Entrega 1, versión inicial | Versión inicial |
 | ADR-004 | D4. Consistencia y concurrencia | Operaciones con garantías especiales, y tratamiento de concurrencia, duplicación, pérdida y fallas parciales. | 2.3, 2.7, 4.4 | A asignar | Sin entrega asignada | Sin escribir |
 | [ADR-005](ADR-005.md) | D5. Comunicación entre servicios | Interacciones síncronas y asíncronas, timeouts, reintentos, eventos e idempotencia. | 4.1 a 4.9 | Salvador | Entrega 1, versión inicial | Versión inicial |
-| ADR-006 | D6. Búsqueda | Qué se indexa, criterios de consulta, actualización o reconstrucción del índice y retraso aceptable. | 3.2 | A asignar | Entrega 2 | Sin escribir |
-| ADR-007 | D7. Caché | Qué se guarda, invalidación, vigencia, comportamiento ante fallas y criterios de medición. | Sin decidir | A asignar | Entrega 2 | Sin escribir |
+| ADR-006 | D6. Búsqueda | Qué se indexa, criterios de consulta, actualización o reconstrucción del índice y retraso aceptable. | 3.2, 14.1 a 14.4 | Carola y Maxi | Entrega 2 | Sin escribir |
+| ADR-007 | D7. Caché | Qué se guarda, invalidación, vigencia, comportamiento ante fallas y criterios de medición. | 10.1 a 10.4 | Male y Salvador | Entrega 2 | Sin escribir |
 | [ADR-008](ADR-008.md) | D8. Contrato propio | Diseño, publicación, compatibilidad y estrategia de versionado de la capacidad que se ofrece. | 6.1 a 6.19 | Male | Entrega 1 | Aceptado |
-| ADR-009 | D9. Consumo del proveedor | Cómo se incorpora la capacidad externa, adaptación al contrato y comportamiento ante errores, cambios o indisponibilidad. | Sin decidir | A asignar | Entrega 2 | Sin escribir |
-| ADR-010 | D10. Resiliencia | Comportamiento ante fallas y mecanismos para limitar su propagación o degradar de forma controlada. | Sin decidir | A asignar | Entrega 2 | Sin escribir |
-| ADR-011 | D11. Observabilidad | Estrategia de logs, métricas, trazas y tableros, objetivo de servicio y criterios de alerta. | Sin decidir | A asignar | Entrega 2, primera versión | Sin escribir |
-| ADR-012 | D12. Balanceo de carga | Servicio elegido, estrategia de distribución, verificación de disponibilidad y caída de una instancia. | Sin decidir | A asignar | Entrega 2 | Sin escribir |
-| ADR-013 | D13. Capacidad y costos | Resultados de las pruebas de carga, principal límite, alternativa de escalado y estimación de costos. | Sin decidir | A asignar | Entrega 2 | Sin escribir |
+| ADR-009 | D9. Consumo del proveedor | Cómo se incorpora la capacidad externa, adaptación al contrato y comportamiento ante errores, cambios o indisponibilidad. | Depende de la asignación de la cátedra | Male y Salvador | Entrega 2 | Sin escribir |
+| ADR-010 | D10. Resiliencia | Comportamiento ante fallas y mecanismos para limitar su propagación o degradar de forma controlada. | 4.5, 13.1 | Carola y Maxi | Entrega 2 | Sin escribir |
+| ADR-011 | D11. Observabilidad | Estrategia de logs, métricas, trazas y tableros, objetivo de servicio y criterios de alerta. | 11.1 a 11.5 | Male y Salvador | Entrega 2, primera versión | Sin escribir |
+| ADR-012 | D12. Balanceo de carga | Servicio elegido, estrategia de distribución, verificación de disponibilidad y caída de una instancia. | 12.1 a 12.3, 15.3 | Male y Salvador | Entrega 2 | Sin escribir |
+| ADR-013 | D13. Capacidad y costos | Resultados de las pruebas de carga, principal límite, alternativa de escalado y estimación de costos. | 11.3, 16.1 | Male y Salvador | Entrega 2 | Sin escribir |
+| ADR-014 | API gateway (adicional) | Herramienta, separación de los roles de gateway y balanceador, validación del token, rutas y control de tráfico. | 15.1 a 15.8 | A asignar | Presentación | Sin escribir |
 
 La columna "Sale de" indica los números de [../decisiones.md](../decisiones.md) que alimentan cada ADR.
 
