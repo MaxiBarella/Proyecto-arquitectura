@@ -77,6 +77,16 @@ El equipo eligió trabajar de a dos (decisión 19) y Maxi informó las parejas. 
 
 **De dónde sale.** Decisiones 2, 4, 8.1, 12.3, 13.1, 14, 15.6, 18 y 20.
 
+**Quién hace qué.** Mitad y mitad: cada uno toma un servicio entero y la documentación más ligada a él. Lo propuso Carola el 16/10/2026; queda confirmado cuando Maxi apruebe el pull request.
+
+| | Carola | Maxi |
+|---|---|---|
+| Código | Pistas | Vuelos |
+| Tests | Unitarios de las reglas de Pistas y el de integración de pedidos simultáneos | Unitarios de las transiciones de estado de Vuelos |
+| Endpoints (lunes 19/10) | Los de Pistas | Los de Vuelos |
+| Documentación | ADR-002, `ARCHITECTURE.md`, ADR-010 y validación del ADR-001 | `SPEC.md` 0.3, ADR-006 y validación del ADR-005 |
+| Los dos | La traza del flujo completo, de Vuelos a Pistas y de vuelta | |
+
 **Qué falta decidir**
 
 - Los endpoints de Vuelos y Pistas. Son un contrato: proponerlos en el pull request y que los revise la otra pareja.
