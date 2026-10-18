@@ -2,7 +2,7 @@
 
 Capacidad que publicamos para otros grupos: las **condiciones meteorológicas actuales** del aeropuerto de Córdoba y si se puede **operar** en él (aterrizar y despegar).
 
-Este documento alcanza para integrarse sin hablar con nosotros. El contrato formal es [clima-v1.yaml](clima-v1.yaml) (OpenAPI 3.1); si algo de acá no coincide con el contrato, manda el contrato.
+Este documento alcanza para integrarse sin hablar con nosotros. El contrato formal es [clima.yaml](clima.yaml) (OpenAPI 3.1); si algo de acá no coincide con el contrato, manda el contrato.
 
 | | |
 |---|---|
@@ -143,7 +143,7 @@ docker run --rm -p 4010:4010 clima-mock
 **Con Node**, desde la raíz del repo:
 
 ```sh
-npx @stoplight/prism-cli mock docs/contracts/clima-v1.yaml
+npx @stoplight/prism-cli mock docs/contracts/clima.yaml
 ```
 
 Pedidos de ejemplo:

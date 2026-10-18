@@ -3,8 +3,8 @@
 # Ejecutar:                        docker run --rm -p 4010:4010 clima-mock
 FROM stoplight/prism:5
 
-COPY clima-v1.yaml /contracts/clima-v1.yaml
+COPY clima.yaml /contracts/clima.yaml
 
 EXPOSE 4010
 
-CMD ["mock", "-h", "0.0.0.0", "-p", "4010", "-m", "false", "/contracts/clima-v1.yaml"]
+CMD ["mock", "-h", "0.0.0.0", "-p", "4010", "-m", "false", "/contracts/clima.yaml"]
