@@ -118,7 +118,7 @@ El equipo eligió trabajar de a dos (decisión 19) y Maxi informó las parejas. 
 
 **De dónde sale.** Decisiones 6, 9, 10, 11, 12, 15.3, 16 y 20.
 
-**Quién hace qué.** Cada uno sigue con lo que hizo en la Entrega 1: Male, que hizo el contrato, toma Clima y lo que sale hacia afuera; Salvador, que hizo el esqueleto, la persistencia y la comunicación, toma lo transversal. Lo propuso Male el 18/10/2026 y Salvador estuvo de acuerdo.
+**Quién hace qué.** Male y Salvador lo acordaron el 18/10/2026. La idea es que cada uno siga con lo que ya conoce de la Entrega 1: Male, que armó el contrato, se encarga de Clima y de lo que sale hacia afuera; Salvador, que armó el esqueleto de los servicios, se encarga de lo transversal.
 
 | | Male | Salvador |
 |---|---|---|
