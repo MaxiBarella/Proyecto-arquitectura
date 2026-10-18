@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Clima API
-  version: 1.0.0
+  version: 1.0.1
   summary: Condiciones meteorológicas actuales y aptitud operativa de aeropuertos.
   description: |
     Devuelve las condiciones actuales de un aeropuerto y si se puede operar en él
@@ -339,7 +339,7 @@ components:
             code: RATE_LIMIT_EXCEEDED
 
     WeatherSourceUnavailable:
-      description: No se pudo obtener el clima de la fuente. **Reintentar** después de `Retry-After`.
+      description: El último dato guardado tiene más de 30 minutos porque no se pudo renovar desde la fuente. **Reintentar** después de `Retry-After`.
       headers:
         Retry-After:
           $ref: '#/components/headers/Retry-After'
@@ -351,6 +351,6 @@ components:
             type: /problems/weather-source-unavailable
             title: Fuente de clima no disponible
             status: 503
-            detail: La fuente de datos meteorológicos no respondió a tiempo.
+            detail: El último dato de clima tiene más de 30 minutos y no se pudo renovar.
             instance: /v1/airports/SACO/conditions
             code: WEATHER_SOURCE_UNAVAILABLE

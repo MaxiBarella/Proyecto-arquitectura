@@ -6,7 +6,7 @@ Este documento alcanza para integrarse sin hablar con nosotros. El contrato form
 
 | | |
 |---|---|
-| **Versión vigente** | `v1` (contrato `1.0.0`) |
+| **Versión vigente** | `v1` (contrato `1.0.1`) |
 | **Estado** | Contrato y mock disponibles. La implementación real se publica en la nube para la Entrega 2. |
 | **Formato** | JSON. Errores en `application/problem+json`. |
 | **Autenticación** | Una clave por grupo consumidor, en el header `X-API-Key`. |
@@ -96,7 +96,7 @@ Todos los errores usan el formato Problem Details ([RFC 9457](https://www.rfc-ed
   "type": "/problems/weather-source-unavailable",
   "title": "Fuente de clima no disponible",
   "status": 503,
-  "detail": "La fuente de datos meteorológicos no respondió a tiempo.",
+  "detail": "El último dato de clima tiene más de 30 minutos y no se pudo renovar.",
   "instance": "/v1/airports/SACO/conditions",
   "code": "WEATHER_SOURCE_UNAVAILABLE"
 }
@@ -109,7 +109,7 @@ Todos los errores usan el formato Problem Details ([RFC 9457](https://www.rfc-ed
 | 401 | `INVALID_API_KEY` | La clave no corresponde a ningún consumidor. | **No.** Revisá la clave. |
 | 404 | `AIRPORT_NOT_SUPPORTED` | El código es válido pero no es un aeropuerto atendido. | **No.** |
 | 429 | `RATE_LIMIT_EXCEEDED` | Pasaste los 60 pedidos por minuto. | **Sí**, después de los segundos que indica `Retry-After`. |
-| 503 | `WEATHER_SOURCE_UNAVAILABLE` | No pudimos obtener el clima de la fuente. | **Sí**, después de los segundos que indica `Retry-After`. |
+| 503 | `WEATHER_SOURCE_UNAVAILABLE` | No pudimos renovar el dato desde la fuente y el último que tenemos tiene más de 30 minutos. | **Sí**, después de los segundos que indica `Retry-After`. |
 
 Cualquier otro `5xx` se puede reintentar con espera creciente.
 
@@ -118,7 +118,8 @@ Cualquier otro `5xx` se puede reintentar con espera creciente.
 - **Clave.** Cada grupo consumidor recibe su propia clave. No la subas a tu repositorio: guardala como secreto o variable de entorno.
 - **Límite.** 60 pedidos por minuto por clave. Cada respuesta `200` trae el header `X-RateLimit-Remaining` con los pedidos que te quedan en el minuto.
 - **Idempotencia.** La operación es de solo lectura: repetir un pedido no cambia nada, así que se puede reintentar sin riesgo.
-- **Frescura.** El clima cambia con el tiempo; usá `observed_at` para decidir si el dato te sirve.
+- **Frescura.** Consultamos la fuente cada 15 minutos y respondemos con la última observación guardada, así que el dato puede tener hasta 30 minutos. Pasado eso respondemos `503`. Usá `observed_at` para decidir si el dato te sirve.
+- **Servicio dormido.** El servicio publicado corre en un plan gratuito que lo duerme cuando no recibe pedidos. El primer pedido después de un rato tarda cerca de un minuto y puede traer un dato viejo o un `503`. Usá un timeout de al menos 60 segundos en ese primer pedido, o reintentá.
 
 ## Versionado y compatibilidad
 
@@ -173,3 +174,4 @@ curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/v1/airp
 | Versión | Fecha | Cambios |
 |---|---|---|
 | 1.0.0 | 9/10/2026 | Primera versión del contrato, con mock. |
+| 1.0.1 | 18/10/2026 | Aclara cuándo se responde `503` (dato de más de 30 minutos) y avisa que el servicio publicado se duerme sin uso. Sin cambios en la API. |

@@ -32,7 +32,7 @@ No se inventan decisiones al escribir un ADR. Si falta algo por decidir, se llev
 | [ADR-005](ADR-005.md) | D5. Comunicación entre servicios | Interacciones síncronas y asíncronas, timeouts, reintentos, eventos e idempotencia. | 4.1 a 4.9 | Salvador | Entrega 1, versión inicial | Versión inicial |
 | ADR-006 | D6. Búsqueda | Qué se indexa, criterios de consulta, actualización o reconstrucción del índice y retraso aceptable. | 3.2, 14.1 a 14.4 | Carola y Maxi | Entrega 2 | Sin escribir |
 | ADR-007 | D7. Caché | Qué se guarda, invalidación, vigencia, comportamiento ante fallas y criterios de medición. | 10.1 a 10.4 | Male y Salvador | Entrega 2 | Sin escribir |
-| [ADR-008](ADR-008.md) | D8. Contrato propio | Diseño, publicación, compatibilidad y estrategia de versionado de la capacidad que se ofrece. | 6.1 a 6.19 | Male | Entrega 1 | Aceptado |
+| [ADR-008](ADR-008.md) | D8. Contrato propio | Diseño, publicación, compatibilidad y estrategia de versionado de la capacidad que se ofrece. | 6.1 a 6.19, 9.1 a 9.9 | Male | Entrega 1 | Aceptado |
 | ADR-009 | D9. Consumo del proveedor | Cómo se incorpora la capacidad externa, adaptación al contrato y comportamiento ante errores, cambios o indisponibilidad. | Depende de la asignación de la cátedra | Male y Salvador | Entrega 2 | Sin escribir |
 | ADR-010 | D10. Resiliencia | Comportamiento ante fallas y mecanismos para limitar su propagación o degradar de forma controlada. | 4.5, 13.1 | Carola y Maxi | Entrega 2 | Sin escribir |
 | ADR-011 | D11. Observabilidad | Estrategia de logs, métricas, trazas y tableros, objetivo de servicio y criterios de alerta. | 11.1 a 11.5 | Male y Salvador | Entrega 2, primera versión | Sin escribir |
