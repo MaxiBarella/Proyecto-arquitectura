@@ -6,7 +6,7 @@ Este documento alcanza para integrarse sin hablar con nosotros. El contrato form
 
 | | |
 |---|---|
-| **Versión vigente** | `v1` (contrato `1.0.1`) |
+| **Versión vigente** | `2.0.0` |
 | **Estado** | Contrato y mock disponibles. La implementación real se publica en la nube para la Entrega 2. |
 | **Formato** | JSON. Errores en `application/problem+json`. |
 | **Autenticación** | Una clave por grupo consumidor, en el header `X-API-Key`. |
@@ -14,7 +14,7 @@ Este documento alcanza para integrarse sin hablar con nosotros. El contrato form
 
 ## Operación
 
-### `GET /v1/airports/{icao}/conditions`
+### `GET /airports/{icao}/conditions`
 
 Devuelve la última observación del aeropuerto y su aptitud operativa.
 
@@ -97,7 +97,7 @@ Todos los errores usan el formato Problem Details ([RFC 9457](https://www.rfc-ed
   "title": "Fuente de clima no disponible",
   "status": 503,
   "detail": "El último dato de clima tiene más de 30 minutos y no se pudo renovar.",
-  "instance": "/v1/airports/SACO/conditions",
+  "instance": "/airports/SACO/conditions",
   "code": "WEATHER_SOURCE_UNAVAILABLE"
 }
 ```
@@ -123,9 +123,10 @@ Cualquier otro `5xx` se puede reintentar con espera creciente.
 
 ## Versionado y compatibilidad
 
-- La versión mayor va en la ruta: `/v1/...`.
-- **Cambios compatibles**, que no cambian la versión: agregar campos a la respuesta, agregar valores nuevos a `reasons` o a `code`, agregar operaciones o aeropuertos atendidos. Tu cliente tiene que **ignorar los campos que no conoce** y tratar un motivo o código desconocido como genérico.
-- **Cambios que rompen**, que crean `/v2`: quitar o renombrar campos, cambiar tipos o unidades, cambiar el significado de un campo o de un código de error. Cuando exista `/v2`, `/v1` se sigue manteniendo.
+- La ruta no lleva versión. La versión es la del contrato, con el formato mayor.menor.parche, y cada cambio queda en el [historial](#historial).
+- **Aclaraciones**, que suben el último número (`2.0.1`): cambios en la documentación que no tocan lo que se envía ni lo que se recibe.
+- **Cambios compatibles**, que suben el número del medio (`2.1.0`): agregar campos a la respuesta, agregar valores nuevos a `reasons` o a `code`, agregar operaciones o aeropuertos atendidos. Tu cliente tiene que **ignorar los campos que no conoce** y tratar un motivo o código desconocido como genérico.
+- **Cambios que rompen**, que suben el primer número (`3.0.0`): quitar o renombrar campos o rutas, cambiar tipos o unidades, cambiar el significado de un campo o de un código de error. Se avisan en el historial antes de aplicarse.
 - Los umbrales de aptitud pueden ajustarse sin cambiar la versión; si cambian, se actualiza este documento.
 
 ## Probar con el mock
@@ -149,24 +150,24 @@ Pedidos de ejemplo:
 
 ```sh
 # Aeropuerto apto
-curl -H "X-API-Key: demo" http://localhost:4010/v1/airports/SACO/conditions
+curl -H "X-API-Key: demo" http://localhost:4010/airports/SACO/conditions
 
 # Aeropuerto no apto
-curl -H "X-API-Key: demo" -H "Prefer: example=not_operable" http://localhost:4010/v1/airports/SACO/conditions
+curl -H "X-API-Key: demo" -H "Prefer: example=not_operable" http://localhost:4010/airports/SACO/conditions
 
 # Sin clave → 401
-curl http://localhost:4010/v1/airports/SACO/conditions
+curl http://localhost:4010/airports/SACO/conditions
 
 # Código inválido → 400
-curl -H "X-API-Key: demo" http://localhost:4010/v1/airports/cor/conditions
+curl -H "X-API-Key: demo" http://localhost:4010/airports/cor/conditions
 ```
 
 El mock no sabe qué aeropuertos atendemos: con cualquier código de cuatro letras responde `200`. Para probar el resto de los errores, pedilos con el header `Prefer`:
 
 ```sh
-curl -i -H "X-API-Key: demo" -H "Prefer: code=404" http://localhost:4010/v1/airports/SAWH/conditions
-curl -i -H "X-API-Key: demo" -H "Prefer: code=429" http://localhost:4010/v1/airports/SACO/conditions
-curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/v1/airports/SACO/conditions
+curl -i -H "X-API-Key: demo" -H "Prefer: code=404" http://localhost:4010/airports/SAWH/conditions
+curl -i -H "X-API-Key: demo" -H "Prefer: code=429" http://localhost:4010/airports/SACO/conditions
+curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/airports/SACO/conditions
 ```
 
 ## Historial
@@ -174,4 +175,4 @@ curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/v1/airp
 | Versión | Fecha | Cambios |
 |---|---|---|
 | 1.0.0 | 9/10/2026 | Primera versión del contrato, con mock. |
-| 1.0.1 | 18/10/2026 | Aclara cuándo se responde `503` (dato de más de 30 minutos) y avisa que el servicio publicado se duerme sin uso. Sin cambios en la API. |
+| 2.0.0 | 18/10/2026 | **Rompe:** la ruta pasa de `/v1/airports/{icao}/conditions` a `/airports/{icao}/conditions`, y la versión pasa a ser solo la del contrato. Además, aclara cuándo se responde `503` (dato de más de 30 minutos) y avisa que el servicio publicado se duerme sin uso. |
