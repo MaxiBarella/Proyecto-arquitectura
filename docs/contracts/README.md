@@ -6,7 +6,7 @@ Este documento alcanza para integrarse sin hablar con nosotros. El contrato form
 
 | | |
 |---|---|
-| **Versión vigente** | `2.0.0` |
+| **Versión vigente** | `2.0.1` |
 | **Estado** | Contrato y mock disponibles. La implementación real se publica en la nube para la Entrega 2. |
 | **Formato** | JSON. Errores en `application/problem+json`. |
 | **Autenticación** | Una clave por grupo consumidor, en el header `X-API-Key`. |
@@ -60,7 +60,7 @@ Devuelve la última observación del aeropuerto y su aptitud operativa.
 | `conditions.wind_gust_kmh` | número | Ráfagas a 10 m, en km/h. |
 | `conditions.wind_direction_deg` | entero, 0 a 360 | Dirección de la que viene el viento (0 = norte). |
 | `conditions.visibility_m` | número | Visibilidad horizontal, en metros. |
-| `conditions.precipitation_mm` | número | Precipitación de la última hora, en mm. |
+| `conditions.precipitation_mm` | número | Precipitación de los últimos 15 minutos, en mm. |
 | `conditions.thunderstorm` | booleano | Si hay tormenta eléctrica. |
 | `operability.operable` | booleano | Si se puede operar, tanto para aterrizar como para despegar. |
 | `operability.reasons` | lista de textos | Por qué no se puede operar. Vacía si `operable` es `true`. |
@@ -176,3 +176,4 @@ curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/airport
 |---|---|---|
 | 1.0.0 | 9/10/2026 | Primera versión del contrato, con mock. |
 | 2.0.0 | 18/10/2026 | **Rompe:** la ruta pasa de `/v1/airports/{icao}/conditions` a `/airports/{icao}/conditions`, y la versión pasa a ser solo la del contrato. Además, aclara cuándo se responde `503` (dato de más de 30 minutos) y avisa que el servicio publicado se duerme sin uso. |
+| 2.0.1 | 19/10/2026 | Aclara que `precipitation_mm` es la de los últimos 15 minutos, que es lo que informa la fuente. Sin cambios en la API. |

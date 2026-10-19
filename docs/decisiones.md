@@ -181,6 +181,18 @@ Quién eligió cada cosa:
 | 9.10 | Versionado del contrato de Clima | **Sin versión en la ruta; con el número del contrato** | Por indicación del profe, la ruta queda `GET /airports/{icao}/conditions`. La versión es el número del contrato (`info.version`, con el formato mayor.menor.parche) y el historial de la guía. Un cambio que rompe sube el número mayor y se avisa en la guía. Reemplaza a la 6.5. Lo decidió el equipo en una llamada. |
 | 9.11 | Timeout recomendado al consumidor | **Al menos 60 segundos en el primer pedido** | Por el servicio dormido de Render (9.4), el primer pedido después de un rato sin uso tarda cerca de un minuto. Se recomienda en la guía del contrato. Lo decidió el equipo en una llamada. |
 
+Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10/2026, con las opciones y recomendaciones del agente; la 9.14 la revisa la pareja 1 en el pull request, porque Pistas consume esos eventos.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 9.12 | Qué se fuerza | **Valores de clima** | El operador fuerza viento, ráfagas, visibilidad o tormenta, y la aptitud se calcula con los umbrales de la 6.11. Así se prueban los umbrales de punta a punta. |
+| 9.13 | Ruta interna del forzado | **`PUT` y `DELETE` en `/internal/airports/SACO/forced-conditions`** | `PUT` pone la condición forzada y `DELETE` la quita. Solo la acepta con `X-User-Role: operator` (15.6). La copia de la nube no la expone. |
+| 9.14 | Eventos de Clima | **`clima.aptitud.cambio` y `clima.sin_datos`** | Son las claves de ruteo. "Aptitud cambió" lleva aeropuerto, `operable`, motivos, fecha de la observación y si es forzada; se publica solo cuando `operable` cambia, y también cuando vuelven los datos después de un "sin datos". "Sin datos" se publica cuando el último dato pasa los 30 minutos (9.2). |
+| 9.15 | Variables de entorno de Clima | **`CLIMA_API_KEYS`, `MONGO_URI`, `RABBITMQ_URL` y `RABBITMQ_ENABLED`** | Las claves van como `grupo1:clave1,grupo2:clave2`. `RABBITMQ_ENABLED=false` apaga la publicación de eventos en la copia de la nube (9.3). |
+| 9.16 | Historial de observaciones | **Se borran solas a los 7 días** | Con un índice TTL de MongoDB. El servicio solo usa la última, y así el plan gratuito de Atlas no se llena. |
+| 9.17 | Cómo se cuenta el límite de 60 por minuto | **Un balde de 60 que se rellena de a 1 por segundo** | Permite ráfagas de hasta 60 y en promedio son 60 por minuto. `Retry-After` dice los segundos hasta que haya lugar; en el `503` dice 60. |
+| 9.18 | Precipitación | **La de los últimos 15 minutos** | Es lo que informa Open-Meteo. Se corrige el texto del contrato, que decía "última hora": pasa a 2.0.1, una aclaración. |
+
 ## 10. Caché (ADR D7)
 
 | # | Decisión | Elegido | Qué significa |
