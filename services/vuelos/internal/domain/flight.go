@@ -95,6 +95,13 @@ func NewFlight(id, airline string, d NewFlightData, now time.Time) (*Flight, err
 	if d.Type == Arrival && !isHomeCity(destination) {
 		return nil, fmt.Errorf("%w: un arribo tiene que llegar a %s", ErrInvalidFlight, HomeCity)
 	}
+	// Nuestra ciudad se guarda siempre igual, para que la búsqueda la encuentre (RN-34).
+	if isHomeCity(origin) {
+		origin = HomeCity
+	}
+	if isHomeCity(destination) {
+		destination = HomeCity
+	}
 	if d.ScheduledAt.IsZero() {
 		return nil, fmt.Errorf("%w: falta el horario", ErrInvalidFlight)
 	}
@@ -114,8 +121,14 @@ func NewFlight(id, airline string, d NewFlightData, now time.Time) (*Flight, err
 	}, nil
 }
 
+// withoutAccents saca los tildes, para aceptar "Cordoba" igual que "Córdoba".
+var withoutAccents = strings.NewReplacer(
+	"á", "a", "é", "e", "í", "i", "ó", "o", "ú", "u",
+	"Á", "A", "É", "E", "Í", "I", "Ó", "O", "Ú", "U",
+)
+
 func isHomeCity(city string) bool {
-	return strings.EqualFold(city, HomeCity)
+	return strings.EqualFold(withoutAccents.Replace(city), withoutAccents.Replace(HomeCity))
 }
 
 // CheckOwner rechaza la operación si el vuelo es de otra aerolínea (RN-30).

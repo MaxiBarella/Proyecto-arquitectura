@@ -122,11 +122,18 @@ func TestNewFlightRejectsInvalidData(t *testing.T) {
 	}
 }
 
-func TestNewFlightAcceptsHomeCityInAnyCase(t *testing.T) {
-	d := departureData()
-	d.Origin = "CÓRDOBA"
-	if _, err := NewFlight("id-1", "AR", d, now); err != nil {
-		t.Errorf("got %v", err)
+func TestNewFlightAcceptsHomeCityWrittenAnyWay(t *testing.T) {
+	for _, city := range []string{"CÓRDOBA", "Cordoba", "cordoba", " córdoba "} {
+		d := departureData()
+		d.Origin = city
+		f, err := NewFlight("id-1", "AR", d, now)
+		if err != nil {
+			t.Errorf("%q: got %v", city, err)
+			continue
+		}
+		if f.Origin != HomeCity {
+			t.Errorf("%q: se tiene que guardar como %q, got %q", city, HomeCity, f.Origin)
+		}
 	}
 }
 
