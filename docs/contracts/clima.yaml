@@ -21,6 +21,8 @@ info:
     La guía de uso con ejemplos está en `docs/contracts/README.md`.
 
 servers:
+  - url: https://clima-aeropuerto.onrender.com
+    description: Clima real, publicado en Render. Se duerme sin uso; el primer pedido tarda cerca de un minuto.
   - url: http://localhost:4010
     description: Mock local generado con Prism a partir de este archivo.
 

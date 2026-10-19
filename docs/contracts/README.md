@@ -7,7 +7,8 @@ Este documento alcanza para integrarse sin hablar con nosotros. El contrato form
 | | |
 |---|---|
 | **Versión vigente** | `2.0.1` |
-| **Estado** | Contrato y mock disponibles. La implementación real se publica en la nube para la Entrega 2. |
+| **Dirección** | `https://clima-aeropuerto.onrender.com` |
+| **Estado** | Publicado. Para probar sin conectarse, el mock corre local (ver abajo). |
 | **Formato** | JSON. Errores en `application/problem+json`. |
 | **Autenticación** | Una clave por grupo consumidor, en el header `X-API-Key`. |
 | **Límite** | 60 pedidos por minuto por clave. |
@@ -128,6 +129,14 @@ Cualquier otro `5xx` se puede reintentar con espera creciente.
 - **Cambios compatibles**, que suben el número del medio (`2.1.0`): agregar campos a la respuesta, agregar valores nuevos a `reasons` o a `code`, agregar operaciones o aeropuertos atendidos. Tu cliente tiene que **ignorar los campos que no conoce** y tratar un motivo o código desconocido como genérico.
 - **Cambios que rompen**, que suben el primer número (`3.0.0`): quitar o renombrar campos o rutas, cambiar tipos o unidades, cambiar el significado de un campo o de un código de error. Se avisan en el historial antes de aplicarse.
 - Los umbrales de aptitud pueden ajustarse sin cambiar la versión; si cambian, se actualiza este documento.
+
+## Probar con el servicio real
+
+```sh
+curl -H "X-API-Key: <tu clave>" https://clima-aeropuerto.onrender.com/airports/SACO/conditions
+```
+
+Si el servicio estaba dormido, este primer pedido tarda cerca de un minuto: usá un timeout de al menos 60 segundos.
 
 ## Probar con el mock
 
