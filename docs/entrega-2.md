@@ -118,6 +118,16 @@ El equipo eligió trabajar de a dos (decisión 19) y Maxi informó las parejas. 
 
 **De dónde sale.** Decisiones 6, 9, 10, 11, 12, 15.3, 16 y 20.
 
+**Quién hace qué.** Male y Salvador lo acordaron el 18/10/2026. La idea es que cada uno siga con lo que ya conoce de la Entrega 1: Male, que armó el contrato, se encarga de Clima y de lo que sale hacia afuera; Salvador, que armó el esqueleto de los servicios, se encarga de lo transversal.
+
+| | Male | Salvador |
+|---|---|---|
+| Código | Clima: consulta a Open-Meteo, MongoDB, aptitud, `503` por dato viejo, claves, límite de pedidos, eventos y ruta para forzar | Grafana en el Docker Compose, y OpenTelemetry y logs en JSON en Clima |
+| Tests | Unitarios del cálculo de aptitud y de cuándo un dato es viejo | |
+| Publicación | Clima en Render con MongoDB Atlas, y la dirección en `docs/contracts/README.md` | |
+| Documentación | ADR-008, ADR-009 y ADR-007 | ADR-011, ADR-012, ADR-013 y validación del ADR-003 |
+| Orden | Programa Clima sobre la observabilidad de Salvador; mientras tanto, los ADR y la lógica de aptitud | Primero: la observabilidad, mergeada para el lunes 19/10 |
+
 **Qué falta decidir**
 
 - Nada que frene esta entrega. El ADR-009 queda incompleto hasta que la cátedra asigne el proveedor.
