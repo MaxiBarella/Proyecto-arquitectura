@@ -27,11 +27,13 @@ services:
     build: ./services/clima
     environment:
       PORT: "8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
     ports:
       - "8083:8080"
     depends_on:
       - mongo-clima
       - rabbitmq
+      - grafana
 
   usuarios:
     build: ./services/usuarios
@@ -88,6 +90,12 @@ services:
       - "8983:8983"
     volumes:
       - solr-data:/var/solr
+
+  grafana:
+    image: grafana/otel-lgtm:0.37.0
+    ports:
+      - "3001:3000"
+      - "4318:4318"
 
 volumes:
   mysql-vuelos-data:
