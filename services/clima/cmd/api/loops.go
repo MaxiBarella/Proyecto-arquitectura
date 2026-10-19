@@ -6,11 +6,13 @@ import (
 	"time"
 )
 
-// Cada cuánto se consulta Open-Meteo (9.2) y cada cuánto se revisa si el último
+// Cada cuánto se consulta Open-Meteo (9.2), cada cuánto se revisa si el último
 // dato se volvió viejo, para avisar "sin datos" a tiempo.
 const (
 	pollInterval    = 15 * time.Minute
 	refreshInterval = time.Minute
+	// relayInterval es cada cuánto el relay revisa el outbox (4.5).
+	relayInterval = time.Second
 )
 
 // runEvery ejecuta task enseguida y después cada interval, hasta que se cancele

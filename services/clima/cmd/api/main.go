@@ -74,13 +74,20 @@ func run(logger *slog.Logger) (err error) {
 		_ = mongoClient.Disconnect(disconnectCtx)
 	}()
 
+	aptitude := repositories.NewAptitudeRepository(db)
 	weather := services.NewWeatherService(
 		models.Cordoba,
 		repositories.NewOpenMeteo(),
 		repositories.NewObservationRepository(db),
-		repositories.NewAptitudeRepository(db),
+		aptitude,
 		cfg.rabbitEnabled,
 	)
+	if cfg.rabbitEnabled {
+		publisher := repositories.NewRabbitPublisher(cfg.rabbitURL)
+		defer publisher.Close()
+		relay := services.NewRelay(aptitude, publisher)
+		go runEvery(ctx, relayInterval, "publicación de eventos", relay.PublishPending)
+	}
 	go runEvery(ctx, pollInterval, "consulta a Open-Meteo", weather.Poll)
 	go runEvery(ctx, refreshInterval, "revisión de la aptitud", weather.Refresh)
 

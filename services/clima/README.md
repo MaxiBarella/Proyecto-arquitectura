@@ -2,7 +2,7 @@
 
 Organización interna: **capas** (decisión 7.3 de [docs/decisiones.md](../../docs/decisiones.md)).
 
-Consulta a Open-Meteo cada 15 minutos, guarda la observación en MongoDB y calcula si se puede operar en Córdoba. Responde la API pública del [contrato](../../docs/contracts/README.md) y, en el Docker Compose, deja en el outbox los eventos para Pistas. Las decisiones están en la sección 9 de [docs/decisiones.md](../../docs/decisiones.md).
+Consulta a Open-Meteo cada 15 minutos, guarda la observación en MongoDB y calcula si se puede operar en Córdoba. Responde la API pública del [contrato](../../docs/contracts/README.md) y, en el Docker Compose, publica los eventos para Pistas en RabbitMQ con un outbox: el evento se guarda junto con el cambio y un relay lo publica cada segundo. Las decisiones están en la sección 9 de [docs/decisiones.md](../../docs/decisiones.md).
 
 | Ruta | Para qué |
 |---|---|

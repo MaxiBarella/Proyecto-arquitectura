@@ -65,6 +65,7 @@ Con Usuarios, los microservicios pasan de tres a **cuatro**, más el API gateway
 | 4.7 | Dónde se aplica el Outbox | **En los tres servicios que publican** | Pistas y Vuelos guardan el evento en una tabla de outbox, en la misma transacción de MySQL. Clima guarda el evento pendiente dentro del documento de aptitud, en la misma escritura. |
 | 4.8 | Mensajes | **JSON, un exchange topic** | Cada mensaje lleva identificador único, tipo, versión, fecha, identificador de correlación, datos y un número de versión del dato. Se publican en un único exchange de tipo topic; cada consumidor tiene su cola durable y su cola de mensajes fallidos. |
 | 4.9 | Consumidores | **Idempotentes** | Confirman el mensaje después de guardar su efecto, y guardan el identificador del mensaje en la misma transacción para no aplicarlo dos veces. |
+| 4.10 | Nombre del exchange y campos del mensaje | **`aeropuerto.eventos`; `id`, `type`, `version`, `occurred_at`, `correlation_id`, `data_version` y `data`** | Detalla la 4.8. El exchange es de tipo topic y durable. `type` es la clave de ruteo, `version` es la versión del formato del evento (empieza en 1) y `data_version` es el número de versión del dato. Lo propuso Male el 19/10/2026 al programar Clima y lo aprobó el equipo. |
 
 Las decisiones 4.5 a 4.9 las tomó Salvador el 8/10/2026, al escribir el [ADR-005](adr/ADR-005.md). Quedaron confirmadas al mergearse el pull request #8.
 
