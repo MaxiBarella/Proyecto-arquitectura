@@ -67,7 +67,7 @@ Por ahora los servicios son la estructura inicial: arrancan y responden `GET /he
 | Pistas | <http://localhost:8082/health> |
 | Clima | <http://localhost:8083/health> |
 | Usuarios | <http://localhost:8084/health> |
-| Grafana (logs, métricas y trazas) | <http://localhost:3001> |
+| Grafana (logs, métricas y trazas; por ahora solo de Clima) | <http://localhost:3001> |
 
 El código de cada servicio está en [services/](services/).
 

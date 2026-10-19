@@ -93,10 +93,16 @@ func Setup(ctx context.Context, service string) (func(context.Context) error, er
 }
 
 // Middleware crea una traza por cada pedido HTTP y mide su duración
-// (métrica http.server.request.duration). Deja afuera /health, que lo consultan
-// el Docker Compose y el balanceador todo el tiempo.
+// (métrica http.server.request.duration). Deja afuera /health (ver isHealthCheck).
 func Middleware(service string) gin.HandlerFunc {
 	return otelgin.Middleware(service, otelgin.WithFilter(func(r *http.Request) bool {
-		return r.URL.Path != "/health"
+		return !isHealthCheck(r)
 	}))
+}
+
+// isHealthCheck indica si el pedido es un chequeo de estado. No genera trazas,
+// métricas ni logs: los chequeos de estado del balanceador y del Docker Compose
+// lo van a consultar todo el tiempo, y solo agregarían ruido.
+func isHealthCheck(r *http.Request) bool {
+	return r.URL.Path == "/health"
 }

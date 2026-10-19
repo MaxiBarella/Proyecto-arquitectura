@@ -2,8 +2,12 @@ package observability
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -25,9 +29,14 @@ func NewLogger(service string) *slog.Logger {
 }
 
 // RequestLogger escribe una línea por cada pedido HTTP con su método, ruta,
-// estado y duración. Va después de Middleware, para que la línea lleve la traza.
+// estado y duración. Va después de Middleware, para que la línea lleve la traza,
+// y antes de Recovery, para que también quede la línea de un pedido que falló.
 func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if isHealthCheck(c.Request) {
+			c.Next()
+			return
+		}
 		start := time.Now()
 		c.Next()
 
@@ -42,6 +51,18 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 			"duration_ms", time.Since(start).Milliseconds(),
 		)
 	}
+}
+
+// Recovery reemplaza a gin.Recovery: si un handler entra en pánico, responde 500
+// y deja el error en el log como JSON, con la traza, en lugar de texto suelto.
+func Recovery(logger *slog.Logger) gin.HandlerFunc {
+	return gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, recovered any) {
+		logger.ErrorContext(c.Request.Context(), "pánico al atender un pedido",
+			"error", fmt.Sprint(recovered),
+			"stack", string(debug.Stack()),
+		)
+		c.AbortWithStatus(http.StatusInternalServerError)
+	})
 }
 
 // traceHandler agrega trace_id y span_id a cada línea escrita dentro de una traza,

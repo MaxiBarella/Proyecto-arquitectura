@@ -17,24 +17,42 @@ import (
 
 const serviceName = "clima"
 
+// shutdownTimeout es el tiempo máximo de cada etapa del apagado: terminar los
+// pedidos en curso, y después enviar la telemetría pendiente.
+const shutdownTimeout = 5 * time.Second
+
 func main() {
-	if err := run(); err != nil {
-		slog.Error("el servicio se detuvo con error", "error", err)
+	// El logger se arma antes que nada, para que hasta un error de arranque salga en JSON.
+	logger := observability.NewLogger(serviceName)
+	slog.SetDefault(logger)
+
+	if err := run(logger); err != nil {
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(logger *slog.Logger) (err error) {
 	// Se cancela con Ctrl+C o cuando Docker pide apagar el contenedor.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	shutdownTelemetry, err := observability.Setup(ctx, serviceName)
 	if err != nil {
+		logger.Error("no se pudo configurar OpenTelemetry", "error", err)
 		return err
 	}
-	logger := observability.NewLogger(serviceName)
-	slog.SetDefault(logger)
+	// Al salir, por cualquier camino: si hubo un error se registra, y después se
+	// envía la telemetría pendiente con un plazo propio.
+	defer func() {
+		if err != nil {
+			logger.Error("el servicio se detuvo con error", "error", err)
+		}
+		flushCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if flushErr := shutdownTelemetry(flushCtx); flushErr != nil {
+			logger.Error("no se pudo enviar la telemetría pendiente", "error", flushErr)
+		}
+	}()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -48,8 +66,8 @@ func run() error {
 	router := gin.New()
 	router.Use(
 		observability.Middleware(serviceName),
-		gin.Recovery(),
 		observability.RequestLogger(logger),
+		observability.Recovery(logger),
 	)
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": serviceName})
@@ -70,14 +88,15 @@ func run() error {
 	}()
 
 	select {
-	case err := <-serverErr:
+	case err = <-serverErr:
 		return err
 	case <-ctx.Done():
 	}
+	// A partir de acá, un segundo Ctrl+C corta el programa en el acto.
+	stop()
 
-	// Al apagar: se terminan los pedidos en curso y se envía la telemetría pendiente.
 	logger.Info("apagando el servidor")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	return errors.Join(server.Shutdown(shutdownCtx), shutdownTelemetry(shutdownCtx))
+	return server.Shutdown(shutdownCtx)
 }
