@@ -2,11 +2,11 @@
 
 Capacidad que publicamos para otros grupos: las **condiciones meteorológicas actuales** del aeropuerto de Córdoba y si se puede **operar** en él (aterrizar y despegar).
 
-Este documento alcanza para integrarse sin hablar con nosotros. El contrato formal es [clima-v1.yaml](clima-v1.yaml) (OpenAPI 3.1); si algo de acá no coincide con el contrato, manda el contrato.
+Este documento alcanza para integrarse sin hablar con nosotros. El contrato formal es [clima.yaml](clima.yaml) (OpenAPI 3.1); si algo de acá no coincide con el contrato, manda el contrato.
 
 | | |
 |---|---|
-| **Versión vigente** | `v1` (contrato `1.0.0`) |
+| **Versión vigente** | `2.0.0` |
 | **Estado** | Contrato y mock disponibles. La implementación real se publica en la nube para la Entrega 2. |
 | **Formato** | JSON. Errores en `application/problem+json`. |
 | **Autenticación** | Una clave por grupo consumidor, en el header `X-API-Key`. |
@@ -14,7 +14,7 @@ Este documento alcanza para integrarse sin hablar con nosotros. El contrato form
 
 ## Operación
 
-### `GET /v1/airports/{icao}/conditions`
+### `GET /airports/{icao}/conditions`
 
 Devuelve la última observación del aeropuerto y su aptitud operativa.
 
@@ -96,8 +96,8 @@ Todos los errores usan el formato Problem Details ([RFC 9457](https://www.rfc-ed
   "type": "/problems/weather-source-unavailable",
   "title": "Fuente de clima no disponible",
   "status": 503,
-  "detail": "La fuente de datos meteorológicos no respondió a tiempo.",
-  "instance": "/v1/airports/SACO/conditions",
+  "detail": "El último dato de clima tiene más de 30 minutos y no se pudo renovar.",
+  "instance": "/airports/SACO/conditions",
   "code": "WEATHER_SOURCE_UNAVAILABLE"
 }
 ```
@@ -109,7 +109,7 @@ Todos los errores usan el formato Problem Details ([RFC 9457](https://www.rfc-ed
 | 401 | `INVALID_API_KEY` | La clave no corresponde a ningún consumidor. | **No.** Revisá la clave. |
 | 404 | `AIRPORT_NOT_SUPPORTED` | El código es válido pero no es un aeropuerto atendido. | **No.** |
 | 429 | `RATE_LIMIT_EXCEEDED` | Pasaste los 60 pedidos por minuto. | **Sí**, después de los segundos que indica `Retry-After`. |
-| 503 | `WEATHER_SOURCE_UNAVAILABLE` | No pudimos obtener el clima de la fuente. | **Sí**, después de los segundos que indica `Retry-After`. |
+| 503 | `WEATHER_SOURCE_UNAVAILABLE` | No pudimos renovar el dato desde la fuente y el último que tenemos tiene más de 30 minutos. | **Sí**, después de los segundos que indica `Retry-After`. |
 
 Cualquier otro `5xx` se puede reintentar con espera creciente.
 
@@ -118,13 +118,15 @@ Cualquier otro `5xx` se puede reintentar con espera creciente.
 - **Clave.** Cada grupo consumidor recibe su propia clave. No la subas a tu repositorio: guardala como secreto o variable de entorno.
 - **Límite.** 60 pedidos por minuto por clave. Cada respuesta `200` trae el header `X-RateLimit-Remaining` con los pedidos que te quedan en el minuto.
 - **Idempotencia.** La operación es de solo lectura: repetir un pedido no cambia nada, así que se puede reintentar sin riesgo.
-- **Frescura.** El clima cambia con el tiempo; usá `observed_at` para decidir si el dato te sirve.
+- **Frescura.** Consultamos la fuente cada 15 minutos y respondemos con la última observación guardada, así que el dato puede tener hasta 30 minutos. Pasado eso respondemos `503`. Usá `observed_at` para decidir si el dato te sirve.
+- **Servicio dormido.** El servicio publicado corre en un plan gratuito que lo duerme cuando no recibe pedidos. El primer pedido después de un rato tarda cerca de un minuto y puede traer un dato viejo o un `503`. Usá un timeout de al menos 60 segundos en ese primer pedido, o reintentá.
 
 ## Versionado y compatibilidad
 
-- La versión mayor va en la ruta: `/v1/...`.
-- **Cambios compatibles**, que no cambian la versión: agregar campos a la respuesta, agregar valores nuevos a `reasons` o a `code`, agregar operaciones o aeropuertos atendidos. Tu cliente tiene que **ignorar los campos que no conoce** y tratar un motivo o código desconocido como genérico.
-- **Cambios que rompen**, que crean `/v2`: quitar o renombrar campos, cambiar tipos o unidades, cambiar el significado de un campo o de un código de error. Cuando exista `/v2`, `/v1` se sigue manteniendo.
+- La ruta no lleva versión. La versión es la del contrato, con el formato mayor.menor.parche, y cada cambio queda en el [historial](#historial).
+- **Aclaraciones**, que suben el último número (`2.0.1`): cambios en la documentación que no tocan lo que se envía ni lo que se recibe.
+- **Cambios compatibles**, que suben el número del medio (`2.1.0`): agregar campos a la respuesta, agregar valores nuevos a `reasons` o a `code`, agregar operaciones o aeropuertos atendidos. Tu cliente tiene que **ignorar los campos que no conoce** y tratar un motivo o código desconocido como genérico.
+- **Cambios que rompen**, que suben el primer número (`3.0.0`): quitar o renombrar campos o rutas, cambiar tipos o unidades, cambiar el significado de un campo o de un código de error. Se avisan en el historial antes de aplicarse.
 - Los umbrales de aptitud pueden ajustarse sin cambiar la versión; si cambian, se actualiza este documento.
 
 ## Probar con el mock
@@ -141,31 +143,31 @@ docker run --rm -p 4010:4010 clima-mock
 **Con Node**, desde la raíz del repo:
 
 ```sh
-npx @stoplight/prism-cli mock docs/contracts/clima-v1.yaml
+npx @stoplight/prism-cli mock docs/contracts/clima.yaml
 ```
 
 Pedidos de ejemplo:
 
 ```sh
 # Aeropuerto apto
-curl -H "X-API-Key: demo" http://localhost:4010/v1/airports/SACO/conditions
+curl -H "X-API-Key: demo" http://localhost:4010/airports/SACO/conditions
 
 # Aeropuerto no apto
-curl -H "X-API-Key: demo" -H "Prefer: example=not_operable" http://localhost:4010/v1/airports/SACO/conditions
+curl -H "X-API-Key: demo" -H "Prefer: example=not_operable" http://localhost:4010/airports/SACO/conditions
 
 # Sin clave → 401
-curl http://localhost:4010/v1/airports/SACO/conditions
+curl http://localhost:4010/airports/SACO/conditions
 
 # Código inválido → 400
-curl -H "X-API-Key: demo" http://localhost:4010/v1/airports/cor/conditions
+curl -H "X-API-Key: demo" http://localhost:4010/airports/cor/conditions
 ```
 
 El mock no sabe qué aeropuertos atendemos: con cualquier código de cuatro letras responde `200`. Para probar el resto de los errores, pedilos con el header `Prefer`:
 
 ```sh
-curl -i -H "X-API-Key: demo" -H "Prefer: code=404" http://localhost:4010/v1/airports/SAWH/conditions
-curl -i -H "X-API-Key: demo" -H "Prefer: code=429" http://localhost:4010/v1/airports/SACO/conditions
-curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/v1/airports/SACO/conditions
+curl -i -H "X-API-Key: demo" -H "Prefer: code=404" http://localhost:4010/airports/SAWH/conditions
+curl -i -H "X-API-Key: demo" -H "Prefer: code=429" http://localhost:4010/airports/SACO/conditions
+curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/airports/SACO/conditions
 ```
 
 ## Historial
@@ -173,3 +175,4 @@ curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/v1/airp
 | Versión | Fecha | Cambios |
 |---|---|---|
 | 1.0.0 | 9/10/2026 | Primera versión del contrato, con mock. |
+| 2.0.0 | 18/10/2026 | **Rompe:** la ruta pasa de `/v1/airports/{icao}/conditions` a `/airports/{icao}/conditions`, y la versión pasa a ser solo la del contrato. Además, aclara cuándo se responde `503` (dato de más de 30 minutos) y avisa que el servicio publicado se duerme sin uso. |

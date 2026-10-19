@@ -97,7 +97,7 @@ El equipo eligió trabajar de a dos (decisión 19) y Maxi informó las parejas. 
 
 - **Clima**
   - consultar a Open-Meteo cada 15 minutos, guardar la observación en MongoDB y calcular la aptitud con los umbrales de la 6.11 (9.1, 9.2);
-  - responder `GET /v1/airports/SACO/conditions` con el último dato, y `503` si tiene más de 30 minutos (9.2, 6.19);
+  - responder `GET /airports/SACO/conditions` con el último dato, y `503` si tiene más de 30 minutos (9.2, 6.19);
   - claves desde una variable de entorno (9.5) y límite de 60 pedidos por minuto por clave, en memoria (9.6);
   - publicar "aptitud operativa cambió" y "Clima sin datos" con el outbox dentro del documento de aptitud (4.7, 18);
   - la ruta interna para forzar una condición, que dura hasta que el operador la quita (6.2, 18);

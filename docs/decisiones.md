@@ -98,7 +98,7 @@ Las decisiones 5.3 a 5.5 las tomó Salvador el 8/10/2026, al escribir el [ADR-00
 | 6.2 | Origen de los datos | **C** | Datos reales, con la posibilidad de que el operador fuerce una condición. |
 | 6.3 | Formato del contrato | **A** | API descrita con OpenAPI. |
 | 6.4 | Quién puede usarla | **B** | Una clave por consumidor, enviada en cada pedido. |
-| 6.5 | Versionado | **A** | La versión va en la dirección (`/v1/...`). Los cambios compatibles no cambian la versión; los que rompen crean una nueva y la anterior se mantiene. |
+| 6.5 | Versionado | **A** (reemplazada por la 9.10) | La versión va en la dirección (`/v1/...`). Los cambios compatibles no cambian la versión; los que rompen crean una nueva y la anterior se mantiene. |
 | 6.6 | Mock | **A** | Generado a partir del archivo del contrato. |
 
 Las decisiones 6.7 a 6.19 surgieron al preparar el contrato de Clima. Las tomó Male el 8/10/2026 y quedaron confirmadas al mergearse el pull request #7.
@@ -110,7 +110,7 @@ Las decisiones 6.7 a 6.19 surgieron al preparar el contrato de Clima. Las tomó 
 | 6.9 | Aeropuertos atendidos | **Solo el nuestro** | La API atiende únicamente Córdoba (`SACO`, decisión 2.8). Los aeropuertos alternativos de la 2.9 no pasan por Clima. |
 | 6.10 | Identificador del aeropuerto | **Código ICAO** | Por ejemplo `SACO`. |
 | 6.11 | Umbrales de aptitud | **Simplificados** | No se opera con viento sostenido de más de 50 km/h, ráfagas de más de 65 km/h, visibilidad de menos de 800 m o tormenta eléctrica. |
-| 6.12 | Rutas | **Un endpoint** | `GET /v1/airports/{icao}/conditions` devuelve las condiciones y la aptitud juntas. Forzar una condición es una ruta interna que no se publica. |
+| 6.12 | Rutas | **Un endpoint** | `GET /airports/{icao}/conditions` (sin `/v1` desde la 9.10) devuelve las condiciones y la aptitud juntas. Forzar una condición es una ruta interna que no se publica. |
 | 6.13 | Envío de la clave | **Header `X-API-Key`** | La clave no va en la URL para que no quede en los logs. |
 | 6.14 | Formato de los errores | **Problem Details (RFC 9457)** | Con un campo `code` propio. No se reintentan 400, 401 y 404; se reintentan 429 y 503, con `Retry-After`. |
 | 6.15 | Límite de pedidos | **60 por minuto por clave** | Al pasarlo se responde 429 con `Retry-After`. Protege a Clima, y a Open-Meteo detrás, de las pruebas de carga de otros grupos. El valor se puede ajustar. |
@@ -178,6 +178,8 @@ Quién eligió cada cosa:
 | 9.7 | MongoDB de la copia de la nube | **MongoDB Atlas, plan gratuito** (agente) | Render no ofrece MongoDB y Atlas es la opción gratuita habitual. Antes de crearlo hay que verificar las condiciones del plan. |
 | 9.8 | Publicación del mock (6.17) | **No se publica** (agente) | Se publica directamente el Clima real. El mock queda en el repo para pruebas locales. |
 | 9.9 | Por dónde entra el grupo consumidor | **Directo a Clima en la nube, sin gateway** (agente) | Lo había propuesto Carola en `docs/ARCHITECTURE.md` y es lo que resulta de la 9.3. Conviene confirmarlo con el profe (ver preguntas). |
+| 9.10 | Versionado del contrato de Clima | **Sin versión en la ruta; con el número del contrato** | Por indicación del profe, la ruta queda `GET /airports/{icao}/conditions`. La versión es el número del contrato (`info.version`, con el formato mayor.menor.parche) y el historial de la guía. Un cambio que rompe sube el número mayor y se avisa en la guía. Reemplaza a la 6.5. Lo decidió el equipo en una llamada. |
+| 9.11 | Timeout recomendado al consumidor | **Al menos 60 segundos en el primer pedido** | Por el servicio dormido de Render (9.4), el primer pedido después de un rato sin uso tarda cerca de un minuto. Se recomienda en la guía del contrato. Lo decidió el equipo en una llamada. |
 
 ## 10. Caché (ADR D7)
 
@@ -384,7 +386,7 @@ Sin respuesta registrada:
 | ADR | Tema | Decisiones que lo alimentan | Vence |
 |---|---|---|---|
 | D1 | Límites de los servicios | 3.1, 3.2, 3.3 | Entrega 1 |
-| D8 | Contrato propio | 6.1 a 6.19; se actualiza con 9.2, 9.4 y 9.6 | Entrega 1; se actualiza en la 2 |
+| D8 | Contrato propio | 6.1 a 6.19; se actualiza con 9.2, 9.4 y 9.6; la 9.10 lo reemplaza por el ADR-015 | Entrega 1; se actualiza en la 2 |
 | D3 | Persistencia | 5.1 a 5.5, 7.2 | Entrega 1, versión inicial; se valida en la 2 |
 | D5 | Comunicación entre servicios | 4.1 a 4.9 | Entrega 1, versión inicial; se valida en la 2 |
 | D2 | Arquitectura interna | 7.3, 7.5, 7.6, 20 | Entrega 2 |

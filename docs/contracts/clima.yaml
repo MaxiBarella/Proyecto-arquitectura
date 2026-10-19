@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Clima API
-  version: 1.0.0
+  version: 2.0.0
   summary: Condiciones meteorológicas actuales y aptitud operativa de aeropuertos.
   description: |
     Devuelve las condiciones actuales de un aeropuerto y si se puede operar en él
@@ -14,8 +14,9 @@ info:
     - **Autenticación:** una clave por consumidor, en el header `X-API-Key`.
     - **Límite:** 60 pedidos por minuto por clave. Al pasarlo se responde `429` con `Retry-After`.
     - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio.
-    - **Versionado:** la versión mayor va en la ruta (`/v1`). Los cambios compatibles
-      no la cambian; los que rompen crean `/v2` y `/v1` se sigue manteniendo.
+    - **Versionado:** la versión es la de este contrato (`info.version`), con el formato
+      mayor.menor.parche. La ruta no lleva versión. Un cambio que rompe sube el número
+      mayor y se avisa en el historial de la guía.
 
     La guía de uso con ejemplos está en `docs/contracts/README.md`.
 
@@ -31,7 +32,7 @@ tags:
     description: Clima actual y aptitud operativa.
 
 paths:
-  /v1/airports/{icao}/conditions:
+  /airports/{icao}/conditions:
     get:
       operationId: getAirportConditions
       tags: [Condiciones]
@@ -278,7 +279,7 @@ components:
             title: Código de aeropuerto inválido
             status: 400
             detail: "'cor' no es un código ICAO: se esperan cuatro letras mayúsculas."
-            instance: /v1/airports/cor/conditions
+            instance: /airports/cor/conditions
             code: INVALID_AIRPORT_CODE
 
     Unauthorized:
@@ -295,7 +296,7 @@ components:
                 title: Falta la clave
                 status: 401
                 detail: El pedido no incluye el header X-API-Key.
-                instance: /v1/airports/SACO/conditions
+                instance: /airports/SACO/conditions
                 code: MISSING_API_KEY
             invalid:
               summary: Clave inválida
@@ -304,7 +305,7 @@ components:
                 title: Clave inválida
                 status: 401
                 detail: La clave enviada no corresponde a ningún consumidor.
-                instance: /v1/airports/SACO/conditions
+                instance: /airports/SACO/conditions
                 code: INVALID_API_KEY
 
     AirportNotSupported:
@@ -318,7 +319,7 @@ components:
             title: Aeropuerto no atendido
             status: 404
             detail: SAWH no es un aeropuerto atendido. Hoy solo se atiende SACO.
-            instance: /v1/airports/SAWH/conditions
+            instance: /airports/SAWH/conditions
             code: AIRPORT_NOT_SUPPORTED
 
     RateLimitExceeded:
@@ -335,11 +336,11 @@ components:
             title: Límite de pedidos superado
             status: 429
             detail: La clave superó los 60 pedidos por minuto.
-            instance: /v1/airports/SACO/conditions
+            instance: /airports/SACO/conditions
             code: RATE_LIMIT_EXCEEDED
 
     WeatherSourceUnavailable:
-      description: No se pudo obtener el clima de la fuente. **Reintentar** después de `Retry-After`.
+      description: El último dato guardado tiene más de 30 minutos porque no se pudo renovar desde la fuente. **Reintentar** después de `Retry-After`.
       headers:
         Retry-After:
           $ref: '#/components/headers/Retry-After'
@@ -351,6 +352,6 @@ components:
             type: /problems/weather-source-unavailable
             title: Fuente de clima no disponible
             status: 503
-            detail: La fuente de datos meteorológicos no respondió a tiempo.
-            instance: /v1/airports/SACO/conditions
+            detail: El último dato de clima tiene más de 30 minutos y no se pudo renovar.
+            instance: /airports/SACO/conditions
             code: WEATHER_SOURCE_UNAVAILABLE
