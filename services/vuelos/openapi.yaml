@@ -166,6 +166,9 @@ paths:
         Vale para un vuelo en `pending_slot` o en `delayed`. Un vuelo `scheduled` no
         cambia de slot (RN-28).
 
+        El bloque no tiene que coincidir con `scheduled_at`: puede ser antes o después.
+        Con el slot asignado, el horario que vale es el del bloque (RN-38).
+
         **Si Pistas asigna el slot, la respuesta es `202`, no el vuelo programado.** El
         vuelo pasa a `scheduled` cuando llega el evento "slot asignado" (4.1). Hasta
         entonces sigue en el estado que tenía.
@@ -257,6 +260,9 @@ paths:
         Lee del índice de búsqueda, así que un cambio puede tardar hasta 60 segundos en
         aparecer (RN-37). El índice con Solr se muestra funcionando en noviembre.
 
+        El horario de cada vuelo es el de su bloque si tiene slot, y `scheduled_at` si no
+        (RN-39). Con ese horario se ordena y se filtra por `date`.
+
         Filtros, búsqueda por texto, orden y paginación: RN-33 a RN-36.
       parameters:
         - name: type
@@ -280,7 +286,7 @@ paths:
         - name: date
           in: query
           required: false
-          description: Día del horario del vuelo.
+          description: Día del horario del vuelo (RN-39).
           schema:
             type: string
             format: date
@@ -295,7 +301,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: Orden de los resultados. Por defecto, por horario.
+          description: Orden de los resultados. Por defecto, por horario (RN-39).
           schema:
             type: string
             enum: [scheduled_at, airline, scope]
@@ -402,7 +408,9 @@ components:
         scheduled_at:
           type: string
           format: date-time
-          description: Horario del vuelo, en UTC.
+          description: |
+            Horario en que la aerolínea quiere operar, en UTC. Cuando el vuelo tiene slot,
+            vale el horario del bloque (RN-38).
 
     Slot:
       type: object
