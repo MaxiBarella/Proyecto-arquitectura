@@ -16,3 +16,5 @@ Es la estructura inicial: el servicio arranca y responde `GET /health`. Todavía
 | `internal/adapters/solr` | Mantiene y consulta el índice de búsqueda en Solr. |
 
 Puerto en el arranque local: `8081`.
+
+Los endpoints están en [openapi.yaml](openapi.yaml).
