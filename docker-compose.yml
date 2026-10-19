@@ -28,6 +28,10 @@ services:
     environment:
       PORT: "8080"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
+      MONGO_URI: mongodb://${MONGO_CLIMA_USER}:${MONGO_CLIMA_PASSWORD}@mongo-clima:27017
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      RABBITMQ_ENABLED: "true"
+      CLIMA_API_KEYS: ${CLIMA_API_KEYS:?falta en .env}
     ports:
       - "8083:8080"
     depends_on:
