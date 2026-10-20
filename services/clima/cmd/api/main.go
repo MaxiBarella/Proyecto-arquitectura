@@ -86,10 +86,10 @@ func run(logger *slog.Logger) (err error) {
 		publisher := repositories.NewRabbitPublisher(cfg.rabbitURL)
 		defer publisher.Close()
 		relay := services.NewRelay(aptitude, publisher)
-		go runEvery(ctx, relayInterval, "publicación de eventos", relay.PublishPending)
+		go runEvery(ctx, relayInterval, relayInterval, "publicación de eventos", relay.PublishPending)
 	}
-	go runEvery(ctx, pollInterval, "consulta a Open-Meteo", weather.Poll)
-	go runEvery(ctx, refreshInterval, "revisión de la aptitud", weather.Refresh)
+	go runEvery(ctx, pollInterval, pollRetryInterval, "consulta a Open-Meteo", weather.Poll)
+	go runEvery(ctx, refreshInterval, refreshInterval, "revisión de la aptitud", weather.Refresh)
 
 	// Sin GIN_MODE, Gin escribe avisos en texto que se mezclarían con los logs JSON.
 	if os.Getenv(gin.EnvGinMode) == "" {

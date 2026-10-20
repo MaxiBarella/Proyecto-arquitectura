@@ -11,7 +11,7 @@ Este documento alcanza para integrarse sin hablar con nosotros. El contrato form
 | **Estado** | Publicado. Para probar sin conectarse, el mock corre local (ver abajo). |
 | **Formato** | JSON. Errores en `application/problem+json`. |
 | **Autenticación** | Una clave por grupo consumidor, en el header `X-API-Key`. |
-| **Límite** | 60 pedidos por minuto por clave. |
+| **Límite** | En promedio 60 pedidos por minuto por clave, con ráfagas de hasta 60. |
 
 ## Operación
 
@@ -117,7 +117,7 @@ Cualquier otro `5xx` se puede reintentar con espera creciente.
 ## Condiciones de uso
 
 - **Clave.** Cada grupo consumidor recibe su propia clave. No la subas a tu repositorio: guardala como secreto o variable de entorno.
-- **Límite.** 60 pedidos por minuto por clave. Cada respuesta `200` trae el header `X-RateLimit-Remaining` con los pedidos que te quedan en el minuto.
+- **Límite.** En promedio 60 pedidos por minuto por clave: podés hacer una ráfaga de hasta 60 seguidos, y después se libera un lugar por segundo. Cada respuesta `200` trae el header `X-RateLimit-Remaining` con los pedidos que te quedan en el minuto.
 - **Idempotencia.** La operación es de solo lectura: repetir un pedido no cambia nada, así que se puede reintentar sin riesgo.
 - **Frescura.** Consultamos la fuente cada 15 minutos y respondemos con la última observación guardada, así que el dato puede tener hasta 30 minutos. Pasado eso respondemos `503`. Usá `observed_at` para decidir si el dato te sirve.
 - **Servicio dormido.** El servicio publicado corre en un plan gratuito que lo duerme cuando no recibe pedidos. El primer pedido después de un rato tarda cerca de un minuto y puede traer un dato viejo o un `503`. Usá un timeout de al menos 60 segundos en ese primer pedido, o reintentá.
