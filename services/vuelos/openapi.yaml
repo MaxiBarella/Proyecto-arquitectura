@@ -44,7 +44,8 @@ paths:
         encabezado `X-Airline`.
 
         Para un despegue (`departure`), el origen tiene que ser Córdoba; para un arribo
-        (`arrival`), el destino.
+        (`arrival`), el destino. El origen y el destino no pueden ser iguales (RN-40), y el
+        horario no puede estar en el pasado (RN-41).
       parameters:
         - $ref: '#/components/parameters/XUserId'
         - $ref: '#/components/parameters/XUserRoleAirline'
@@ -257,8 +258,9 @@ paths:
         Público: no necesita los encabezados de identidad. Muestra los vuelos de todas las
         aerolíneas (RN-30).
 
-        Lee del índice de búsqueda, así que un cambio puede tardar hasta 60 segundos en
-        aparecer (RN-37). El índice con Solr se muestra funcionando en noviembre.
+        Lee del índice de búsqueda, con una caché de 60 segundos: un cambio puede tardar
+        hasta 2 minutos en aparecer (RN-37). El índice con Solr y la caché se muestran
+        funcionando en noviembre.
 
         El horario de cada vuelo es el de su bloque si tiene slot, y `scheduled_at` si no
         (RN-39). Con ese horario se ordena y se filtra por `date`.
@@ -316,6 +318,8 @@ paths:
                 $ref: '#/components/schemas/FlightPage'
         '400':
           $ref: '#/components/responses/InvalidRequest'
+        '503':
+          $ref: '#/components/responses/BoardUnavailable'
 
 components:
   parameters:
@@ -546,6 +550,7 @@ components:
             - RUNWAY_CLOSED
             - INVALID_TRANSITION
             - RUNWAYS_UNAVAILABLE
+            - BOARD_UNAVAILABLE
         nearest_free_slots:
           type: array
           description: Solo en `SLOT_TAKEN`. Los 3 slots libres más cercanos al pedido (RN-09).
@@ -725,3 +730,26 @@ components:
             detail: No se pudo pedir el slot. El vuelo sigue pendiente de slot.
             instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/slot-request
             code: RUNWAYS_UNAVAILABLE
+
+    BoardUnavailable:
+      description: |
+        El índice de búsqueda no responde. **Reintentar** después de `Retry-After`. Si solo
+        falla la caché, el tablero responde igual, consultando el índice directo (10.4).
+      headers:
+        Retry-After:
+          description: Segundos que conviene esperar antes de reintentar.
+          schema:
+            type: integer
+            minimum: 1
+          example: 30
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/board-unavailable
+            title: Tablero no disponible
+            status: 503
+            detail: El índice de búsqueda no responde.
+            instance: /board
+            code: BOARD_UNAVAILABLE
