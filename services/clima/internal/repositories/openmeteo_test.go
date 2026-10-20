@@ -72,3 +72,17 @@ func TestOpenMeteoRechazaUnDatoNulo(t *testing.T) {
 		t.Errorf("se esperaba un error por las ráfagas nulas, fue %v", err)
 	}
 }
+
+func TestOpenMeteoInformaElMotivoDeUnRechazo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":true,"reason":"Daily API request limit exceeded. Please try again tomorrow."}`))
+	}))
+	defer srv.Close()
+	o := NewOpenMeteo()
+	o.baseURL = srv.URL
+	_, err := o.Current(context.Background(), models.Cordoba)
+	if err == nil || !strings.Contains(err.Error(), "429") || !strings.Contains(err.Error(), "Daily API request limit") {
+		t.Errorf("el error tendría que incluir el código y el motivo, fue %v", err)
+	}
+}

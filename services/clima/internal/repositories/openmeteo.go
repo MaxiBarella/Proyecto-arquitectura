@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -68,6 +69,15 @@ func (o *OpenMeteo) Current(ctx context.Context, airport models.Airport) (models
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		// Open-Meteo explica el motivo en el campo "reason", por ejemplo si se pasó
+		// un límite por minuto, por hora o por día.
+		var failure struct {
+			Reason string `json:"reason"`
+		}
+		_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&failure)
+		if failure.Reason != "" {
+			return models.Observation{}, fmt.Errorf("Open-Meteo respondió %d: %s", resp.StatusCode, failure.Reason)
+		}
 		return models.Observation{}, fmt.Errorf("Open-Meteo respondió %d", resp.StatusCode)
 	}
 
