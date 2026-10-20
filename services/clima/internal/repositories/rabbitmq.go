@@ -20,15 +20,67 @@ const (
 	publishTimout = 5 * time.Second
 )
 
+// ErrNoQueue indica que RabbitMQ devolvió el evento porque ninguna cola lo recibe,
+// por ejemplo si Pistas todavía no arrancó. El evento se queda en el outbox.
+var ErrNoQueue = errors.New("ninguna cola recibe el evento todavía")
+
 // message es el formato de cada evento en RabbitMQ (4.10).
 type message struct {
-	ID            string           `json:"id"`
-	Type          string           `json:"type"`
-	Version       int              `json:"version"`
-	OccurredAt    time.Time        `json:"occurred_at"`
-	CorrelationID string           `json:"correlation_id"`
-	DataVersion   int64            `json:"data_version"`
-	Data          models.EventData `json:"data"`
+	ID            string    `json:"id"`
+	Type          string    `json:"type"`
+	Version       int       `json:"version"`
+	OccurredAt    time.Time `json:"occurred_at"`
+	CorrelationID string    `json:"correlation_id"`
+	DataVersion   int64     `json:"data_version"`
+	Data          any       `json:"data"`
+}
+
+// aptitudeData son los datos de "aptitud cambió" (9.14). reasons va siempre, como
+// lista, igual que en la API pública.
+type aptitudeData struct {
+	Airport    string    `json:"airport"`
+	Operable   bool      `json:"operable"`
+	Reasons    []string  `json:"reasons"`
+	ObservedAt time.Time `json:"observed_at"`
+	Forced     bool      `json:"forced"`
+}
+
+// noDataData son los datos de "sin datos": el aeropuerto y la fecha del último dato.
+type noDataData struct {
+	Airport    string    `json:"airport"`
+	ObservedAt time.Time `json:"observed_at"`
+}
+
+// encodeMessage arma el cuerpo JSON de un evento. Es el contrato con Pistas.
+func encodeMessage(e models.PendingEvent) ([]byte, error) {
+	var observedAt time.Time
+	if e.Data.ObservedAt != nil {
+		observedAt = e.Data.ObservedAt.UTC()
+	}
+	var data any = noDataData{Airport: e.Data.Airport, ObservedAt: observedAt}
+	if e.Type == models.EventAptitudeChanged {
+		reasons := e.Data.Reasons
+		if reasons == nil {
+			reasons = []string{}
+		}
+		d := aptitudeData{Airport: e.Data.Airport, Reasons: reasons, ObservedAt: observedAt}
+		if e.Data.Operable != nil {
+			d.Operable = *e.Data.Operable
+		}
+		if e.Data.Forced != nil {
+			d.Forced = *e.Data.Forced
+		}
+		data = d
+	}
+	return json.Marshal(message{
+		ID:            e.ID,
+		Type:          e.Type,
+		Version:       eventVersion,
+		OccurredAt:    e.OccurredAt.UTC(),
+		CorrelationID: e.CorrelationID,
+		DataVersion:   e.DataVersion,
+		Data:          data,
+	})
 }
 
 // RabbitPublisher publica eventos en el exchange del sistema. Se conecta cuando
@@ -39,24 +91,19 @@ type RabbitPublisher struct {
 	mu      sync.Mutex
 	conn    *amqp.Connection
 	channel *amqp.Channel
+	// returns recibe los mensajes que RabbitMQ devuelve porque no los toma ninguna cola.
+	returns chan amqp.Return
 }
 
 func NewRabbitPublisher(url string) *RabbitPublisher {
 	return &RabbitPublisher{url: url}
 }
 
-// Publish publica un evento y espera la confirmación de RabbitMQ. Solo si la
-// recibe devuelve nil: recién ahí se puede sacar el evento del outbox.
+// Publish publica un evento y espera la confirmación de RabbitMQ. Solo devuelve nil
+// si RabbitMQ lo confirmó y lo dejó en al menos una cola: recién ahí se puede sacar
+// el evento del outbox.
 func (p *RabbitPublisher) Publish(ctx context.Context, e models.PendingEvent) error {
-	body, err := json.Marshal(message{
-		ID:            e.ID,
-		Type:          e.Type,
-		Version:       eventVersion,
-		OccurredAt:    e.OccurredAt.UTC(),
-		CorrelationID: e.CorrelationID,
-		DataVersion:   e.DataVersion,
-		Data:          e.Data,
-	})
+	body, err := encodeMessage(e)
 	if err != nil {
 		return fmt.Errorf("armar el mensaje: %w", err)
 	}
@@ -67,9 +114,11 @@ func (p *RabbitPublisher) Publish(ctx context.Context, e models.PendingEvent) er
 	if err != nil {
 		return err
 	}
+	p.discardOldReturns()
 
 	ctx, cancel := context.WithTimeout(ctx, publishTimout)
 	defer cancel()
+	// mandatory=true: si ninguna cola lo recibe, RabbitMQ lo devuelve en vez de descartarlo.
 	confirmation, err := ch.PublishWithDeferredConfirmWithContext(ctx, exchangeName, e.Type, true, false, amqp.Publishing{
 		ContentType:   "application/json",
 		DeliveryMode:  amqp.Persistent,
@@ -91,7 +140,30 @@ func (p *RabbitPublisher) Publish(ctx context.Context, e models.PendingEvent) er
 	if !ok {
 		return errors.New("RabbitMQ rechazó el mensaje")
 	}
+	// RabbitMQ manda la devolución antes que la confirmación, así que si hubo una, ya llegó.
+	select {
+	case r := <-p.returns:
+		if r.MessageId == e.ID {
+			return fmt.Errorf("%w (%s)", ErrNoQueue, e.Type)
+		}
+	default:
+	}
 	return nil
+}
+
+// discardOldReturns vacía devoluciones que hayan quedado de publicaciones anteriores.
+func (p *RabbitPublisher) discardOldReturns() {
+	for {
+		select {
+		case _, open := <-p.returns:
+			if !open {
+				// La librería cierra el canal cuando se cae la conexión.
+				return
+			}
+		default:
+			return
+		}
+	}
 }
 
 // ensureChannel abre la conexión y el canal si no están abiertos, declara el
@@ -119,6 +191,7 @@ func (p *RabbitPublisher) ensureChannel() (*amqp.Channel, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("activar las confirmaciones: %w", err)
 	}
+	p.returns = ch.NotifyReturn(make(chan amqp.Return, 16))
 	p.conn, p.channel = conn, ch
 	return ch, nil
 }
@@ -134,5 +207,5 @@ func (p *RabbitPublisher) closeLocked() {
 	if p.conn != nil {
 		_ = p.conn.Close()
 	}
-	p.conn, p.channel = nil, nil
+	p.conn, p.channel, p.returns = nil, nil, nil
 }

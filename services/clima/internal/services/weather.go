@@ -17,6 +17,9 @@ import (
 // ErrNoData indica que no hay un dato de clima reciente para responder (9.2).
 var ErrNoData = errors.New("no hay un dato de clima reciente")
 
+// ErrInvalidForced indica que la condición forzada no tiene sentido.
+var ErrInvalidForced = errors.New("condición forzada inválida")
+
 // maxConflictRetries es cuántas veces se reintenta guardar el estado si otro
 // proceso lo cambió en el medio.
 const maxConflictRetries = 3
@@ -109,6 +112,9 @@ type ForcedInput struct {
 
 // SetForced pone una condición forzada y devuelve la aptitud que resulta (9.12).
 func (s *WeatherService) SetForced(ctx context.Context, in ForcedInput) (models.Conditions, models.Operability, error) {
+	if err := in.validate(); err != nil {
+		return models.Conditions{}, models.Operability{}, err
+	}
 	base := models.Conditions{VisibilityM: 10000}
 	if obs, err := s.observations.Latest(ctx, s.airport.ICAO); err == nil {
 		base = obs.Conditions
@@ -297,4 +303,27 @@ func applyForced(c models.Conditions, in ForcedInput) models.Conditions {
 		c.Thunderstorm = *in.Thunderstorm
 	}
 	return c
+}
+
+// validate rechaza un pedido vacío, que congelaría el dato real como forzado sin que
+// nadie lo pida, y valores imposibles.
+func (in ForcedInput) validate() error {
+	if in == (ForcedInput{}) {
+		return fmt.Errorf("%w: hay que mandar al menos un valor", ErrInvalidForced)
+	}
+	nonNegative := map[string]*float64{
+		"wind_speed_kmh":   in.WindSpeedKmh,
+		"wind_gust_kmh":    in.WindGustKmh,
+		"visibility_m":     in.VisibilityM,
+		"precipitation_mm": in.PrecipitationMm,
+	}
+	for _, name := range []string{"wind_speed_kmh", "wind_gust_kmh", "visibility_m", "precipitation_mm"} {
+		if v := nonNegative[name]; v != nil && *v < 0 {
+			return fmt.Errorf("%w: %s no puede ser negativo", ErrInvalidForced, name)
+		}
+	}
+	if in.WindDirectionDeg != nil && (*in.WindDirectionDeg < 0 || *in.WindDirectionDeg > 360) {
+		return fmt.Errorf("%w: wind_direction_deg tiene que estar entre 0 y 360", ErrInvalidForced)
+	}
+	return nil
 }

@@ -92,6 +92,10 @@ func (ctl *ConditionsController) PutForced(c *gin.Context) {
 		return
 	}
 	conditions, apt, err := ctl.weather.SetForced(c.Request.Context(), in)
+	if errors.Is(err, services.ErrInvalidForced) {
+		writeProblem(c, http.StatusBadRequest, codeInvalidBody, err.Error(), 0)
+		return
+	}
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "no se pudo forzar la condición", "error", err)
 		writeProblem(c, http.StatusInternalServerError, codeInternalError, "", 0)

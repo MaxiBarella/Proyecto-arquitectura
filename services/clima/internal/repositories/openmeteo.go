@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/models"
@@ -31,16 +33,19 @@ func NewOpenMeteo() *OpenMeteo {
 	return &OpenMeteo{client: &http.Client{Timeout: openMeteoTimeout}, baseURL: openMeteoURL}
 }
 
+// Los valores son punteros para distinguir un dato que no vino de un 0: si falta
+// alguno, la observación se descarta en vez de leerse como 0 (por ejemplo, 0 metros
+// de visibilidad cerraría las pistas).
 type openMeteoResponse struct {
 	Current struct {
-		Time             string  `json:"time"`
-		TemperatureC     float64 `json:"temperature_2m"`
-		WindSpeedKmh     float64 `json:"wind_speed_10m"`
-		WindGustKmh      float64 `json:"wind_gusts_10m"`
-		WindDirectionDeg float64 `json:"wind_direction_10m"`
-		VisibilityM      float64 `json:"visibility"`
-		PrecipitationMm  float64 `json:"precipitation"`
-		WeatherCode      int     `json:"weather_code"`
+		Time             string   `json:"time"`
+		TemperatureC     *float64 `json:"temperature_2m"`
+		WindSpeedKmh     *float64 `json:"wind_speed_10m"`
+		WindGustKmh      *float64 `json:"wind_gusts_10m"`
+		WindDirectionDeg *float64 `json:"wind_direction_10m"`
+		VisibilityM      *float64 `json:"visibility"`
+		PrecipitationMm  *float64 `json:"precipitation"`
+		WeatherCode      *int     `json:"weather_code"`
 	} `json:"current"`
 }
 
@@ -77,17 +82,41 @@ func (o *OpenMeteo) Current(ctx context.Context, airport models.Airport) (models
 	}
 
 	c := body.Current
+	missing := missingFields(map[string]bool{
+		"temperature_2m":     c.TemperatureC == nil,
+		"wind_speed_10m":     c.WindSpeedKmh == nil,
+		"wind_gusts_10m":     c.WindGustKmh == nil,
+		"wind_direction_10m": c.WindDirectionDeg == nil,
+		"visibility":         c.VisibilityM == nil,
+		"precipitation":      c.PrecipitationMm == nil,
+		"weather_code":       c.WeatherCode == nil,
+	})
+	if len(missing) > 0 {
+		return models.Observation{}, fmt.Errorf("Open-Meteo no mandó %s", strings.Join(missing, ", "))
+	}
 	return models.Observation{
 		Airport:    airport.ICAO,
 		ObservedAt: observedAt,
 		Conditions: models.Conditions{
-			TemperatureC:     c.TemperatureC,
-			WindSpeedKmh:     c.WindSpeedKmh,
-			WindGustKmh:      c.WindGustKmh,
-			WindDirectionDeg: int(c.WindDirectionDeg),
-			VisibilityM:      c.VisibilityM,
-			PrecipitationMm:  c.PrecipitationMm,
-			Thunderstorm:     thunderstormCodes[c.WeatherCode],
+			TemperatureC:     *c.TemperatureC,
+			WindSpeedKmh:     *c.WindSpeedKmh,
+			WindGustKmh:      *c.WindGustKmh,
+			WindDirectionDeg: int(*c.WindDirectionDeg),
+			VisibilityM:      *c.VisibilityM,
+			PrecipitationMm:  *c.PrecipitationMm,
+			Thunderstorm:     thunderstormCodes[*c.WeatherCode],
 		},
 	}, nil
+}
+
+// missingFields devuelve, en orden alfabético, los campos marcados como faltantes.
+func missingFields(fields map[string]bool) []string {
+	var missing []string
+	for name, isMissing := range fields {
+		if isMissing {
+			missing = append(missing, name)
+		}
+	}
+	sort.Strings(missing)
+	return missing
 }

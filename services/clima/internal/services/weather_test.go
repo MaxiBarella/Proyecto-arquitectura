@@ -274,3 +274,62 @@ func TestSiFallaLaFuenteNoSeGuardaNada(t *testing.T) {
 		t.Error("no se tendría que haber guardado nada")
 	}
 }
+
+func TestForzadoRechazaValoresImposibles(t *testing.T) {
+	neg, dir := -5.0, 400
+	tests := map[string]ForcedInput{
+		"pedido vacío":         {},
+		"viento negativo":      {WindSpeedKmh: &neg},
+		"ráfagas negativas":    {WindGustKmh: &neg},
+		"visibilidad negativa": {VisibilityM: &neg},
+		"lluvia negativa":      {PrecipitationMm: &neg},
+		"dirección de 400°":    {WindDirectionDeg: &dir},
+	}
+	for name, in := range tests {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(true)
+			h.poll(t, calm)
+			if _, _, err := h.svc.SetForced(context.Background(), in); !errors.Is(err, ErrInvalidForced) {
+				t.Errorf("se esperaba ErrInvalidForced, fue %v", err)
+			}
+			if h.aptitude.state.Forced != nil {
+				t.Error("no se tendría que haber guardado la condición forzada")
+			}
+		})
+	}
+}
+
+// conflictingAptitude simula que otro proceso cambia el documento entre que el
+// servicio lo lee y lo guarda, las primeras conflicts veces.
+type conflictingAptitude struct {
+	fakeAptitude
+	conflicts int
+}
+
+func (f *conflictingAptitude) SavePublished(ctx context.Context, airport string, expected int64, published models.PublishedState, events []models.PendingEvent) error {
+	if f.conflicts > 0 {
+		f.conflicts--
+		return repositories.ErrConflict
+	}
+	return f.fakeAptitude.SavePublished(ctx, airport, expected, published, events)
+}
+
+func TestRefreshReintentaAnteUnConflicto(t *testing.T) {
+	h := newHarness(true)
+	apt := &conflictingAptitude{fakeAptitude: fakeAptitude{state: models.AptitudeState{Airport: "SACO"}}, conflicts: 2}
+	h.svc.aptitude = apt
+	h.poll(t, calm)
+	if len(apt.state.Outbox) != 1 {
+		t.Errorf("después de 2 conflictos tendría que haberse guardado el evento: %v", apt.state.Outbox)
+	}
+}
+
+func TestRefreshSeRindeDespuesDeTresConflictos(t *testing.T) {
+	h := newHarness(true)
+	apt := &conflictingAptitude{fakeAptitude: fakeAptitude{state: models.AptitudeState{Airport: "SACO"}}, conflicts: 3}
+	h.svc.aptitude = apt
+	h.source.obs = models.Observation{Airport: "SACO", ObservedAt: h.now, Conditions: calm}
+	if err := h.svc.Poll(context.Background()); !errors.Is(err, repositories.ErrConflict) {
+		t.Errorf("se esperaba ErrConflict, fue %v", err)
+	}
+}
