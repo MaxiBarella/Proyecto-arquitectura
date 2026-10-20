@@ -271,6 +271,8 @@ Son los puntos de la sección "Pendiente de definir" del [SPEC.md](../SPEC.md). 
 | 16 | Qué pasa si ningún alternativo está disponible | **No se contempla:** se asume que siempre hay uno disponible. |
 | 17 | Cómo se entera el sistema de que Clima no tiene datos | **Con un evento nuevo, "Clima sin datos"** (sección 4). Una condición forzada dura hasta que el operador la quita, y mientras dura manda sobre el dato real (agente). |
 | 18 | Si el bloque pedido tiene que coincidir con el horario del vuelo | **No: se puede pedir cualquier bloque, y con slot vale el horario del bloque.** El tablero muestra, ordena y filtra por el horario del slot; sin slot, por el publicado. Así un vuelo demorado puede pedir un bloque más tarde. Apareció al escribir los endpoints de Vuelos; lo eligió Maxi el 19/10/2026 y queda confirmado al mergearse el pull request #17. |
+| 19 | Si un vuelo puede tener el mismo origen y destino | **No, se rechaza al publicar.** Lo propuso Male en la revisión del pull request #19 y lo aceptó Maxi el 20/10/2026. |
+| 20 | Si se puede publicar un vuelo con horario en el pasado | **No, se rechaza.** Se compara con el momento en que se publica; no afecta a los demorados, que ya están publicados. Lo propuso Male en la revisión del pull request #19 y lo aceptó Maxi el 20/10/2026. |
 
 El pendiente 11 se resolvió en la 14.1. El 14 depende de la capacidad que asigne la cátedra.
 

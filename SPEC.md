@@ -157,6 +157,8 @@ Las cuentas no se registran desde el sistema: se cargan al arrancar. Hay un oper
 | RN-30 | Cada aerolínea ve y opera solo sus vuelos: publicarlos, pedirles slot y cancelarlos. El tablero público muestra los de todas. |
 | RN-31 | Solo la aerolínea dueña de un vuelo puede cancelarlo. |
 | RN-32 | Un vuelo programado pasa solo a finalizado cuando pasa su bloque. |
+| RN-40 | Un vuelo no puede tener el mismo origen y destino. |
+| RN-41 | No se puede publicar un vuelo con horario en el pasado. Se compara con el momento en que se publica. |
 
 ### Datos de un vuelo
 
@@ -179,7 +181,7 @@ Las cuentas no se registran desde el sistema: se cargan al arrancar. Hay un oper
 | RN-34 | Se puede buscar por texto en el número de vuelo y en la ciudad. |
 | RN-35 | El orden por defecto es por horario. También se puede ordenar por aerolínea y por ámbito. |
 | RN-36 | Los resultados se muestran de a 20 vuelos por página. |
-| RN-37 | Un cambio en un vuelo aparece en la búsqueda en 60 segundos como máximo. |
+| RN-37 | Un cambio en un vuelo llega al índice de búsqueda en 60 segundos como máximo. El tablero guarda cada consulta otros 60 segundos, así que el visitante lo ve en 2 minutos como máximo. |
 | RN-39 | En el tablero, el horario de un vuelo es el de su bloque si tiene slot, y el publicado si no. Con ese horario se muestra, se ordena y se filtra por fecha. |
 
 ## 6. Estados de un vuelo
@@ -264,6 +266,8 @@ Cada criterio indica la regla que comprueba.
 | CA-19 | Sección 3 | Dada una aerolínea con sesión, entonces no puede dar de alta, cerrar ni reabrir pistas. |
 | CA-26 | RN-30, RN-31 | Dada una aerolínea con sesión, cuando intenta pedir un slot para un vuelo de otra aerolínea o cancelarlo, entonces la operación se rechaza y el vuelo no cambia. |
 | CA-27 | RN-32 | Dado un vuelo programado, cuando pasa su bloque, entonces queda "Finalizado" sin que nadie lo marque. |
+| CA-34 | RN-40 | Dado un vuelo con origen y destino iguales, cuando la aerolínea lo publica, entonces se rechaza. |
+| CA-35 | RN-41 | Dado un vuelo con horario anterior al momento de publicarlo, cuando la aerolínea lo publica, entonces se rechaza. |
 | CA-28 | RN-28 | Dado un vuelo programado, cuando la aerolínea pide otro slot para él, entonces el pedido se rechaza y el vuelo conserva su slot. |
 
 ### Tablero
@@ -273,7 +277,7 @@ Cada criterio indica la regla que comprueba.
 | CA-29 | RN-33, RN-36 | Dado un tablero con más de 20 vuelos, cuando un visitante filtra por tipo de operación, entonces ve solo vuelos de ese tipo, de a 20 por página. |
 | CA-30 | RN-34 | Dado un vuelo `AR1550`, cuando un visitante busca "AR1550" o el nombre de su ciudad de origen o destino, entonces el vuelo aparece en los resultados. |
 | CA-31 | RN-35 | Dado un visitante que busca sin elegir orden, entonces los vuelos aparecen ordenados por horario. |
-| CA-32 | RN-37 | Dado un vuelo que cambia de estado, entonces el cambio se ve en la búsqueda antes de que pasen 60 segundos. |
+| CA-32 | RN-37 | Dado un vuelo que cambia de estado, entonces el cambio se ve en el tablero antes de que pasen 2 minutos. |
 | CA-33 | RN-38, RN-39 | Dado un vuelo publicado para las 14:30, cuando la aerolínea pide un slot libre en el bloque de las 18:00, entonces se le asigna y el tablero lo muestra a las 18:00. |
 
 ## 8. Fuera de alcance
@@ -311,8 +315,10 @@ Puntos que las decisiones tomadas no resuelven. Cada uno necesita una decisión 
 | 14 | Qué capacidad del grupo proveedor se consume y en qué flujo entra. Depende de la asignación de la cátedra. | F-19 |
 | 15 | **Resuelto en la versión 0.3:** la lista de alternativos es SAOU, SAAR, SAME, SABE y SAEZ (decisión 18). | RN-25, F-20 |
 | 16 | **Resuelto en la versión 0.3:** no se contempla; se asume que siempre hay un alternativo disponible (decisión 18). | RN-25, RN-26 |
-| 17 | **Resuelto en la versión 0.3:** la condición forzada dura hasta que el operador la quita y manda sobre el dato real (decisión 18). Cómo se entera el sistema de que Clima no tiene datos es de arquitectura y está en el ADR-005. | RN-24, RN-29, F-12, F-21 |
+| 17 | **Resuelto en la versión 0.3:** la condición forzada dura hasta que el operador la quita y manda sobre el dato real (decisión 18). Cómo se entera el sistema de que Clima no tiene datos es de arquitectura: es el evento "Clima sin datos" de la sección 4 de decisiones.md, que se suma al ADR-005 en su validación. | RN-24, RN-29, F-12, F-21 |
 | 18 | **Resuelto en la versión 0.3:** el bloque pedido no tiene que coincidir con el horario publicado; con slot, vale el horario del bloque (decisión 18). Apareció al escribir los endpoints de Vuelos. | RN-38, RN-39 |
+| 19 | **Resuelto en la versión 0.3:** un vuelo no puede tener el mismo origen y destino (decisión 18). Apareció en la revisión del pull request #19. | RN-40 |
+| 20 | **Resuelto en la versión 0.3:** no se publica un vuelo con horario en el pasado (decisión 18). Apareció en la revisión del pull request #19. | RN-41 |
 
 ## 10. Historial de cambios
 
@@ -322,4 +328,4 @@ Cuando una regla cambia, no se borra: se agrega una fila acá que dice qué camb
 |---|---|---|
 | 0.1 | 8/10/2026 | Primera versión, a partir de las decisiones del equipo del 7/10/2026. |
 | 0.2 | 8/10/2026 | Incorpora las decisiones que entraron con el contrato de Clima. El aeropuerto es Córdoba (2.8, RN-01). La aptitud es una sola y cierra todas las pistas (6.7, RN-15, CA-10). Los arribos desviados van al alternativo más cercano disponible (2.9, RN-18, RN-25, RN-26, F-20). Si Clima no tiene datos, decide el operador (6.19, RN-24, F-21). El clima forzado no sale hacia otros grupos (6.18, F-12). Se cierra el pendiente 13 y se abren el 15, el 16 y el 17. |
-| 0.3 | 19/10/2026 | Incorpora las decisiones 14.1, 14.2, 14.4, 17.1 y 18. Bloques de 15 minutos (RN-03). Se informan los 3 libres más cercanos (RN-09, F-04, CA-03). El cierre alcanza a los vuelos de ahí en adelante (RN-17, RN-18). Nuevas reglas: no se pide slot en pista cerrada (RN-27), no se cambia el slot (RN-28), duración de la condición forzada (RN-29), cada aerolínea opera solo sus vuelos (RN-30, RN-31), finalizado automático (RN-32, F-22) las del tablero (RN-33 a RN-37) y el horario que vale cuando el vuelo tiene slot (RN-38, RN-39). Se suman los datos del vuelo, la lista de alternativos (RN-25), las cuentas cargadas al arrancar y los criterios CA-23 a CA-33. Se anuncia que no se toma ningún bonus. Se cierran todos los pendientes salvo el 14. |
+| 0.3 | 19/10/2026 | Incorpora las decisiones 14.1, 14.2, 14.4, 17.1 y 18. Bloques de 15 minutos (RN-03). Se informan los 3 libres más cercanos (RN-09, F-04, CA-03). El cierre alcanza a los vuelos de ahí en adelante (RN-17, RN-18). Nuevas reglas: no se pide slot en pista cerrada (RN-27), no se cambia el slot (RN-28), duración de la condición forzada (RN-29), cada aerolínea opera solo sus vuelos (RN-30, RN-31), finalizado automático (RN-32, F-22) las del tablero (RN-33 a RN-37) el horario que vale cuando el vuelo tiene slot (RN-38, RN-39) y dos validaciones al publicar (RN-40, RN-41). El atraso del tablero queda en 2 minutos: 60 segundos del índice más 60 de la caché (RN-37, 10.3). Se suman los datos del vuelo, la lista de alternativos (RN-25), las cuentas cargadas al arrancar y los criterios CA-23 a CA-35. Se anuncia que no se toma ningún bonus. Se cierran todos los pendientes salvo el 14. |
