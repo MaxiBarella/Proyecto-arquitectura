@@ -71,6 +71,7 @@ type Flight struct {
 }
 
 // NewFlight valida los datos y crea el vuelo en "pendiente de slot", sin slot (RN-06).
+// Rechaza origen igual al destino (RN-40) y un horario anterior a now (RN-41).
 func NewFlight(id, airline string, d NewFlightData, now time.Time) (*Flight, error) {
 	if strings.TrimSpace(airline) == "" {
 		return nil, fmt.Errorf("%w: falta la aerolínea", ErrInvalidFlight)
@@ -102,8 +103,14 @@ func NewFlight(id, airline string, d NewFlightData, now time.Time) (*Flight, err
 	if isHomeCity(destination) {
 		destination = HomeCity
 	}
+	if strings.EqualFold(withoutAccents.Replace(origin), withoutAccents.Replace(destination)) {
+		return nil, fmt.Errorf("%w: el origen y el destino no pueden ser iguales", ErrInvalidFlight)
+	}
 	if d.ScheduledAt.IsZero() {
 		return nil, fmt.Errorf("%w: falta el horario", ErrInvalidFlight)
+	}
+	if d.ScheduledAt.Before(now) {
+		return nil, fmt.Errorf("%w: el horario ya pasó", ErrInvalidFlight)
 	}
 
 	return &Flight{

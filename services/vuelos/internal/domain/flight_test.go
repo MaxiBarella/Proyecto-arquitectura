@@ -106,6 +106,8 @@ func TestNewFlightRejectsInvalidData(t *testing.T) {
 		"despegue que no sale de acá":   func(d *NewFlightData) { d.Origin = "Rosario" },
 		"arribo que no llega acá":       func(d *NewFlightData) { d.Type = Arrival },
 		"despegue con origen en blanco": func(d *NewFlightData) { d.Origin = "" },
+		"origen igual al destino":       func(d *NewFlightData) { d.Destination = "cordoba" },             // RN-40, CA-34
+		"horario en el pasado":          func(d *NewFlightData) { d.ScheduledAt = now.Add(-time.Minute) }, // RN-41, CA-35
 	}
 	for name, change := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -119,6 +121,14 @@ func TestNewFlightRejectsInvalidData(t *testing.T) {
 
 	if _, err := NewFlight("id-1", "", departureData(), now); !errors.Is(err, ErrInvalidFlight) {
 		t.Errorf("sin aerolínea: got %v, want ErrInvalidFlight", err)
+	}
+}
+
+func TestNewFlightAcceptsScheduleRightNow(t *testing.T) {
+	d := departureData()
+	d.ScheduledAt = now
+	if _, err := NewFlight("id-1", "AR", d, now); err != nil {
+		t.Errorf("un horario igual al momento de publicar no está en el pasado: %v", err)
 	}
 }
 
