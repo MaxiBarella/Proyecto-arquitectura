@@ -12,8 +12,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	httpadapter "github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/http"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/mysql"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/commands"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/observability"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/queries"
 )
 
 const serviceName = "vuelos"
@@ -78,8 +81,7 @@ func run(logger *slog.Logger) (err error) {
 			_ = sqlDB.Close()
 		}
 	}()
-	// Lo usan los comandos y los consumidores de eventos, que vienen en otro PR.
-	_ = mysql.NewRepository(db)
+	flights := mysql.NewRepository(db)
 
 	// Sin GIN_MODE, Gin escribe avisos en texto que se mezclarían con los logs JSON.
 	if os.Getenv(gin.EnvGinMode) == "" {
@@ -94,6 +96,7 @@ func run(logger *slog.Logger) (err error) {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": serviceName})
 	})
+	httpadapter.Register(router, commands.New(flights), queries.New(flights))
 
 	server := &http.Server{
 		Addr:              ":" + port,
