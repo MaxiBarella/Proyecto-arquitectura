@@ -68,6 +68,22 @@ Con Usuarios, los microservicios pasan de tres a **cuatro**, más el API gateway
 
 Las decisiones 4.5 a 4.9 las tomó Salvador el 8/10/2026, al escribir el [ADR-005](adr/ADR-005.md). Quedaron confirmadas al mergearse el pull request #8.
 
+Las decisiones 4.11 a 4.13 las tomó Maxi el 21/10/2026, al cerrar el contrato entre Vuelos y Pistas: Carola, que programa Pistas, le delegó la elección. Quedan confirmadas al mergearse el pull request #18.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 4.11 | Cómo se identifican la pista y el bloque | **Pista: un nombre sin barra, como `05-23`. Bloque: su hora de inicio en UTC** | El nombre lo pone Pistas al cargar las dos pistas (RN-02). Va sin barra para que no rompa rutas como `/runways/05-23/close`. El bloque se indica con la hora en que empieza, en múltiplos de 15 minutos (RN-03), por ejemplo `2026-10-23T14:30:00Z`. |
+| 4.12 | Datos de los eventos entre Vuelos y Pistas | **Lo mínimo que usa el que los recibe** | Ver la tabla de abajo. Pistas no guarda los datos del vuelo, que son de Vuelos: solo su identificador y su tipo, que Vuelos manda al pedir el slot porque Pistas lo necesita para la prioridad de los arribos (RN-11). |
+| 4.13 | Cómo se asegura que las colas existan antes del primer evento | **Un archivo de definiciones de RabbitMQ** | Al arrancar, antes que los servicios, RabbitMQ crea el exchange, la cola de cada consumidor, sus uniones y sus colas de mensajes fallidos (4.8). Así no se pierde un evento publicado antes de que arranque el que lo recibe. Además, un publicador no saca un evento del outbox si RabbitMQ se lo devuelve por no tener cola. El archivo se suma al `docker-compose.yml`, que edita la pareja 2. |
+
+| Evento | Datos (4.12) |
+|---|---|
+| Slot asignado | `flight_id`, `runway_id` y `block_start`. |
+| Slot cedido a un arribo | `flight_id` del despegue que lo pierde, `runway_id`, `block_start` y `taken_by_flight_id`, el arribo que se lo queda. |
+| Slot liberado por cierre | `flight_id`, `runway_id`, `block_start` y `diverted_to`: el código ICAO del alternativo si es un arribo (RN-25), o `null` si es un despegue. |
+| Pista cerrada / reabierta | `runway_id` y `reason`: `weather` si la cerró el clima, `operator` si la cerró el operador. |
+| Vuelo cancelado | `flight_id`. |
+
 | Evento | Quién lo publica | Quién lo recibe y para qué |
 |---|---|---|
 | Slot asignado | Pistas | Vuelos: pasa el vuelo a "programado" y actualiza el tablero. |

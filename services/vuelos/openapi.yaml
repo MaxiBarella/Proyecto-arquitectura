@@ -188,7 +188,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Slot'
             example:
-              runway_id: '05'
+              runway_id: '05-23'
               block_start: '2026-10-23T14:30:00Z'
       responses:
         '202':
@@ -203,7 +203,7 @@ paths:
               example:
                 flight_id: 7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b
                 slot:
-                  runway_id: '05'
+                  runway_id: '05-23'
                   block_start: '2026-10-23T14:30:00Z'
                 status: pending_slot
         '400':
@@ -422,12 +422,12 @@ components:
       properties:
         runway_id:
           type: string
-          description: Identificador de la pista, el mismo que usa Pistas.
-          example: '05'
+          description: Nombre de la pista, sin barra, como lo carga Pistas (4.11).
+          example: '05-23'
         block_start:
           type: string
           format: date-time
-          description: Comienzo del bloque, en UTC. Tiene que caer justo en un múltiplo de 15 minutos (RN-03).
+          description: Comienzo del bloque, en UTC. Tiene que caer justo en un múltiplo de 15 minutos (RN-03, 4.11).
           example: '2026-10-23T14:30:00Z'
 
     Flight:
@@ -664,15 +664,15 @@ components:
                 type: /problems/slot-taken
                 title: Slot ocupado
                 status: 409
-                detail: La pista 05 ya tiene un vuelo a las 14:30.
+                detail: La pista 05-23 ya tiene un vuelo a las 14:30.
                 instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/slot-request
                 code: SLOT_TAKEN
                 nearest_free_slots:
-                  - runway_id: '23'
+                  - runway_id: '18-36'
                     block_start: '2026-10-23T14:30:00Z'
-                  - runway_id: '05'
+                  - runway_id: '05-23'
                     block_start: '2026-10-23T14:15:00Z'
-                  - runway_id: '05'
+                  - runway_id: '05-23'
                     block_start: '2026-10-23T14:45:00Z'
             closed:
               summary: Pista cerrada (RN-27, CA-23)
@@ -680,7 +680,7 @@ components:
                 type: /problems/runway-closed
                 title: Pista cerrada
                 status: 409
-                detail: La pista 05 está cerrada.
+                detail: La pista 05-23 está cerrada.
                 instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/slot-request
                 code: RUNWAY_CLOSED
             state:
