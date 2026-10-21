@@ -90,6 +90,15 @@ Las decisiones 4.5 a 4.9 las tomó Salvador el 8/10/2026, al escribir el [ADR-00
 
 Las decisiones 5.3 a 5.5 las tomó Salvador el 8/10/2026, al escribir el [ADR-003](adr/ADR-003.md). Quedaron confirmadas al mergearse el pull request #8.
 
+Las decisiones 5.6 a 5.9 las tomó Maxi el 21/10/2026, al programar cómo guarda Vuelos sus datos. Quedan confirmadas al mergearse el pull request de la rama `feat/mysql-vuelos`. Valen para Vuelos; Pistas y Usuarios pueden seguir el mismo modelo.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 5.6 | Cómo se crean las tablas | **Un script SQL que MySQL corre al crear la base** | Está en `services/vuelos/db/`. Por qué: las dos instancias de Vuelos (12.1) arrancan a la vez y así ninguna compite por crear las tablas; además los tests de integración usan el mismo archivo. Lo que se paga: si una tabla cambia, hay que borrar el volumen con `docker compose down -v`. |
+| 5.7 | Dos cambios a la vez sobre el mismo vuelo | **Bloquear la fila mientras se cambia** | El vuelo se lee con `SELECT ... FOR UPDATE` dentro de la transacción: el segundo cambio espera al primero y trabaja sobre el estado nuevo. Por ejemplo, una cancelación y un "slot asignado" que llegan juntos. |
+| 5.8 | Cómo se generan los identificadores | **Una función propia, como en Clima** | Un UUID versión 4 hecho con `crypto/rand`, sin sumar librerías. |
+| 5.9 | Cómo se conecta Vuelos a MySQL | **Usuario propio y la variable `MYSQL_DSN`** | La imagen de MySQL crea un usuario con acceso solo a la base `vuelos`. El Docker Compose arma `MYSQL_DSN` con ese usuario. Vuelos no usa root. |
+
 ## 6. Clima hacia afuera
 
 | # | Decisión | Elegido | Qué significa |
