@@ -90,7 +90,7 @@ Las decisiones 4.5 a 4.9 las tomó Salvador el 8/10/2026, al escribir el [ADR-00
 
 Las decisiones 5.3 a 5.5 las tomó Salvador el 8/10/2026, al escribir el [ADR-003](adr/ADR-003.md). Quedaron confirmadas al mergearse el pull request #8.
 
-Las decisiones 5.6 a 5.9 las tomó Maxi el 21/10/2026, al programar cómo guarda Vuelos sus datos. Quedan confirmadas al mergearse el pull request de la rama `feat/mysql-vuelos`. Valen para Vuelos; Pistas y Usuarios pueden seguir el mismo modelo.
+Las decisiones 5.6 a 5.9 las tomó Maxi el 21/10/2026, al programar cómo guarda Vuelos sus datos. Quedan confirmadas al mergearse el pull request #24. Valen para Vuelos; Pistas y Usuarios pueden seguir el mismo modelo.
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
