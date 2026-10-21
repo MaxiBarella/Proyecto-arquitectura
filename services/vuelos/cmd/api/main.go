@@ -14,6 +14,7 @@ import (
 
 	httpadapter "github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/http"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/mysql"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/pistas"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/commands"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/observability"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/queries"
@@ -69,6 +70,10 @@ func run(logger *slog.Logger) (err error) {
 	if dsn == "" {
 		return errors.New("falta la variable MYSQL_DSN")
 	}
+	pistasURL := os.Getenv("PISTAS_URL")
+	if pistasURL == "" {
+		return errors.New("falta la variable PISTAS_URL")
+	}
 
 	connectCtx, cancel := context.WithTimeout(ctx, dbConnectTimeout)
 	db, err := mysql.Open(connectCtx, dsn)
@@ -96,7 +101,8 @@ func run(logger *slog.Logger) (err error) {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": serviceName})
 	})
-	httpadapter.Register(router, commands.New(flights), queries.New(flights))
+	slots := pistas.NewClient(pistas.DefaultConfig(pistasURL))
+	httpadapter.Register(router, commands.New(flights, slots), queries.New(flights))
 
 	server := &http.Server{
 		Addr:              ":" + port,

@@ -78,11 +78,13 @@ Las decisiones 4.5 a 4.9 las tomó Salvador el 8/10/2026, al escribir el [ADR-00
 | Vuelo cancelado | Vuelos | Pistas: libera el slot. |
 | Clima sin datos | Clima | Pistas: deja de cerrar y reabrir solo y muestra el aviso al operador (6.19). Se sumó en la Entrega 2 (sección 18, pendiente 17). |
 
-La 4.14 la tomó Maxi el 21/10/2026 y queda confirmada al mergearse el pull request #26. Las claves de Pistas las eligió por Carola, que le delegó la elección.
+La 4.14 la tomó Maxi el 21/10/2026 y queda confirmada al mergearse el pull request #26; la 4.15 y la 4.16, al mergearse el pull request de la rama `feat/pedido-de-slot`. Las claves y la ruta de Pistas las eligió por Carola, que le delegó la elección.
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 4.14 | Claves de ruteo de los eventos | **Servicio, cosa y qué pasó, en español, como las de Clima (9.14)** | `vuelos.vuelo.cancelado`; `pistas.slot.asignado`, `pistas.slot.cedido`, `pistas.slot.liberado_por_cierre`, `pistas.pista.cerrada` y `pistas.pista.reabierta`. Así un consumidor puede pedir todo lo de un servicio con `pistas.#`. |
+| 4.15 | Cómo pide Vuelos el slot a Pistas | **`POST /internal/slots` en Pistas** | Con `flight_id`, `flight_type`, `runway_id` y `block_start`. Responde `200` con el slot asignado (también si se repite el mismo pedido, 4.6), o `409` con `SLOT_TAKEN` y los 3 libres, `RUNWAY_CLOSED` o `FLIGHT_ALREADY_HAS_SLOT`, o `404` con `RUNWAY_NOT_FOUND`. Es interna: el gateway no la expone (15.7). El contrato está en `services/pistas/openapi.yaml`. La eligió Maxi por Carola, que le delegó la elección. |
+| 4.16 | Los 2 segundos del pedido de slot (4.5) | **Son por intento** | Cada llamada a Pistas tiene 2 segundos. Si Pistas no contesta nunca, la aerolínea espera unos 7 segundos: 3 intentos más las esperas. Así los reintentos sirven también cuando Pistas está lento. |
 
 ## 5. Datos
 
@@ -228,6 +230,7 @@ Quién eligió cada cosa:
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 13.1 | Dónde va el mecanismo de protección | **B. Circuit breaker de Vuelos a Pistas** | Si Pistas viene fallando, Vuelos deja de llamarla un rato y los vuelos quedan "pendiente de slot". Se suma al timeout y los reintentos de la 4.5. Por qué: el efecto se ve en el frontend. |
+| 13.2 | Valores del circuit breaker | **5 fallas seguidas, 30 segundos abierto, 1 pedido de prueba** (Maxi, 21/10/2026) | Cuenta como falla un pedido que no consiguió respuesta de Pistas después de los reintentos, o al que Pistas respondió con un error suyo (por ejemplo, `500`). Un rechazo, como slot ocupado o pista cerrada, no cuenta. Abierto, Vuelos responde `503` enseguida, con `Retry-After: 30`. Pasados los 30 segundos deja pasar un pedido: si anda, se cierra; si falla, se abre otra vez. Queda confirmada al mergearse el pull request de la rama `feat/pedido-de-slot`. |
 
 ## 14. Búsqueda (ADR D6)
 

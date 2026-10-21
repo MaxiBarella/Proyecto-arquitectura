@@ -81,17 +81,33 @@ func (m *memStore) ListByAirline(_ context.Context, airline string, status domai
 	return all[start:end], int64(len(all)), nil
 }
 
+// fakeSlots hace de Pistas: responde lo que el test le indique y guarda lo que le piden.
+type fakeSlots struct {
+	err error
+	got []commands.SlotRequest
+}
+
+func (f *fakeSlots) RequestSlot(_ context.Context, req commands.SlotRequest) (domain.Slot, error) {
+	f.got = append(f.got, req)
+	if f.err != nil {
+		return domain.Slot{}, f.err
+	}
+	return req.Slot, nil
+}
+
 type testServer struct {
 	router *gin.Engine
 	store  *memStore
+	slots  *fakeSlots
 }
 
 func newServer() *testServer {
 	gin.SetMode(gin.TestMode)
 	store := newMemStore()
+	slots := &fakeSlots{}
 	r := gin.New()
-	Register(r, commands.New(store), queries.New(store))
-	return &testServer{router: r, store: store}
+	Register(r, commands.New(store, slots), queries.New(store))
+	return &testServer{router: r, store: store, slots: slots}
 }
 
 // Encabezados de identidad que pone el gateway (15.6).
@@ -277,5 +293,94 @@ func TestCancel(t *testing.T) {
 	}
 	if len(s.store.outbox) != 1 {
 		t.Errorf("el rechazo no tiene que dejar eventos: %d", len(s.store.outbox))
+	}
+}
+
+func slotBody(runway string, start time.Time) map[string]any {
+	return map[string]any{"runway_id": runway, "block_start": start.Format(time.RFC3339)}
+}
+
+func TestRequestSlotAccepted(t *testing.T) {
+	s := newServer()
+	f := s.publish(t, aerolineasArgentinas)
+	start := f.ScheduledAt.Truncate(15 * time.Minute)
+
+	rec := s.do(t, http.MethodPost, "/flights/"+f.ID+"/slot-request", aerolineasArgentinas, slotBody("05-23", start))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("got %d %s", rec.Code, rec.Body.String())
+	}
+	got := decode[slotAccepted](t, rec)
+	// El vuelo sigue pendiente: pasa a programado con el evento (4.1).
+	if got.Status != "pending_slot" || got.Slot.RunwayID != "05-23" || !got.Slot.BlockStart.Equal(start) {
+		t.Errorf("respuesta: %+v", got)
+	}
+	// A Pistas le llega el tipo del vuelo, para la prioridad de los arribos (4.12).
+	if len(s.slots.got) != 1 || s.slots.got[0].FlightType != domain.Departure || s.slots.got[0].FlightID != f.ID {
+		t.Errorf("pedido a Pistas: %+v", s.slots.got)
+	}
+}
+
+func TestRequestSlotErrors(t *testing.T) {
+	nearest := []domain.Slot{{RunwayID: "18-36", BlockStart: time.Date(2026, 10, 23, 14, 30, 0, 0, time.UTC)}}
+	cases := []struct {
+		name       string
+		pistas     error
+		status     int
+		code       string
+		retryAfter string
+	}{
+		{"slot ocupado (CA-03)", &commands.SlotTakenError{Nearest: nearest}, http.StatusConflict, codeSlotTaken, ""},
+		{"pista cerrada (CA-23)", commands.ErrRunwayClosed, http.StatusConflict, codeRunwayClosed, ""},
+		{"pista inexistente", commands.ErrRunwayNotFound, http.StatusNotFound, codeRunwayNotFound, ""},
+		{"Pistas no responde (13.1)", commands.ErrRunwaysUnavailable, http.StatusServiceUnavailable, codeRunwaysUnavailable, "30"},
+		{"el vuelo ya tiene slot en Pistas", domain.ErrInvalidTransition, http.StatusConflict, codeInvalidTransition, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := newServer()
+			f := s.publish(t, aerolineasArgentinas)
+			s.slots.err = c.pistas
+			rec := s.do(t, http.MethodPost, "/flights/"+f.ID+"/slot-request", aerolineasArgentinas,
+				slotBody("05-23", f.ScheduledAt.Truncate(15*time.Minute)))
+			p := decode[problem](t, rec)
+			if rec.Code != c.status || p.Code != c.code || rec.Header().Get("Retry-After") != c.retryAfter {
+				t.Errorf("got %d %s, Retry-After %q", rec.Code, rec.Body.String(), rec.Header().Get("Retry-After"))
+			}
+			if c.code == codeSlotTaken && (len(p.NearestFreeSlots) != 1 || p.NearestFreeSlots[0].RunwayID != "18-36") {
+				t.Errorf("faltan los libres más cercanos: %+v", p.NearestFreeSlots)
+			}
+		})
+	}
+}
+
+func TestRequestSlotIsCheckedBeforeCallingPistas(t *testing.T) {
+	s := newServer()
+	f := s.publish(t, aerolineasArgentinas)
+	start := f.ScheduledAt.Truncate(15 * time.Minute)
+	path := "/flights/" + f.ID + "/slot-request"
+
+	cases := []struct {
+		name    string
+		headers map[string]string
+		body    map[string]any
+		status  int
+	}{
+		{"bloque fuera de un múltiplo de 15 minutos", aerolineasArgentinas, slotBody("05-23", start.Add(7*time.Minute)), http.StatusBadRequest},
+		{"sin pista", aerolineasArgentinas, slotBody("", start), http.StatusBadRequest},
+		{"vuelo de otra aerolínea (CA-26)", latam, slotBody("05-23", start), http.StatusForbidden},
+	}
+	for _, c := range cases {
+		if rec := s.do(t, http.MethodPost, path, c.headers, c.body); rec.Code != c.status {
+			t.Errorf("%s: got %d %s", c.name, rec.Code, rec.Body.String())
+		}
+	}
+
+	// Un vuelo cancelado no pide slot (CA-15).
+	s.do(t, http.MethodPost, "/flights/"+f.ID+"/cancel", aerolineasArgentinas, nil)
+	if rec := s.do(t, http.MethodPost, path, aerolineasArgentinas, slotBody("05-23", start)); rec.Code != http.StatusConflict {
+		t.Errorf("cancelado: got %d", rec.Code)
+	}
+	if len(s.slots.got) != 0 {
+		t.Errorf("no se tendría que haber llamado a Pistas: %+v", s.slots.got)
 	}
 }

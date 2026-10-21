@@ -32,11 +32,12 @@ type FlightStore interface {
 // Service es el lado de escritura de Vuelos (CQRS, 7.3).
 type Service struct {
 	flights FlightStore
+	slots   SlotRequester
 	now     func() time.Time
 }
 
-func New(flights FlightStore) *Service {
-	return &Service{flights: flights, now: func() time.Time { return time.Now().UTC() }}
+func New(flights FlightStore, slots SlotRequester) *Service {
+	return &Service{flights: flights, slots: slots, now: func() time.Time { return time.Now().UTC() }}
 }
 
 // Publish publica un vuelo de la aerolínea del pedido (F-02). Queda en

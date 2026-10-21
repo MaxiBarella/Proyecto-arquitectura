@@ -4,7 +4,7 @@ Organización interna: **CQRS** (decisión 7.3 de [docs/decisiones.md](../../doc
 
 El servicio arranca, se conecta a MySQL y responde `GET /health`. Ya tiene el vuelo con sus estados (`internal/domain`) y cómo se guarda (`internal/adapters/mysql`); faltan los endpoints y los eventos.
 
-Se conecta a MySQL con la variable `MYSQL_DSN`, que arma el Docker Compose con el usuario propio de Vuelos.
+Se conecta a MySQL con la variable `MYSQL_DSN`, que arma el Docker Compose con el usuario propio de Vuelos, y le pide los slots a Pistas en `PISTAS_URL`.
 
 Tests: `go test ./...`. Los del adaptador de MySQL levantan un MySQL real con testcontainers y necesitan Docker abierto; sin Docker, se saltean.
 
@@ -19,6 +19,7 @@ Tests: `go test ./...`. Los del adaptador de MySQL levantan un MySQL real con te
 | `db` | Las tablas de MySQL. La base las crea la primera vez que arranca; si cambian, hay que borrar el volumen con `docker compose down -v`. |
 | `internal/adapters/rabbitmq` | Publica y consume eventos en RabbitMQ. |
 | `internal/observability` | Logs en JSON, trazas y métricas con OpenTelemetry. Es una copia de la carpeta de Clima: se copia, no se importa. |
+| `internal/adapters/pistas` | Le pide los slots a Pistas, con timeout, reintentos y circuit breaker (4.5, 13.1). |
 | `internal/adapters/solr` | Mantiene y consulta el índice de búsqueda en Solr. |
 
 Puerto en el arranque local: `8081`.

@@ -1,7 +1,9 @@
 package httpadapter
 
 import (
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,6 +26,7 @@ func Register(r gin.IRouter, cmds *commands.Service, qs *queries.Service) {
 	flights.GET("", h.listOwn)
 	flights.GET("/:id", h.getOwn)
 	flights.POST("/:id/cancel", h.cancel)
+	flights.POST("/:id/slot-request", h.requestSlot)
 }
 
 type handlers struct {
@@ -191,6 +194,59 @@ func (h *handlers) cancel(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, toResponse(f))
+}
+
+type slotAccepted struct {
+	FlightID string  `json:"flight_id"`
+	Slot     slotDTO `json:"slot"`
+	Status   string  `json:"status"`
+}
+
+// runwaysRetryAfter son los segundos que se le piden a la aerolínea antes de
+// reintentar si Pistas no está disponible: lo que queda abierto el circuit
+// breaker (13.2).
+const runwaysRetryAfter = 30
+
+// requestSlot responde POST /flights/:id/slot-request (F-03, F-05). Si Pistas
+// asigna el slot responde 202: el vuelo pasa a programado con el evento (4.1).
+func (h *handlers) requestSlot(c *gin.Context) {
+	var req slotDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeProblem(c, http.StatusBadRequest, codeInvalidRequest, fmt.Sprintf("No se pudo leer el cuerpo: %v", err), 0)
+		return
+	}
+	f, assigned, err := h.cmds.RequestSlot(c.Request.Context(), identity(c), c.Param("id"),
+		domain.Slot{RunwayID: req.RunwayID, BlockStart: req.BlockStart})
+
+	var taken *commands.SlotTakenError
+	switch {
+	case err == nil:
+		c.JSON(http.StatusAccepted, slotAccepted{
+			FlightID: f.ID,
+			Slot:     slotDTO{RunwayID: assigned.RunwayID, BlockStart: assigned.BlockStart.UTC()},
+			Status:   string(f.Status),
+		})
+	case errors.As(err, &taken):
+		nearest := make([]slotDTO, len(taken.Nearest))
+		for i, s := range taken.Nearest {
+			nearest[i] = slotDTO{RunwayID: s.RunwayID, BlockStart: s.BlockStart.UTC()}
+		}
+		writeProblemBody(c, http.StatusConflict, problem{
+			Code:             codeSlotTaken,
+			Detail:           fmt.Sprintf("La pista %s ya tiene un vuelo en ese bloque.", req.RunwayID),
+			NearestFreeSlots: nearest,
+		}, 0)
+	case errors.Is(err, commands.ErrRunwayClosed):
+		writeProblem(c, http.StatusConflict, codeRunwayClosed, fmt.Sprintf("La pista %s está cerrada.", req.RunwayID), 0)
+	case errors.Is(err, commands.ErrRunwayNotFound):
+		writeProblem(c, http.StatusNotFound, codeRunwayNotFound, fmt.Sprintf("No existe la pista %s.", req.RunwayID), 0)
+	case errors.Is(err, commands.ErrRunwaysUnavailable):
+		slog.WarnContext(c.Request.Context(), "no se pudo pedir el slot", "error", err)
+		writeProblem(c, http.StatusServiceUnavailable, codeRunwaysUnavailable,
+			"No se pudo pedir el slot. El vuelo sigue como estaba.", runwaysRetryAfter)
+	default:
+		writeError(c, err)
+	}
 }
 
 // pageSize es la cantidad de vuelos por página (14.4).
