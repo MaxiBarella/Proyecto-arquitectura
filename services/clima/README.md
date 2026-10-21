@@ -19,7 +19,9 @@ Consulta a Open-Meteo cada 15 minutos, guarda la observación en MongoDB y calcu
 | `RABBITMQ_URL` | Conexión a RabbitMQ, si está habilitado. |
 | `PORT` | Puerto. Por defecto `8080`. |
 
-Tests: `go test ./...` desde esta carpeta.
+Tests: `go test ./...` desde esta carpeta. Los de integración levantan MongoDB con Docker (testcontainers-go); `go test -short ./...` los saltea.
+
+**La copia de la nube** está en Render (`https://clima-aeropuerto.onrender.com`) con MongoDB Atlas (ADR-015). Render no despliega solo: después de cada merge a la rama que usa, hay que entrar a Render y tocar **Manual Deploy → Deploy latest commit**. Si Open-Meteo rechaza las consultas (`429` en los logs de Render), es por el límite por IP del plan gratuito: Clima reintenta cada minuto.
 
 | Carpeta | Para qué es |
 |---|---|
