@@ -22,3 +22,5 @@ Tests: `go test ./...`. Los del adaptador de MySQL levantan un MySQL real con te
 | `internal/adapters/solr` | Mantiene y consulta el índice de búsqueda en Solr. |
 
 Puerto en el arranque local: `8081`.
+
+Los endpoints están en [openapi.yaml](openapi.yaml).
