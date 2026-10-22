@@ -6,11 +6,12 @@ Este documento alcanza para integrarse sin hablar con nosotros. El contrato form
 
 | | |
 |---|---|
-| **Versión vigente** | `2.0.0` |
-| **Estado** | Contrato y mock disponibles. La implementación real se publica en la nube para la Entrega 2. |
+| **Versión vigente** | `2.0.1` |
+| **Dirección** | `https://clima-aeropuerto.onrender.com` |
+| **Estado** | Publicado. Para probar sin conectarse, el mock corre local (ver abajo). |
 | **Formato** | JSON. Errores en `application/problem+json`. |
 | **Autenticación** | Una clave por grupo consumidor, en el header `X-API-Key`. |
-| **Límite** | 60 pedidos por minuto por clave. |
+| **Límite** | En promedio 60 pedidos por minuto por clave, con ráfagas de hasta 60. |
 
 ## Operación
 
@@ -60,7 +61,7 @@ Devuelve la última observación del aeropuerto y su aptitud operativa.
 | `conditions.wind_gust_kmh` | número | Ráfagas a 10 m, en km/h. |
 | `conditions.wind_direction_deg` | entero, 0 a 360 | Dirección de la que viene el viento (0 = norte). |
 | `conditions.visibility_m` | número | Visibilidad horizontal, en metros. |
-| `conditions.precipitation_mm` | número | Precipitación de la última hora, en mm. |
+| `conditions.precipitation_mm` | número | Precipitación de los últimos 15 minutos, en mm. |
 | `conditions.thunderstorm` | booleano | Si hay tormenta eléctrica. |
 | `operability.operable` | booleano | Si se puede operar, tanto para aterrizar como para despegar. |
 | `operability.reasons` | lista de textos | Por qué no se puede operar. Vacía si `operable` es `true`. |
@@ -116,7 +117,7 @@ Cualquier otro `5xx` se puede reintentar con espera creciente.
 ## Condiciones de uso
 
 - **Clave.** Cada grupo consumidor recibe su propia clave. No la subas a tu repositorio: guardala como secreto o variable de entorno.
-- **Límite.** 60 pedidos por minuto por clave. Cada respuesta `200` trae el header `X-RateLimit-Remaining` con los pedidos que te quedan en el minuto.
+- **Límite.** En promedio 60 pedidos por minuto por clave: podés hacer una ráfaga de hasta 60 seguidos, y después se libera un lugar por segundo. Cada respuesta `200` trae el header `X-RateLimit-Remaining` con los pedidos que te quedan en el minuto.
 - **Idempotencia.** La operación es de solo lectura: repetir un pedido no cambia nada, así que se puede reintentar sin riesgo.
 - **Frescura.** Consultamos la fuente cada 15 minutos y respondemos con la última observación guardada, así que el dato puede tener hasta 30 minutos. Pasado eso respondemos `503`. Usá `observed_at` para decidir si el dato te sirve.
 - **Servicio dormido.** El servicio publicado corre en un plan gratuito que lo duerme cuando no recibe pedidos. El primer pedido después de un rato tarda cerca de un minuto y puede traer un dato viejo o un `503`. Usá un timeout de al menos 60 segundos en ese primer pedido, o reintentá.
@@ -128,6 +129,14 @@ Cualquier otro `5xx` se puede reintentar con espera creciente.
 - **Cambios compatibles**, que suben el número del medio (`2.1.0`): agregar campos a la respuesta, agregar valores nuevos a `reasons` o a `code`, agregar operaciones o aeropuertos atendidos. Tu cliente tiene que **ignorar los campos que no conoce** y tratar un motivo o código desconocido como genérico.
 - **Cambios que rompen**, que suben el primer número (`3.0.0`): quitar o renombrar campos o rutas, cambiar tipos o unidades, cambiar el significado de un campo o de un código de error. Se avisan en el historial antes de aplicarse.
 - Los umbrales de aptitud pueden ajustarse sin cambiar la versión; si cambian, se actualiza este documento.
+
+## Probar con el servicio real
+
+```sh
+curl -H "X-API-Key: <tu clave>" https://clima-aeropuerto.onrender.com/airports/SACO/conditions
+```
+
+Si el servicio estaba dormido, este primer pedido tarda cerca de un minuto: usá un timeout de al menos 60 segundos.
 
 ## Probar con el mock
 
@@ -176,3 +185,4 @@ curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/airport
 |---|---|---|
 | 1.0.0 | 9/10/2026 | Primera versión del contrato, con mock. |
 | 2.0.0 | 18/10/2026 | **Rompe:** la ruta pasa de `/v1/airports/{icao}/conditions` a `/airports/{icao}/conditions`, y la versión pasa a ser solo la del contrato. Además, aclara cuándo se responde `503` (dato de más de 30 minutos) y avisa que el servicio publicado se duerme sin uso. |
+| 2.0.1 | 19/10/2026 | Aclara que `precipitation_mm` es la de los últimos 15 minutos, que es lo que informa la fuente. Sin cambios en la API. |

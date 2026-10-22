@@ -33,9 +33,26 @@ Va en los cuatro servicios: Vuelos y Pistas en la Entrega 2, y Usuarios en novie
 4. En `docker-compose.yml`, sumarle al servicio `OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318` y `grafana` en `depends_on`.
 5. Para escribir un log dentro de un pedido, usar `slog.InfoContext(c.Request.Context(), ...)`: con el contexto, la línea lleva la traza.
 
-## Lo que falta
+## Llamadas entre servicios
 
-Las dos piezas van en un pull request aparte, esta semana, para que Vuelos y Pistas usen las mismas.
+Para que la traza siga de un servicio a otro por HTTP, el cliente usa el transporte de `go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp` (`otelhttp.NewTransport`), que agrega el encabezado `traceparent`. Vuelos ya lo usa para llamar a Pistas (PR #27).
 
-- **Llamadas entre servicios.** Para que la traza siga de Vuelos a Pistas, el cliente HTTP de Vuelos tiene que usar el transporte de `go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp` (`otelhttp.NewTransport`), que agrega el encabezado `traceparent`.
-- **Eventos.** El identificador de la traza va en el campo de correlación de cada mensaje (11.2). Falta agregar acá las funciones que lo escriben al publicar y lo leen al consumir.
+## Eventos
+
+`messaging.go` hace que la traza siga a través de RabbitMQ (decisión 11.6). Sin esto, Grafana muestra el que publica y el que consume como trazas separadas.
+
+1. **Al guardar el evento en el outbox**, guardar también `observability.TraceParent(ctx)`, con el contexto del pedido o de la tarea que lo origina. El `correlation_id` es `observability.TraceID(ctx)` (11.2).
+2. **En el relay**, para cada evento:
+   ```go
+   pubCtx, span := observability.StartPublish(ctx, evento.TraceParent, evento.Type)
+   err := publicar(pubCtx, evento) // con Headers: amqp.Table(observability.MessageHeaders(pubCtx))
+   observability.EndSpan(span, err)
+   ```
+3. **En el consumidor**, para cada mensaje:
+   ```go
+   ctx, span := observability.StartConsume(ctx, entrega.Headers, entrega.RoutingKey)
+   err := procesar(ctx, entrega) // los logs con slog.InfoContext(ctx, ...) llevan la traza
+   observability.EndSpan(span, err)
+   ```
+
+Así la traza queda: pedido o tarea → publicar → procesar en el otro servicio, y lo que ese servicio haga después (por ejemplo, publicar su propio evento) cuelga de la misma traza. Clima lo usa en `services/weather.go`, `services/relay.go` y `repositories/rabbitmq.go`.
