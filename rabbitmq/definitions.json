@@ -1,0 +1,26 @@
+{
+  "vhosts": [{ "name": "/" }],
+  "exchanges": [
+    { "name": "aeropuerto.eventos", "vhost": "/", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "aeropuerto.fallidos", "vhost": "/", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {} }
+  ],
+  "queues": [
+    {
+      "name": "pistas.eventos", "vhost": "/", "durable": true, "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "aeropuerto.fallidos", "x-dead-letter-routing-key": "pistas.eventos.fallidos" }
+    },
+    { "name": "pistas.eventos.fallidos", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    {
+      "name": "vuelos.eventos", "vhost": "/", "durable": true, "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "aeropuerto.fallidos", "x-dead-letter-routing-key": "vuelos.eventos.fallidos" }
+    },
+    { "name": "vuelos.eventos.fallidos", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+  "bindings": [
+    { "source": "aeropuerto.eventos", "vhost": "/", "destination": "pistas.eventos", "destination_type": "queue", "routing_key": "clima.#", "arguments": {} },
+    { "source": "aeropuerto.eventos", "vhost": "/", "destination": "pistas.eventos", "destination_type": "queue", "routing_key": "vuelos.vuelo.cancelado", "arguments": {} },
+    { "source": "aeropuerto.eventos", "vhost": "/", "destination": "vuelos.eventos", "destination_type": "queue", "routing_key": "pistas.#", "arguments": {} },
+    { "source": "aeropuerto.fallidos", "vhost": "/", "destination": "pistas.eventos.fallidos", "destination_type": "queue", "routing_key": "pistas.eventos.fallidos", "arguments": {} },
+    { "source": "aeropuerto.fallidos", "vhost": "/", "destination": "vuelos.eventos.fallidos", "destination_type": "queue", "routing_key": "vuelos.eventos.fallidos", "arguments": {} }
+  ]
+}
