@@ -11,6 +11,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/models"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/observability"
 )
 
 // Exchange y formato de los mensajes (4.8, 4.10).
@@ -126,7 +127,9 @@ func (p *RabbitPublisher) Publish(ctx context.Context, e models.PendingEvent) er
 		CorrelationId: e.CorrelationID,
 		Type:          e.Type,
 		Timestamp:     e.OccurredAt,
-		Body:          body,
+		// traceparent, para que el consumidor siga la misma traza (11.6).
+		Headers: amqp.Table(observability.MessageHeaders(ctx)),
+		Body:    body,
 	})
 	if err != nil {
 		p.closeLocked()

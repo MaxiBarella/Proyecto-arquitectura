@@ -44,8 +44,11 @@ type PendingEvent struct {
 	Type          string    `bson:"type"`
 	OccurredAt    time.Time `bson:"occurred_at"`
 	CorrelationID string    `bson:"correlation_id"`
-	DataVersion   int64     `bson:"data_version"`
-	Data          EventData `bson:"data"`
+	// TraceParent es la traza en curso al guardar el evento. El relay publica
+	// dentro de esa traza, así sigue en el consumidor (11.6).
+	TraceParent string    `bson:"traceparent,omitempty"`
+	DataVersion int64     `bson:"data_version"`
+	Data        EventData `bson:"data"`
 }
 
 // EventData son los datos de un evento de Clima (9.14). "Sin datos" solo lleva

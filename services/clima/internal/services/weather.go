@@ -8,9 +8,10 @@ import (
 	"log/slog"
 	"time"
 
-	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel"
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/models"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/observability"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/repositories"
 )
 
@@ -69,7 +70,12 @@ func NewWeatherService(airport models.Airport, source WeatherSource, observation
 func (s *WeatherService) Airport() models.Airport { return s.airport }
 
 // Poll consulta la fuente, guarda la observación y actualiza la aptitud.
-func (s *WeatherService) Poll(ctx context.Context) error {
+func (s *WeatherService) Poll(ctx context.Context) (err error) {
+	// Cada consulta es una traza: si cambia la aptitud, el evento y lo que haga
+	// Pistas con él quedan dentro de ella (11.6).
+	ctx, span := otel.Tracer("clima").Start(ctx, "consulta a Open-Meteo")
+	defer func() { observability.EndSpan(span, err) }()
+
 	obs, err := s.source.Current(ctx, s.airport)
 	if err != nil {
 		return err
@@ -257,16 +263,17 @@ func (s *WeatherService) newEvent(ctx context.Context, eventType string, dataVer
 		Type:          eventType,
 		OccurredAt:    s.now(),
 		CorrelationID: correlationID(ctx),
+		TraceParent:   observability.TraceParent(ctx),
 		DataVersion:   dataVersion,
 		Data:          data,
 	}
 }
 
-// correlationID es el identificador de la traza en curso (11.2). Para los eventos
-// que nacen de la consulta periódica, sin pedido que los origine, es un identificador nuevo.
+// correlationID es el identificador de la traza en curso (11.2). Si no hay
+// traza, es un identificador nuevo.
 func correlationID(ctx context.Context) string {
-	if sc := trace.SpanContextFromContext(ctx); sc.HasTraceID() {
-		return sc.TraceID().String()
+	if id := observability.TraceID(ctx); id != "" {
+		return id
 	}
 	return newID()
 }

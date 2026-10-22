@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/models"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/observability"
 )
 
 // EventPublisher publica un evento y devuelve nil solo si RabbitMQ lo confirmó.
@@ -39,7 +40,11 @@ func (r *Relay) PublishPending(ctx context.Context) error {
 	}
 	for _, st := range states {
 		for _, e := range st.Outbox {
-			if err := r.publisher.Publish(ctx, e); err != nil {
+			// Se publica dentro de la traza que guardó el evento (11.6).
+			pubCtx, span := observability.StartPublish(ctx, e.TraceParent, e.Type)
+			err := r.publisher.Publish(pubCtx, e)
+			observability.EndSpan(span, err)
+			if err != nil {
 				return err
 			}
 			if err := r.outbox.MarkPublished(ctx, st.Airport, e.ID); err != nil {
