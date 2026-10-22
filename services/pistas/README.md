@@ -6,6 +6,7 @@ Asigna slots de pista sin que se pisen: un slot por vuelo, prioridad de los arri
 
 - **Endpoint:** `POST /internal/slots`, el pedido de slot de Vuelos. El contrato es `services/pistas/openapi.yaml`, que entra con el pull request #27 (decisión 4.15).
 - **Tablas:** las crea [db/001_schema.sql](db/001_schema.sql) la primera vez que arranca MySQL, junto con las pistas `05-23` y `18-36` (RN-02, 4.11, 5.6). Si el script cambia, hay que borrar el volumen: `docker compose down -v`.
+- **Consume** la cola `pistas.eventos` (4.18, 4.19). `vuelos.vuelo.cancelado` libera el slot del vuelo (RN-23). Los eventos de clima se confirman sin efecto hasta noviembre, cuando se programe el cierre de pistas (8.1). Cada mensaje se aplica una sola vez (4.9); una falla pasajera se reintenta 3 veces, a 1, 2 y 4 segundos, y después el mensaje va a `pistas.eventos.fallidos` (4.20, 4.24).
 - **Observabilidad:** logs en JSON, métricas y trazas con OpenTelemetry hacia Grafana, con la carpeta `internal/observability` copiada de Vuelos (11.1). La traza que llega de Vuelos sigue en el evento: se guarda en el outbox y viaja en el encabezado `traceparent` del mensaje (11.6).
 - **Eventos:** publica `pistas.slot.asignado` y `pistas.slot.cedido` en el exchange `aeropuerto.eventos` (4.10, 4.12, 4.14). Si ninguna cola recibe un evento, queda en el outbox hasta que exista una (4.13).
 
@@ -13,11 +14,11 @@ Asigna slots de pista sin que se pisen: un slot por vuelo, prioridad de los arri
 |---|---|
 | `cmd/api` | Punto de entrada: lee la configuración, conecta los adaptadores con el núcleo y levanta el servidor y el relay. |
 | `internal/domain` | Las reglas: validez de un bloque, prioridad de los arribos y slots libres más cercanos. No conoce ni la base ni el framework. |
-| `internal/aplicacion` | El caso de uso de asignar un slot y el relay del outbox. Coordina las reglas con los puertos. |
+| `internal/aplicacion` | Los casos de uso (asignar un slot y procesar los eventos recibidos) y el relay del outbox. Coordina las reglas con los puertos. |
 | `internal/ports` | Las interfaces por las que el núcleo habla con el exterior: repositorio, outbox y publicador. |
 | `internal/adapters/http` | Adaptador de entrada: expone los casos de uso por HTTP con Gin. |
 | `internal/adapters/mysql` | Adaptador de salida: guarda pistas, slots y el outbox en MySQL con GORM. |
-| `internal/adapters/rabbitmq` | Adaptador de salida: publica los eventos en RabbitMQ. |
+| `internal/adapters/rabbitmq` | Publica los eventos en RabbitMQ (salida) y consume la cola de Pistas (entrada). |
 | `internal/observability` | Logs, métricas y trazas. Es la copia de la de Vuelos y Clima: se copia, no se importa. |
 
 `internal/aplicacion` se sumó al programar: los casos de uso usan las interfaces de `ports`, y `ports` usa los tipos de `domain`, así que no podían ir en ninguno de los dos sin crear un import circular.

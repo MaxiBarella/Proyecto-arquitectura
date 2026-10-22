@@ -64,13 +64,17 @@ func correr(log *slog.Logger) error {
 	defer publicador.Cerrar()
 	go aplicacion.NuevoRelay(repo, publicador, log).Correr(ctx)
 
+	// Casos de uso, y el consumidor de la cola de Pistas: vuelo cancelado y clima (4.19).
+	casos := aplicacion.NuevoPistas(repo)
+	go rabbitmq.NuevoConsumidor(rabbitURL, casos.ProcesarEvento).Correr(ctx)
+
 	// Sin GIN_MODE, Gin escribe avisos en texto que se mezclarían con los logs JSON.
 	if os.Getenv(gin.EnvGinMode) == "" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	servidor := &http.Server{
 		Addr:              ":" + port,
-		Handler:           httpadapter.NuevoRouter(aplicacion.NuevoPistas(repo), log),
+		Handler:           httpadapter.NuevoRouter(casos, log),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {

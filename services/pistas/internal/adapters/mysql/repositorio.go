@@ -176,6 +176,16 @@ func (t *transaccion) GuardarEvento(ctx context.Context, e domain.Evento) error 
 	}).Error
 }
 
+// MarcarProcesado inserta el id del mensaje; si ya estaba, no inserta nada y devuelve false.
+func (t *transaccion) MarcarProcesado(ctx context.Context, mensajeID string) (bool, error) {
+	res := t.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&mensajeProcesadoModelo{ID: mensajeID, ProcesadoEn: time.Now().UTC()})
+	if res.Error != nil {
+		return false, traducir(res.Error)
+	}
+	return res.RowsAffected == 1, nil
+}
+
 func pistas(db *gorm.DB) ([]domain.Pista, error) {
 	var filas []pistaModelo
 	if err := db.Order("id").Find(&filas).Error; err != nil {

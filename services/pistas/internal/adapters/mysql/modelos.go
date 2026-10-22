@@ -58,3 +58,11 @@ type outboxModelo struct {
 }
 
 func (outboxModelo) TableName() string { return "outbox" }
+
+// mensajeProcesadoModelo es la tabla de mensajes ya aplicados (4.9).
+type mensajeProcesadoModelo struct {
+	ID          string    `gorm:"primaryKey;size:36"`
+	ProcesadoEn time.Time `gorm:"not null"`
+}
+
+func (mensajeProcesadoModelo) TableName() string { return "mensajes_procesados" }

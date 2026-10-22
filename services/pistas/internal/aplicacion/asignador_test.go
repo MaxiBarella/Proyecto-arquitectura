@@ -16,6 +16,7 @@ type repoEnMemoria struct {
 	pistas     []domain.Pista
 	slots      []domain.Slot
 	eventos    []domain.Evento
+	procesados map[string]bool
 	proximoID  int64
 	conflictos int // cuántas veces Ocupar va a fallar con ErrConflicto antes de funcionar
 	// fotoVieja hace que SlotDelVuelo no vea los slots, como una lectura sin bloqueo que todavía no
@@ -32,15 +33,19 @@ func nuevoRepo() *repoEnMemoria {
 
 func (r *repoEnMemoria) EnTransaccion(ctx context.Context, fn func(context.Context, ports.Transaccion) error) error {
 	tx := &txEnMemoria{
-		repo:    r,
-		slots:   append([]domain.Slot(nil), r.slots...),
-		eventos: append([]domain.Evento(nil), r.eventos...),
-		id:      r.proximoID,
+		repo:       r,
+		slots:      append([]domain.Slot(nil), r.slots...),
+		eventos:    append([]domain.Evento(nil), r.eventos...),
+		procesados: map[string]bool{},
+		id:         r.proximoID,
+	}
+	for k := range r.procesados {
+		tx.procesados[k] = true
 	}
 	if err := fn(ctx, tx); err != nil {
 		return err
 	}
-	r.slots, r.eventos, r.proximoID = tx.slots, tx.eventos, tx.id
+	r.slots, r.eventos, r.procesados, r.proximoID = tx.slots, tx.eventos, tx.procesados, tx.id
 	return nil
 }
 
@@ -51,10 +56,19 @@ func (r *repoEnMemoria) SlotsOcupados(_ context.Context, desde, hasta time.Time)
 }
 
 type txEnMemoria struct {
-	repo    *repoEnMemoria
-	slots   []domain.Slot
-	eventos []domain.Evento
-	id      int64
+	repo       *repoEnMemoria
+	slots      []domain.Slot
+	eventos    []domain.Evento
+	procesados map[string]bool
+	id         int64
+}
+
+func (t *txEnMemoria) MarcarProcesado(_ context.Context, mensajeID string) (bool, error) {
+	if t.procesados[mensajeID] {
+		return false, nil
+	}
+	t.procesados[mensajeID] = true
+	return true, nil
 }
 
 func (t *txEnMemoria) Pistas(context.Context) ([]domain.Pista, error) { return t.repo.pistas, nil }

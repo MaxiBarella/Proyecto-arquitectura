@@ -42,6 +42,9 @@ type Transaccion interface {
 	Liberar(ctx context.Context, slotID int64) error
 	// GuardarEvento lo agrega al outbox, en la misma transacción (4.4).
 	GuardarEvento(ctx context.Context, e domain.Evento) error
+	// MarcarProcesado registra que el mensaje se aplicó. Devuelve false si ya estaba registrado:
+	// el mensaje llegó dos veces y no hay que aplicarlo de nuevo (4.9).
+	MarcarProcesado(ctx context.Context, mensajeID string) (bool, error)
 }
 
 // EventoGuardado es un evento del outbox, con el número de orden que le dio la base.

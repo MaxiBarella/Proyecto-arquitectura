@@ -18,6 +18,7 @@ import (
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/aplicacion"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/domain"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/ports"
 )
 
 func levantarBase(t *testing.T) *Repositorio {
@@ -143,4 +144,38 @@ func verificarUnSoloVuelo(t *testing.T, repo *Repositorio) []domain.Slot {
 		t.Fatalf("el slot tiene que tener exactamente un vuelo, tiene %d", len(ocupados))
 	}
 	return ocupados
+}
+
+// RN-23 y 4.9: "vuelo cancelado" libera el slot, y el mismo mensaje dos veces a la vez se aplica una
+// sola vez, porque la base no deja guardar dos veces su id.
+func TestVueloCanceladoContraMySQL(t *testing.T) {
+	repo := levantarBase(t)
+	pistas := aplicacion.NuevoPistas(repo)
+	if _, err := pistas.Asignar(context.Background(), domain.PedidoDeSlot{
+		VueloID: "LA2000", TipoOperacion: domain.Despegue, PistaID: "05-23", InicioBloque: bloque,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	mensaje := aplicacion.Mensaje{ID: "0c8f3d7e-6a51-4c1b-9d2e-5f4a3b2c1d0e", Type: aplicacion.EventoVueloCancelado,
+		Data: []byte(`{"flight_id":"LA2000"}`)}
+	var wg sync.WaitGroup
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := pistas.ProcesarEvento(context.Background(), mensaje); err != nil && !errors.Is(err, ports.ErrConflicto) {
+				t.Errorf("no se esperaba error: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	ocupados, err := repo.SlotsOcupados(context.Background(), bloque, bloque.Add(domain.DuracionBloque))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ocupados) != 0 {
+		t.Fatalf("el slot tenía que quedar libre, tiene %d vuelos", len(ocupados))
+	}
 }

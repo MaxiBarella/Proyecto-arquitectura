@@ -46,8 +46,7 @@ CREATE TABLE outbox (
   INDEX ix_outbox_publicado (publicado_en)
 );
 
--- Mensajes ya aplicados, para no aplicar dos veces el mismo (4.9). La usan los
--- consumidores de noviembre: vuelo cancelado y clima.
+-- Mensajes ya aplicados, para no aplicar dos veces el mismo (4.9).
 CREATE TABLE mensajes_procesados (
   id           CHAR(36)    NOT NULL,
   procesado_en DATETIME(6) NOT NULL,
