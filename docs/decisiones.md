@@ -112,7 +112,7 @@ Las decisiones 4.17 a 4.20 detallan la 4.13. Las tomó Male el 22/10/2026, con l
 | 4.19 | Qué recibe cada cola | **Lo que sale de la 4.3, la 4.14 y la 9.14** | `pistas.eventos` recibe `clima.#` y `vuelos.vuelo.cancelado`; `vuelos.eventos` recibe `pistas.#`. |
 | 4.20 | Cómo llega un mensaje a la cola de fallidos | **Por el exchange `aeropuerto.fallidos` de RabbitMQ** | Cada cola tiene configurado ese exchange para los mensajes rechazados. El consumidor, después de sus 3 intentos (4.5), rechaza el mensaje sin volver a encolarlo, y RabbitMQ lo pasa solo a su cola de fallidos (11.4). |
 
-Las decisiones 4.21 a 4.24 las tomó Maxi el 22/10/2026, al programar el relay y el consumidor de Vuelos. Quedan confirmadas al mergearse el pull request de la rama `feat/eventos-vuelos`.
+Las decisiones 4.21 a 4.24 las tomó Maxi el 22/10/2026, al programar el relay y el consumidor de Vuelos. Quedan confirmadas al mergearse el pull request #29.
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
