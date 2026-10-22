@@ -35,7 +35,7 @@ No se inventan decisiones al escribir un ADR. Si falta algo por decidir, se llev
 | [ADR-008](ADR-008.md) | D8. Contrato propio | Diseño, publicación, compatibilidad y estrategia de versionado de la capacidad que se ofrece. | 6.1 a 6.19 | Male | Entrega 1 | Reemplazado |
 | ADR-009 | D9. Consumo del proveedor | Cómo se incorpora la capacidad externa, adaptación al contrato y comportamiento ante errores, cambios o indisponibilidad. | Depende de la asignación de la cátedra | Male y Salvador | Entrega 2 | Sin escribir |
 | ADR-010 | D10. Resiliencia | Comportamiento ante fallas y mecanismos para limitar su propagación o degradar de forma controlada. | 4.5, 13.1 | Carola y Maxi | Entrega 2 | Sin escribir |
-| ADR-011 | D11. Observabilidad | Estrategia de logs, métricas, trazas y tableros, objetivo de servicio y criterios de alerta. | 11.1 a 11.5 | Male y Salvador | Entrega 2, primera versión | Sin escribir |
+| [ADR-011](ADR-011.md) | D11. Observabilidad | Estrategia de logs, métricas, trazas y tableros, objetivo de servicio y criterios de alerta. | 11.1 a 11.5 | Male y Salvador | Entrega 2, primera versión | Versión inicial |
 | ADR-012 | D12. Balanceo de carga | Servicio elegido, estrategia de distribución, verificación de disponibilidad y caída de una instancia. | 12.1 a 12.3, 15.3 | Male y Salvador | Entrega 2 | Sin escribir |
 | ADR-013 | D13. Capacidad y costos | Resultados de las pruebas de carga, principal límite, alternativa de escalado y estimación de costos. | 11.3, 16.1 | Male y Salvador | Entrega 2 | Sin escribir |
 | ADR-014 | API gateway (adicional) | Herramienta, separación de los roles de gateway y balanceador, validación del token, rutas y control de tráfico. | 15.1 a 15.8 | A asignar | Presentación | Sin escribir |
