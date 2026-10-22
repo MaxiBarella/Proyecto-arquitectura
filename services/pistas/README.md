@@ -5,7 +5,7 @@ Organización interna: **hexagonal** (decisión 7.3 de [docs/decisiones.md](../.
 Asigna slots de pista sin que se pisen: un slot por vuelo, prioridad de los arribos sobre los despegues y pedidos simultáneos.
 
 - **Endpoint:** `POST /internal/slots`, el pedido de slot de Vuelos. El contrato es `services/pistas/openapi.yaml`, que entra con el pull request #27 (decisión 4.15).
-- **Pistas:** se cargan al arrancar `05-23` y `18-36` (RN-02, 4.11).
+- **Tablas:** las crea [db/001_schema.sql](db/001_schema.sql) la primera vez que arranca MySQL, junto con las pistas `05-23` y `18-36` (RN-02, 4.11, 5.6). Si el script cambia, hay que borrar el volumen: `docker compose down -v`.
 - **Eventos:** publica `pistas.slot.asignado` y `pistas.slot.cedido` en el exchange `aeropuerto.eventos` (4.10, 4.12, 4.14). Si ninguna cola recibe un evento, queda en el outbox hasta que exista una (4.13).
 
 | Carpeta | Para qué es |
@@ -33,7 +33,7 @@ Asigna slots de pista sin que se pisen: un slot por vuelo, prioridad de los arri
 | Variable | Ejemplo |
 |---|---|
 | `PORT` | `8080` |
-| `MYSQL_DSN` | `root:clave@tcp(mysql-pistas:3306)/pistas?parseTime=true&loc=UTC` |
+| `MYSQL_DSN` | `pistas:clave@tcp(mysql-pistas:3306)/pistas?parseTime=true&loc=UTC`. En el Docker Compose se arma con `MYSQL_PISTAS_USER` y `MYSQL_PISTAS_PASSWORD`: Pistas no usa root (5.9). |
 | `RABBITMQ_URL` | `amqp://usuario:clave@rabbitmq:5672/` |
 
 Si RabbitMQ no está, el servicio arranca igual y atiende pedidos; los eventos esperan en el outbox hasta que se puedan publicar.

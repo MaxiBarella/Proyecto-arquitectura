@@ -23,7 +23,13 @@ import (
 func levantarBase(t *testing.T) *Repositorio {
 	t.Helper()
 	ctx := context.Background()
-	contenedor, err := tcmysql.Run(ctx, "mysql:8.4", tcmysql.WithDatabase("pistas"))
+	contenedor, err := tcmysql.Run(ctx, "mysql:8.4",
+		tcmysql.WithDatabase("pistas"),
+		tcmysql.WithUsername("pistas"),
+		tcmysql.WithPassword("pistas"),
+		// El mismo script que usa el Docker Compose (5.6).
+		tcmysql.WithScripts("../../../db/001_schema.sql"),
+	)
 	if err != nil {
 		t.Fatalf("no se pudo levantar MySQL (¿está Docker corriendo?): %v", err)
 	}
@@ -35,12 +41,6 @@ func levantarBase(t *testing.T) *Repositorio {
 	}
 	repo, err := Conectar(dsn)
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.Migrar(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.CargarPistasIniciales(ctx); err != nil {
 		t.Fatal(err)
 	}
 	return repo

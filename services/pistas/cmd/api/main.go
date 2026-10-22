@@ -59,17 +59,15 @@ func main() {
 	}
 }
 
-// conectarConEspera reintenta mientras MySQL arranca: en Docker Compose el servicio puede levantar
-// antes que la base.
+// conectarConEspera reintenta mientras MySQL arranca. En Docker Compose, Pistas ya espera a que la
+// base esté sana; esto cubre el arranque fuera de Docker y un reinicio de la base.
 func conectarConEspera(ctx context.Context, dsn string, log *slog.Logger) (*mysql.Repositorio, error) {
 	var ultimo error
 	for intento := 1; intento <= 30; intento++ {
 		repo, err := mysql.Conectar(dsn)
 		if err == nil {
-			if err = repo.Migrar(ctx); err == nil {
-				if err = repo.CargarPistasIniciales(ctx); err == nil {
-					return repo, nil
-				}
+			if err = repo.Verificar(ctx); err == nil {
+				return repo, nil
 			}
 		}
 		ultimo = err

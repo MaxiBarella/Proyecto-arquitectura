@@ -44,29 +44,14 @@ func Conectar(dsn string) (*Repositorio, error) {
 	return &Repositorio{db: db}, nil
 }
 
-// Migrar crea o actualiza las tablas (ADR-003).
-func (r *Repositorio) Migrar(ctx context.Context) error {
-	return r.db.WithContext(ctx).AutoMigrate(&pistaModelo{}, &slotModelo{}, &outboxModelo{}, &mensajeProcesadoModelo{})
-}
-
-// PistasIniciales son las dos pistas con las que arranca el sistema (RN-02), con el nombre sin barra
-// de la 4.11.
-var PistasIniciales = []string{"05-23", "18-36"}
-
-// CargarPistasIniciales crea las pistas iniciales, si no hay ninguna.
-func (r *Repositorio) CargarPistasIniciales(ctx context.Context) error {
-	var cantidad int64
-	if err := r.db.WithContext(ctx).Model(&pistaModelo{}).Count(&cantidad).Error; err != nil {
+// Verificar comprueba que la base responde. Las tablas no las crea el servicio: las crea
+// db/001_schema.sql cuando MySQL arranca por primera vez (5.6).
+func (r *Repositorio) Verificar(ctx context.Context) error {
+	sqlDB, err := r.db.DB()
+	if err != nil {
 		return err
 	}
-	if cantidad > 0 {
-		return nil
-	}
-	filas := make([]pistaModelo, len(PistasIniciales))
-	for i, id := range PistasIniciales {
-		filas[i] = pistaModelo{ID: id, Abierta: true}
-	}
-	return r.db.WithContext(ctx).Create(&filas).Error
+	return sqlDB.PingContext(ctx)
 }
 
 // EnTransaccion implementa ports.Repositorio.

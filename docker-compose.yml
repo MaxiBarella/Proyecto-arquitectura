@@ -29,15 +29,19 @@ services:
     build: ./services/pistas
     environment:
       PORT: "8080"
-      MYSQL_DSN: root:${MYSQL_PISTAS_ROOT_PASSWORD:?falta en .env}@tcp(mysql-pistas:3306)/pistas?parseTime=true&loc=UTC
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:?falta en .env}:${RABBITMQ_PASSWORD:?falta en .env}@rabbitmq:5672/
+      MYSQL_DSN: ${MYSQL_PISTAS_USER:?falta en .env}:${MYSQL_PISTAS_PASSWORD:?falta en .env}@tcp(mysql-pistas:3306)/pistas?parseTime=true&loc=UTC
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?falta en .env}:${RABBITMQ_PASSWORD:?falta en .env}@rabbitmq:5672
     ports:
       - "8082:8080"
     depends_on:
+      # Pistas arranca recién cuando MySQL acepta conexiones.
       mysql-pistas:
-        condition: service_started
+        condition: service_healthy
       rabbitmq-init:
         condition: service_completed_successfully
+      grafana:
+        condition: service_started
 
   clima:
     build: ./services/clima
@@ -90,8 +94,18 @@ services:
     environment:
       MYSQL_DATABASE: pistas
       MYSQL_ROOT_PASSWORD: ${MYSQL_PISTAS_ROOT_PASSWORD:?falta en .env}
+      # Usuario propio de Pistas, con acceso solo a la base pistas.
+      MYSQL_USER: ${MYSQL_PISTAS_USER:?falta en .env}
+      MYSQL_PASSWORD: ${MYSQL_PISTAS_PASSWORD:?falta en .env}
     volumes:
       - mysql-pistas-data:/var/lib/mysql
+      # Las tablas se crean la primera vez que arranca la base.
+      - ./services/pistas/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   mysql-usuarios:
     image: mysql:8.4
