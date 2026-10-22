@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -356,5 +357,107 @@ func TestListByAirline(t *testing.T) {
 	scheduled, total, _ := r.ListByAirline(ctx, "AR", domain.Scheduled, 1)
 	if total != 1 || len(scheduled) != 1 || scheduled[0].Number != "AR1000" {
 		t.Errorf("filtro por estado: total %d, %+v", total, scheduled)
+	}
+}
+
+// createWithEvents guarda n vuelos, cada uno con un evento, un segundo después del anterior.
+func createWithEvents(t *testing.T, r *Repository, n int) []string {
+	t.Helper()
+	var ids []string
+	for i := range n {
+		e := event("vuelos.prueba")
+		e.OccurredAt = now.Add(time.Duration(i) * time.Second)
+		e.TraceParent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
+		if err := r.Create(ctx, newFlight(t, "AR", fmt.Sprintf("AR%d", 2000+i), block), e); err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		ids = append(ids, e.ID)
+	}
+	return ids
+}
+
+func TestPublishPendingPublishesInOrderAndDeletes(t *testing.T) {
+	r := newRepo(t)
+	ids := createWithEvents(t, r, 3)
+
+	var got []domain.Event
+	n, err := r.PublishPending(ctx, func(_ context.Context, e domain.Event) error {
+		got = append(got, e)
+		return nil
+	})
+	if err != nil || n != 3 {
+		t.Fatalf("publicados %d, error %v", n, err)
+	}
+	for i, e := range got {
+		if e.ID != ids[i] {
+			t.Errorf("tienen que salir en el orden en que se guardaron: %d es %s", i, e.ID)
+		}
+	}
+	if got[0].TraceParent == "" || string(got[0].Data.(json.RawMessage)) != `{"flight_id": "x"}` {
+		t.Errorf("el evento tiene que traer la traza y los datos: %+v", got[0])
+	}
+	if left := len(outbox(t)); left != 0 {
+		t.Errorf("quedaron %d en el outbox", left)
+	}
+}
+
+func TestPublishPendingStopsAtTheFirstFailure(t *testing.T) {
+	r := newRepo(t)
+	ids := createWithEvents(t, r, 3)
+
+	n, err := r.PublishPending(ctx, func(_ context.Context, e domain.Event) error {
+		if e.ID == ids[1] {
+			return errors.New("RabbitMQ no responde")
+		}
+		return nil
+	})
+	if err == nil || n != 1 {
+		t.Fatalf("publicados %d, error %v", n, err)
+	}
+	// El primero salió y se borró; el que falló y el siguiente quedan para la próxima.
+	rows := outbox(t)
+	if len(rows) != 2 || rows[0].ID != ids[1] || rows[1].ID != ids[2] {
+		t.Errorf("outbox: %+v", rows)
+	}
+}
+
+// Las dos instancias de Vuelos corren el relay a la vez (4.21): cada evento sale una sola vez.
+func TestTwoRelaysDoNotPublishTheSameEvent(t *testing.T) {
+	r := newRepo(t)
+	createWithEvents(t, r, 30)
+
+	var mu sync.Mutex
+	seen := map[string]int{}
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				n, err := r.PublishPending(ctx, func(_ context.Context, e domain.Event) error {
+					mu.Lock()
+					seen[e.ID]++
+					mu.Unlock()
+					time.Sleep(5 * time.Millisecond) // como si esperara la confirmación de RabbitMQ
+					return nil
+				})
+				if err != nil {
+					t.Errorf("PublishPending: %v", err)
+					return
+				}
+				if n == 0 {
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	if len(seen) != 30 {
+		t.Errorf("salieron %d eventos distintos, want 30", len(seen))
+	}
+	for id, times := range seen {
+		if times != 1 {
+			t.Errorf("el evento %s salió %d veces", id, times)
+		}
 	}
 }

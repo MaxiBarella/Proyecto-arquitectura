@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/domain"
@@ -33,6 +34,7 @@ type outboxRow struct {
 	Type          string
 	OccurredAt    time.Time
 	CorrelationID string
+	TraceParent   *string `gorm:"column:traceparent"`
 	DataVersion   int64
 	Data          string
 }
@@ -94,4 +96,20 @@ func (row *flightRow) toDomain() *domain.Flight {
 		f.DivertedTo = *row.DivertedTo
 	}
 	return f
+}
+
+func (row outboxRow) toEvent() domain.Event {
+	e := domain.Event{
+		ID:            row.ID,
+		Type:          row.Type,
+		OccurredAt:    row.OccurredAt.UTC(),
+		CorrelationID: row.CorrelationID,
+		DataVersion:   row.DataVersion,
+		// Los datos ya están en JSON: se publican tal cual.
+		Data: json.RawMessage(row.Data),
+	}
+	if row.TraceParent != nil {
+		e.TraceParent = *row.TraceParent
+	}
+	return e
 }

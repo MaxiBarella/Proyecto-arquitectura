@@ -13,6 +13,9 @@ type Event struct {
 	Type          string
 	OccurredAt    time.Time
 	CorrelationID string
+	// TraceParent es la traza en curso al guardar el evento. El relay publica
+	// dentro de ella, así sigue en el que lo recibe (11.6).
+	TraceParent string
 	// DataVersion es la versión del vuelo después del cambio. La completa el
 	// repositorio al guardar.
 	DataVersion int64

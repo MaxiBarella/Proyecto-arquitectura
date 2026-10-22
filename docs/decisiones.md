@@ -95,7 +95,7 @@ Las decisiones 4.11 a 4.13 las tomó Maxi el 21/10/2026, al cerrar el contrato e
 | Vuelo cancelado | Vuelos | Pistas: libera el slot. |
 | Clima sin datos | Clima | Pistas: deja de cerrar y reabrir solo y muestra el aviso al operador (6.19). Se sumó en la Entrega 2 (sección 18, pendiente 17). |
 
-La 4.14 la tomó Maxi el 21/10/2026 y queda confirmada al mergearse el pull request #26; la 4.15 y la 4.16, al mergearse el pull request de la rama `feat/pedido-de-slot`. Las claves y la ruta de Pistas las eligió por Carola, que le delegó la elección.
+La 4.14 la tomó Maxi el 21/10/2026 y queda confirmada al mergearse el pull request #26; la 4.15 y la 4.16, al mergearse el pull request #27. Las claves y la ruta de Pistas las eligió por Carola, que le delegó la elección.
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
@@ -111,6 +111,15 @@ Las decisiones 4.17 a 4.20 detallan la 4.13. Las tomó Male el 22/10/2026, con l
 | 4.18 | Nombres de las colas | **`<consumidor>.eventos` y `<consumidor>.eventos.fallidos`** | `pistas.eventos`, `pistas.eventos.fallidos`, `vuelos.eventos` y `vuelos.eventos.fallidos`. |
 | 4.19 | Qué recibe cada cola | **Lo que sale de la 4.3, la 4.14 y la 9.14** | `pistas.eventos` recibe `clima.#` y `vuelos.vuelo.cancelado`; `vuelos.eventos` recibe `pistas.#`. |
 | 4.20 | Cómo llega un mensaje a la cola de fallidos | **Por el exchange `aeropuerto.fallidos` de RabbitMQ** | Cada cola tiene configurado ese exchange para los mensajes rechazados. El consumidor, después de sus 3 intentos (4.5), rechaza el mensaje sin volver a encolarlo, y RabbitMQ lo pasa solo a su cola de fallidos (11.4). |
+
+Las decisiones 4.21 a 4.24 las tomó Maxi el 22/10/2026, al programar el relay y el consumidor de Vuelos. Quedan confirmadas al mergearse el pull request de la rama `feat/eventos-vuelos`.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 4.21 | Relay con dos instancias de Vuelos | **Cada una toma eventos que la otra no tiene** | El relay lee el outbox con `SELECT ... FOR UPDATE SKIP LOCKED`: si una instancia está publicando unos eventos, la otra los saltea. Ninguno sale dos veces y, si una instancia se cae, la otra sigue sola. |
+| 4.22 | Evento que no se puede aplicar | **Se confirma y queda un aviso en el log** | Por ejemplo, "slot asignado" para un vuelo que la aerolínea ya canceló, o un tipo de evento que Vuelos no conoce. Reintentar no lo arregla, y mandarlo a fallidos dispararía la alerta de la 11.4 sin un error real. Pistas igual libera el slot al recibir "vuelo cancelado". |
+| 4.23 | Orden de los eventos que recibe Vuelos | **Un solo consumidor activo en `vuelos.eventos`** | La cola tiene `x-single-active-consumer`: RabbitMQ la entrega a una instancia por vez y la otra queda de reserva. Así los eventos de un mismo vuelo se aplican en orden; por ejemplo, "slot asignado" antes que "slot cedido". |
+| 4.24 | Esperas entre reintentos del consumidor (4.5) | **1, 2 y 4 segundos** | Ante una falla pasajera, como MySQL sin responder. Después del tercer reintento el mensaje va a fallidos (4.20). |
 
 ## 5. Datos
 
@@ -272,7 +281,7 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 13.1 | Dónde va el mecanismo de protección | **B. Circuit breaker de Vuelos a Pistas** | Si Pistas viene fallando, Vuelos deja de llamarla un rato y los vuelos quedan "pendiente de slot". Se suma al timeout y los reintentos de la 4.5. Por qué: el efecto se ve en el frontend. |
-| 13.2 | Valores del circuit breaker | **5 fallas seguidas, 30 segundos abierto, 1 pedido de prueba** (Maxi, 21/10/2026) | Cuenta como falla un pedido que no consiguió respuesta de Pistas después de los reintentos, o al que Pistas respondió con un error suyo (por ejemplo, `500`). Un rechazo, como slot ocupado o pista cerrada, no cuenta. Abierto, Vuelos responde `503` enseguida, con `Retry-After: 30`. Pasados los 30 segundos deja pasar un pedido: si anda, se cierra; si falla, se abre otra vez. Queda confirmada al mergearse el pull request de la rama `feat/pedido-de-slot`. |
+| 13.2 | Valores del circuit breaker | **5 fallas seguidas, 30 segundos abierto, 1 pedido de prueba** (Maxi, 21/10/2026) | Cuenta como falla un pedido que no consiguió respuesta de Pistas después de los reintentos, o al que Pistas respondió con un error suyo (por ejemplo, `500`). Un rechazo, como slot ocupado o pista cerrada, no cuenta. Abierto, Vuelos responde `503` enseguida, con `Retry-After: 30`. Pasados los 30 segundos deja pasar un pedido: si anda, se cierra; si falla, se abre otra vez. Queda confirmada al mergearse el pull request #27. |
 
 ## 14. Búsqueda (ADR D6)
 
