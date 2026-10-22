@@ -102,9 +102,8 @@ func (r *Repository) ListByAirline(ctx context.Context, airline string, status d
 	return flights, total, nil
 }
 
-// Change es un cambio sobre un vuelo: lo modifica y devuelve los eventos que hay
-// que publicar. Si devuelve un error, no se guarda nada.
-type Change func(f *domain.Flight) ([]domain.Event, error)
+// Change es un cambio sobre un vuelo (domain.Change).
+type Change = domain.Change
 
 // Update aplica un cambio a un vuelo dentro de una transacción. Lee el vuelo con
 // SELECT ... FOR UPDATE: si otro pedido lo está cambiando, espera a que termine y
