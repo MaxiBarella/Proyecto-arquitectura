@@ -288,7 +288,7 @@ paths:
         - name: date
           in: query
           required: false
-          description: Día del horario del vuelo (RN-39).
+          description: Día del horario del vuelo (RN-39), en hora de Argentina (UTC−3), aunque el resto de los horarios de la API vayan en UTC (RN-33).
           schema:
             type: string
             format: date
@@ -296,7 +296,7 @@ paths:
         - name: q
           in: query
           required: false
-          description: Texto a buscar en el número de vuelo y en las ciudades de origen y destino.
+          description: Texto a buscar en el número de vuelo y en las ciudades de origen y destino. Encuentra por el comienzo y no distingue mayúsculas ni tildes, así que `ar15` encuentra AR1550 y `cordoba`, Córdoba (RN-34).
           schema:
             type: string
           example: AR1550

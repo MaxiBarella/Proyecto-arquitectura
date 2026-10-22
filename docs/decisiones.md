@@ -291,6 +291,14 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 | 14.2 | Atraso máximo del índice | **60 segundos** | Desde que cambia un vuelo hasta que se ve en la búsqueda. Por qué: es una espera razonable para un tablero. |
 | 14.3 | Cómo se reconstruye el índice | **A. Comando manual** | Lee los vuelos de MySQL y los vuelve a cargar en Solr. Por qué: si fuera automático al arrancar, las dos instancias de Vuelos lo harían a la vez. |
 | 14.4 | Paginación | **20 vuelos por página** (agente) | El enunciado pide paginación sin dar un valor. |
+| 14.5 | Cómo se entera el índice de cada cambio | **Un evento de Vuelos por RabbitMQ** | Cada cambio de un vuelo guarda en el outbox, en la misma transacción, el evento `vuelos.vuelo.actualizado`, con los datos que muestra el tablero. El relay lo publica y Vuelos lo lee de la cola `vuelos.indice` para escribirlo en Solr. Si algo falla, se reintenta y termina en `vuelos.indice.fallidos`. Suma una clave de ruteo a la 4.14 y una cola a la 4.19. La cola va aparte de `vuelos.eventos` para que, si Solr se cae, no se frenen los eventos de Pistas. Las dos instancias de Vuelos la consumen. Se descartaron dos opciones: que el relay escriba directo en Solr, porque habría que programar los reintentos aparte, y revisar MySQL cada 30 segundos, porque no es "a partir de eventos" (3.2). |
+| 14.6 | Un cambio viejo no pisa uno nuevo | **Solr descarta una escritura con versión menor o igual a la que tiene** | Cada vuelo lleva su número de versión, que es el `data_version` del evento (4.10). Si llega tarde un evento viejo, si llega dos veces el mismo o si el comando de reconstrucción corre al mismo tiempo, Solr se queda con el dato más nuevo. Por eso la cola `vuelos.indice` no necesita un solo consumidor activo, como la 4.23. |
+| 14.7 | Cuándo Solr muestra lo escrito | **En hasta 5 segundos** (agente) | Solr hace visible lo escrito cada 5 segundos. Así un cambio llega a la búsqueda bastante antes de los 60 segundos de la 14.2: se suma hasta 1 segundo del relay (4.5) y, si algo falla, 7 de reintentos (4.24). |
+| 14.8 | Cómo encuentra la búsqueda por texto | **Por el comienzo, sin distinguir mayúsculas ni tildes** | "AR15" encuentra AR1550, "Bue" encuentra Buenos Aires y "cordoba" encuentra Córdoba. Se descartaron la palabra completa, porque obliga a escribir el número entero, y cualquier parte de la palabra, porque agranda el índice y trae resultados de más. |
+| 14.9 | Fecha del filtro del tablero | **El día en hora de Argentina (UTC−3)** | Un vuelo de las 23:30 en Córdoba es de ese día, aunque en UTC sean las 02:30 del siguiente. Es lo que espera quien mira el tablero. El resto de los horarios de la API siguen en UTC. |
+| 14.10 | Si Solr no responde al actualizar el índice | **Igual que los demás consumidores** | Se hacen 3 reintentos, a 1, 2 y 4 segundos (4.24), y el evento pasa a `vuelos.indice.fallidos`, con la alerta de la 11.4. Cuando Solr vuelve, se corre la reconstrucción (14.3). Se descartó reintentar sin límite, porque se comportaría distinto que el resto y los eventos se acumularían. |
+
+Maxi eligió las decisiones 14.5 a 14.10 el 22/10/2026, al escribir el ADR-006, entre las opciones que propuso el agente. La 14.7 tiene la marca "(agente)" porque el valor de 5 segundos lo propuso el agente. Quedan confirmadas al mergearse el pull request #30.
 
 ## 15. API gateway
 
@@ -464,7 +472,7 @@ Sin respuesta registrada:
 | D5 | Comunicación entre servicios | 4.1 a 4.9 | Entrega 1, versión inicial; se valida en la 2 |
 | D2 | Arquitectura interna | 7.3, 7.5, 7.6, 20 | Entrega 2 |
 | D4 | Consistencia y concurrencia | 2.3, 2.7, 4.4 | Sin entrega asignada |
-| D6 | Búsqueda | 3.2, 14.1 a 14.4 | Entrega 2 |
+| D6 | Búsqueda | 3.2, 7.2, 10.4, 14.1 a 14.10 | Entrega 2 |
 | D7 | Caché | 10.1 a 10.4 | Entrega 2 |
 | D9 | Consumo del proveedor | Depende de la asignación de la cátedra | Entrega 2 |
 | D10 | Resiliencia | 4.5, 13.1 | Entrega 2 |
