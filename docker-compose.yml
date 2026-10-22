@@ -29,6 +29,8 @@ services:
     build: ./services/pistas
     environment:
       PORT: "8080"
+      MYSQL_DSN: root:${MYSQL_PISTAS_ROOT_PASSWORD:?falta en .env}@tcp(mysql-pistas:3306)/pistas?parseTime=true&loc=UTC
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?falta en .env}:${RABBITMQ_PASSWORD:?falta en .env}@rabbitmq:5672/
     ports:
       - "8082:8080"
     depends_on:
