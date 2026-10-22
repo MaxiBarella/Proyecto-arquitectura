@@ -7,7 +7,7 @@ import (
 )
 
 func hora(h, m int) time.Time {
-	return time.Date(2026, 10, 23, h, m, 0, 0, ZonaCordoba)
+	return time.Date(2026, 10, 23, h, m, 0, 0, time.UTC)
 }
 
 func TestInicioDeBloqueValido(t *testing.T) {
@@ -21,7 +21,7 @@ func TestInicioDeBloqueValido(t *testing.T) {
 		{"menos cuarto", hora(14, 45), true},
 		{"minuto suelto", hora(14, 10), false},
 		{"con segundos", hora(14, 15).Add(30 * time.Second), false},
-		{"en UTC, mismo instante", hora(14, 15).UTC(), true},
+		{"otra zona, mismo instante", hora(14, 15).In(time.FixedZone("ART", -3*3600)), true},
 		{"vacío", time.Time{}, false},
 	}
 	for _, c := range casos {
@@ -32,15 +32,15 @@ func TestInicioDeBloqueValido(t *testing.T) {
 }
 
 func TestValidarPedido(t *testing.T) {
-	bueno := PedidoDeSlot{VueloID: "v1", TipoOperacion: Arribo, PistaID: 1, InicioBloque: hora(10, 0)}
+	bueno := PedidoDeSlot{VueloID: "v1", TipoOperacion: Arribo, PistaID: "05-23", InicioBloque: hora(10, 0)}
 	if err := ValidarPedido(bueno); err != nil {
 		t.Fatalf("un pedido completo no debería fallar: %v", err)
 	}
 
 	malos := map[string]func(p *PedidoDeSlot){
 		"sin vuelo":      func(p *PedidoDeSlot) { p.VueloID = " " },
-		"tipo inválido":  func(p *PedidoDeSlot) { p.TipoOperacion = "aterrizaje" },
-		"sin pista":      func(p *PedidoDeSlot) { p.PistaID = 0 },
+		"tipo inválido":  func(p *PedidoDeSlot) { p.TipoOperacion = "arribo" },
+		"sin pista":      func(p *PedidoDeSlot) { p.PistaID = "" },
 		"bloque partido": func(p *PedidoDeSlot) { p.InicioBloque = hora(10, 7) },
 	}
 	for nombre, romper := range malos {
@@ -78,37 +78,37 @@ func TestDecidir(t *testing.T) {
 }
 
 func TestSlotsLibresCercanos(t *testing.T) {
-	pistas := []Pista{{ID: 2, Abierta: true}, {ID: 1, Abierta: true}}
-	pedido := SlotLibre{PistaID: 1, InicioBloque: hora(14, 0)}
+	pistas := []Pista{{ID: "18-36", Abierta: true}, {ID: "05-23", Abierta: true}}
+	pedido := SlotLibre{PistaID: "05-23", InicioBloque: hora(14, 0)}
 
 	t.Run("primero el mismo horario en otra pista, después antes y después", func(t *testing.T) {
-		ocupados := []Slot{{PistaID: 1, InicioBloque: hora(14, 0)}}
+		ocupados := []Slot{{PistaID: "05-23", InicioBloque: hora(14, 0)}}
 		got := SlotsLibresCercanos(pedido, pistas, ocupados, 3, 24*time.Hour)
 		esperado := []SlotLibre{
-			{PistaID: 2, InicioBloque: hora(14, 0)},
-			{PistaID: 1, InicioBloque: hora(13, 45)},
-			{PistaID: 2, InicioBloque: hora(13, 45)},
+			{PistaID: "18-36", InicioBloque: hora(14, 0)},
+			{PistaID: "05-23", InicioBloque: hora(13, 45)},
+			{PistaID: "18-36", InicioBloque: hora(13, 45)},
 		}
 		compararLibres(t, got, esperado)
 	})
 
 	t.Run("saltea los ocupados y las pistas cerradas", func(t *testing.T) {
-		conCerrada := []Pista{{ID: 1, Abierta: true}, {ID: 2, Abierta: false}}
+		conCerrada := []Pista{{ID: "05-23", Abierta: true}, {ID: "18-36", Abierta: false}}
 		ocupados := []Slot{
-			{PistaID: 1, InicioBloque: hora(14, 0)},
-			{PistaID: 1, InicioBloque: hora(13, 45)},
+			{PistaID: "05-23", InicioBloque: hora(14, 0)},
+			{PistaID: "05-23", InicioBloque: hora(13, 45)},
 		}
 		got := SlotsLibresCercanos(pedido, conCerrada, ocupados, 3, 24*time.Hour)
 		esperado := []SlotLibre{
-			{PistaID: 1, InicioBloque: hora(14, 15)},
-			{PistaID: 1, InicioBloque: hora(13, 30)},
-			{PistaID: 1, InicioBloque: hora(14, 30)},
+			{PistaID: "05-23", InicioBloque: hora(14, 15)},
+			{PistaID: "05-23", InicioBloque: hora(13, 30)},
+			{PistaID: "05-23", InicioBloque: hora(14, 30)},
 		}
 		compararLibres(t, got, esperado)
 	})
 
 	t.Run("no pasa del límite", func(t *testing.T) {
-		soloUna := []Pista{{ID: 1, Abierta: true}}
+		soloUna := []Pista{{ID: "05-23", Abierta: true}}
 		got := SlotsLibresCercanos(pedido, soloUna, nil, 3, 15*time.Minute)
 		if len(got) != 2 {
 			t.Fatalf("con un límite de un bloque para cada lado hay 2 libres, vinieron %d: %v", len(got), got)
@@ -125,16 +125,6 @@ func TestSlotsLibresCercanos(t *testing.T) {
 	})
 }
 
-func TestBloquesDelDia(t *testing.T) {
-	bloques := BloquesDelDia(hora(9, 0))
-	if len(bloques) != 96 {
-		t.Fatalf("un día tiene 96 bloques de 15 minutos, vinieron %d", len(bloques))
-	}
-	if !bloques[0].Equal(hora(0, 0)) || !bloques[95].Equal(hora(23, 45)) {
-		t.Fatalf("el día va de 00:00 a 23:45, vino de %v a %v", bloques[0], bloques[95])
-	}
-}
-
 func compararLibres(t *testing.T, got, esperado []SlotLibre) {
 	t.Helper()
 	if len(got) != len(esperado) {
@@ -142,7 +132,7 @@ func compararLibres(t *testing.T, got, esperado []SlotLibre) {
 	}
 	for i := range esperado {
 		if got[i].PistaID != esperado[i].PistaID || !got[i].InicioBloque.Equal(esperado[i].InicioBloque) {
-			t.Errorf("libre %d: vino pista %d a las %s, se esperaba pista %d a las %s", i,
+			t.Errorf("libre %d: vino pista %s a las %s, se esperaba pista %s a las %s", i,
 				got[i].PistaID, got[i].InicioBloque.Format("15:04"),
 				esperado[i].PistaID, esperado[i].InicioBloque.Format("15:04"))
 		}

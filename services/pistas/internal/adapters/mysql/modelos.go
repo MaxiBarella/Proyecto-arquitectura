@@ -8,15 +8,14 @@ import (
 
 // pistaModelo es la tabla de pistas.
 type pistaModelo struct {
-	ID      int64  `gorm:"primaryKey"`
-	Nombre  string `gorm:"size:50;not null"`
+	ID      string `gorm:"primaryKey;size:10"`
 	Abierta bool   `gorm:"not null;default:true"`
 }
 
 func (pistaModelo) TableName() string { return "pistas" }
 
 func (p pistaModelo) aDominio() domain.Pista {
-	return domain.Pista{ID: p.ID, Nombre: p.Nombre, Abierta: p.Abierta}
+	return domain.Pista{ID: p.ID, Abierta: p.Abierta}
 }
 
 // slotModelo es la tabla de slots ocupados. Un bloque libre no tiene fila.
@@ -26,7 +25,7 @@ func (p pistaModelo) aDominio() domain.Pista {
 //   - ux_slot_vuelo: un vuelo tiene a lo sumo un slot, que es lo que hace idempotente el pedido (4.6).
 type slotModelo struct {
 	ID            int64     `gorm:"primaryKey"`
-	PistaID       int64     `gorm:"not null;uniqueIndex:ux_slot_pista_bloque,priority:1"`
+	PistaID       string    `gorm:"size:10;not null;uniqueIndex:ux_slot_pista_bloque,priority:1"`
 	InicioBloque  time.Time `gorm:"not null;uniqueIndex:ux_slot_pista_bloque,priority:2;index:ix_slot_inicio"`
 	VueloID       string    `gorm:"size:64;not null;uniqueIndex:ux_slot_vuelo"`
 	TipoOperacion string    `gorm:"size:10;not null"`
@@ -39,7 +38,7 @@ func (s slotModelo) aDominio() domain.Slot {
 	return domain.Slot{
 		ID:            s.ID,
 		PistaID:       s.PistaID,
-		InicioBloque:  s.InicioBloque.In(domain.ZonaCordoba),
+		InicioBloque:  s.InicioBloque.UTC(),
 		VueloID:       s.VueloID,
 		TipoOperacion: domain.TipoOperacion(s.TipoOperacion),
 	}

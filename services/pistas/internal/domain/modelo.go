@@ -2,19 +2,16 @@ package domain
 
 import "time"
 
-// DuracionBloque es lo que dura un bloque de pista (pendiente 1 de la sección 18 de decisiones.md).
+// DuracionBloque es lo que dura un bloque de pista (RN-03).
 const DuracionBloque = 15 * time.Minute
 
-// ZonaCordoba es la hora de Córdoba. Argentina no cambia la hora en verano, así que alcanza con
-// un desplazamiento fijo y la imagen del contenedor no necesita la base de zonas horarias.
-var ZonaCordoba = time.FixedZone("ART", -3*60*60)
-
-// TipoOperacion dice si un vuelo aterriza o despega en nuestro aeropuerto.
+// TipoOperacion dice si un vuelo aterriza o despega en nuestro aeropuerto. Los valores son los del
+// contrato con Vuelos (services/pistas/openapi.yaml).
 type TipoOperacion string
 
 const (
-	Arribo   TipoOperacion = "arribo"
-	Despegue TipoOperacion = "despegue"
+	Arribo   TipoOperacion = "arrival"
+	Despegue TipoOperacion = "departure"
 )
 
 // Valido indica si el tipo es uno de los dos que existen.
@@ -22,24 +19,24 @@ func (t TipoOperacion) Valido() bool {
 	return t == Arribo || t == Despegue
 }
 
-// Pista es el recurso físico donde se aterriza y se despega.
+// Pista es el recurso físico donde se aterriza y se despega. Su ID es el nombre, sin barra, como
+// "05-23" (4.11).
 type Pista struct {
-	ID      int64
-	Nombre  string
+	ID      string
 	Abierta bool
 }
 
 // Slot es una pista más un bloque, ocupado por un vuelo. Un bloque sin vuelo no se guarda: está libre.
 type Slot struct {
 	ID            int64
-	PistaID       int64
+	PistaID       string
 	InicioBloque  time.Time
 	VueloID       string
 	TipoOperacion TipoOperacion
 }
 
 // MismoLugar indica si el slot está en esa pista y ese bloque.
-func (s Slot) MismoLugar(pistaID int64, inicio time.Time) bool {
+func (s Slot) MismoLugar(pistaID string, inicio time.Time) bool {
 	return s.PistaID == pistaID && s.InicioBloque.Equal(inicio)
 }
 
@@ -47,13 +44,13 @@ func (s Slot) MismoLugar(pistaID int64, inicio time.Time) bool {
 type PedidoDeSlot struct {
 	VueloID       string
 	TipoOperacion TipoOperacion
-	PistaID       int64
+	PistaID       string
 	InicioBloque  time.Time
 }
 
 // SlotLibre es un lugar que se puede pedir.
 type SlotLibre struct {
-	PistaID      int64
+	PistaID      string
 	InicioBloque time.Time
 }
 
@@ -66,10 +63,10 @@ type Resultado struct {
 	VueloDesplazadoID string
 }
 
-// Tipos de evento que publica Pistas (docs/contracts/pistas-eventos.md).
+// Claves de ruteo de los eventos que publica Pistas (4.14).
 const (
-	EventoSlotAsignado = "slot.asignado"
-	EventoSlotCedido   = "slot.cedido"
+	EventoSlotAsignado = "pistas.slot.asignado"
+	EventoSlotCedido   = "pistas.slot.cedido"
 )
 
 // Evento es un evento de dominio que se guarda en el outbox y se publica después (4.4).
@@ -81,20 +78,18 @@ type Evento struct {
 	Datos         any
 }
 
-// DatosSlotAsignado son los datos de "slot.asignado".
+// DatosSlotAsignado son los datos de "slot asignado" (4.12).
 type DatosSlotAsignado struct {
-	VueloID       string        `json:"vuelo_id"`
-	SlotID        int64         `json:"slot_id"`
-	PistaID       int64         `json:"pista_id"`
-	InicioBloque  time.Time     `json:"inicio_bloque"`
-	TipoOperacion TipoOperacion `json:"tipo_operacion"`
+	VueloID      string    `json:"flight_id"`
+	PistaID      string    `json:"runway_id"`
+	InicioBloque time.Time `json:"block_start"`
 }
 
-// DatosSlotCedido son los datos de "slot.cedido". VueloID es el despegue que perdió el slot.
+// DatosSlotCedido son los datos de "slot cedido a un arribo" (4.12). VueloID es el despegue que
+// perdió el slot y CedidoAVueloID, el arribo que se lo queda.
 type DatosSlotCedido struct {
-	VueloID        string    `json:"vuelo_id"`
-	SlotID         int64     `json:"slot_id"`
-	PistaID        int64     `json:"pista_id"`
-	InicioBloque   time.Time `json:"inicio_bloque"`
-	CedidoAVueloID string    `json:"cedido_a_vuelo_id"`
+	VueloID        string    `json:"flight_id"`
+	PistaID        string    `json:"runway_id"`
+	InicioBloque   time.Time `json:"block_start"`
+	CedidoAVueloID string    `json:"taken_by_flight_id"`
 }

@@ -45,7 +45,7 @@ func registrarPedido(log *slog.Logger) gin.HandlerFunc {
 			"ruta", c.FullPath(),
 			"estado", c.Writer.Status(),
 			"duracion_ms", time.Since(inicio).Milliseconds(),
-			"correlacion_id", aplicacion.CorrelacionDe(c.Request.Context()),
+			"correlation_id", aplicacion.CorrelacionDe(c.Request.Context()),
 		)
 	}
 }

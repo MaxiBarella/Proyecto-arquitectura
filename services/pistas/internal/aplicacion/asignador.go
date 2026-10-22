@@ -14,7 +14,7 @@ import (
 const intentosPorConflicto = 3
 
 // ventanasDeBusqueda son los rangos, hacia cada lado, en que se buscan los libres cercanos. Se
-// agranda solo si no alcanzan; 18.2 dice "sin límite de distancia" y un año lo es en la práctica.
+// agranda solo si no alcanzan; RN-09 dice "sin límite de distancia" y un año lo es en la práctica.
 var ventanasDeBusqueda = []time.Duration{24 * time.Hour, 7 * 24 * time.Hour, 365 * 24 * time.Hour}
 
 // Pistas reúne los casos de uso del servicio.
@@ -29,12 +29,12 @@ func NuevoPistas(repo ports.Repositorio) *Pistas {
 	return &Pistas{repo: repo, reloj: time.Now, nuevoID: NuevoUUID}
 }
 
-// Asignar atiende un pedido de slot de Vuelos (4.1).
+// Asignar atiende un pedido de slot de Vuelos (4.1, 4.15).
 func (a *Pistas) Asignar(ctx context.Context, p domain.PedidoDeSlot) (domain.Resultado, error) {
 	if err := domain.ValidarPedido(p); err != nil {
 		return domain.Resultado{}, err
 	}
-	p.InicioBloque = p.InicioBloque.In(domain.ZonaCordoba)
+	p.InicioBloque = p.InicioBloque.UTC()
 
 	var res domain.Resultado
 	var err error
@@ -75,6 +75,11 @@ func (a *Pistas) asignarEn(ctx context.Context, tx ports.Transaccion, p domain.P
 	if err != nil {
 		return domain.Resultado{}, err
 	}
+	// Si dos copias del mismo pedido llegan a la vez, la segunda puede ver el slot recién guardado
+	// por la primera: es el mismo vuelo, así que es un pedido repetido (CA-06).
+	if ocupante != nil && ocupante.VueloID == p.VueloID {
+		return domain.Resultado{Slot: *ocupante, YaAsignado: true}, nil
+	}
 
 	switch domain.Decidir(p.TipoOperacion, ocupante) {
 	case domain.Rechazar:
@@ -90,9 +95,8 @@ func (a *Pistas) asignarEn(ctx context.Context, tx ports.Transaccion, p domain.P
 		}
 		cedido := a.evento(ctx, domain.EventoSlotCedido, domain.DatosSlotCedido{
 			VueloID:        ocupante.VueloID,
-			SlotID:         ocupante.ID,
 			PistaID:        ocupante.PistaID,
-			InicioBloque:   ocupante.InicioBloque,
+			InicioBloque:   ocupante.InicioBloque.UTC(),
 			CedidoAVueloID: p.VueloID,
 		})
 		if err := tx.GuardarEvento(ctx, cedido); err != nil {
@@ -113,7 +117,7 @@ func (a *Pistas) asignarEn(ctx context.Context, tx ports.Transaccion, p domain.P
 	}
 }
 
-// ocupar guarda el slot y su evento "slot.asignado".
+// ocupar guarda el slot y su evento "slot asignado".
 func (a *Pistas) ocupar(ctx context.Context, tx ports.Transaccion, p domain.PedidoDeSlot) (domain.Slot, error) {
 	s := domain.Slot{
 		PistaID:       p.PistaID,
@@ -125,11 +129,9 @@ func (a *Pistas) ocupar(ctx context.Context, tx ports.Transaccion, p domain.Pedi
 		return domain.Slot{}, err
 	}
 	e := a.evento(ctx, domain.EventoSlotAsignado, domain.DatosSlotAsignado{
-		VueloID:       s.VueloID,
-		SlotID:        s.ID,
-		PistaID:       s.PistaID,
-		InicioBloque:  s.InicioBloque,
-		TipoOperacion: s.TipoOperacion,
+		VueloID:      s.VueloID,
+		PistaID:      s.PistaID,
+		InicioBloque: s.InicioBloque.UTC(),
 	})
 	if err := tx.GuardarEvento(ctx, e); err != nil {
 		return domain.Slot{}, err
@@ -161,49 +163,8 @@ func (a *Pistas) evento(ctx context.Context, tipo string, datos any) domain.Even
 	return domain.Evento{
 		ID:            a.nuevoID(),
 		Tipo:          tipo,
-		Fecha:         a.reloj().In(domain.ZonaCordoba),
+		Fecha:         a.reloj().UTC(),
 		CorrelacionID: CorrelacionDe(ctx),
 		Datos:         datos,
 	}
-}
-
-// BloqueDelDia es un bloque de una pista en la consulta de slots.
-type BloqueDelDia struct {
-	domain.SlotLibre
-	Libre bool
-}
-
-// ListarSlots devuelve los bloques de un día de cada pista, o de una sola si pistaID no es 0.
-// Un bloque de una pista cerrada no está libre: no se puede pedir (18.4).
-func (a *Pistas) ListarSlots(ctx context.Context, fecha time.Time, pistaID int64) ([]BloqueDelDia, error) {
-	pistas, err := a.repo.Pistas(ctx)
-	if err != nil {
-		return nil, err
-	}
-	bloques := domain.BloquesDelDia(fecha)
-	ocupados, err := a.repo.SlotsOcupados(ctx, bloques[0], bloques[len(bloques)-1].Add(domain.DuracionBloque))
-	if err != nil {
-		return nil, err
-	}
-	tomado := make(map[domain.SlotLibre]bool, len(ocupados))
-	for _, s := range ocupados {
-		tomado[domain.SlotLibre{PistaID: s.PistaID, InicioBloque: s.InicioBloque.UTC()}] = true
-	}
-
-	var res []BloqueDelDia
-	for _, p := range pistas {
-		if pistaID != 0 && p.ID != pistaID {
-			continue
-		}
-		for _, b := range bloques {
-			libre := p.Abierta && !tomado[domain.SlotLibre{PistaID: p.ID, InicioBloque: b.UTC()}]
-			res = append(res, BloqueDelDia{SlotLibre: domain.SlotLibre{PistaID: p.ID, InicioBloque: b}, Libre: libre})
-		}
-	}
-	return res, nil
-}
-
-// ListarPistas devuelve todas las pistas.
-func (a *Pistas) ListarPistas(ctx context.Context) ([]domain.Pista, error) {
-	return a.repo.Pistas(ctx)
 }

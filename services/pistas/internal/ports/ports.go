@@ -30,12 +30,12 @@ type Lectura interface {
 type Transaccion interface {
 	Lectura
 	// Pista devuelve domain.ErrPistaInexistente si no existe.
-	Pista(ctx context.Context, id int64) (domain.Pista, error)
+	Pista(ctx context.Context, id string) (domain.Pista, error)
 	// SlotDelVuelo devuelve nil si el vuelo no tiene slot.
 	SlotDelVuelo(ctx context.Context, vueloID string) (*domain.Slot, error)
 	// OcupanteConBloqueo devuelve quién ocupa el slot, o nil, y lo bloquea hasta el final de la
 	// transacción para que nadie lo cambie mientras se decide.
-	OcupanteConBloqueo(ctx context.Context, pistaID int64, inicio time.Time) (*domain.Slot, error)
+	OcupanteConBloqueo(ctx context.Context, pistaID string, inicio time.Time) (*domain.Slot, error)
 	// Ocupar guarda el slot y le completa el ID. Devuelve ErrConflicto si el slot o el vuelo ya
 	// están tomados por otra transacción.
 	Ocupar(ctx context.Context, s *domain.Slot) error

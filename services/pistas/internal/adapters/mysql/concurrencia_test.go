@@ -46,7 +46,7 @@ func levantarBase(t *testing.T) *Repositorio {
 	return repo
 }
 
-var bloque = time.Date(2026, 10, 23, 14, 0, 0, 0, domain.ZonaCordoba)
+var bloque = time.Date(2026, 10, 23, 17, 0, 0, 0, time.UTC)
 
 // CA-05 y RN-10: muchos despegues piden el mismo slot a la vez; lo obtiene uno solo y los demás
 // reciben un rechazo. Nunca quedan dos vuelos con el mismo slot.
@@ -62,7 +62,7 @@ func TestPedidosSimultaneosPorElMismoSlot(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			_, errs[i] = pistas.Asignar(context.Background(), domain.PedidoDeSlot{
-				VueloID: fmt.Sprintf("D%02d", i), TipoOperacion: domain.Despegue, PistaID: 1, InicioBloque: bloque,
+				VueloID: fmt.Sprintf("D%02d", i), TipoOperacion: domain.Despegue, PistaID: "05-23", InicioBloque: bloque,
 			})
 		}(i)
 	}
@@ -95,7 +95,7 @@ func TestArriboYDespeguesSimultaneos(t *testing.T) {
 	pedir := func(vuelo string, tipo domain.TipoOperacion) {
 		defer wg.Done()
 		_, _ = pistas.Asignar(context.Background(), domain.PedidoDeSlot{
-			VueloID: vuelo, TipoOperacion: tipo, PistaID: 1, InicioBloque: bloque,
+			VueloID: vuelo, TipoOperacion: tipo, PistaID: "05-23", InicioBloque: bloque,
 		})
 	}
 	for i := 0; i < 5; i++ {
@@ -123,7 +123,7 @@ func TestMismoPedidoRepetidoAlMismoTiempo(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			if _, err := pistas.Asignar(context.Background(), domain.PedidoDeSlot{
-				VueloID: "AR1550", TipoOperacion: domain.Arribo, PistaID: 1, InicioBloque: bloque,
+				VueloID: "AR1550", TipoOperacion: domain.Arribo, PistaID: "05-23", InicioBloque: bloque,
 			}); err != nil {
 				t.Errorf("un pedido repetido no debería fallar: %v", err)
 			}

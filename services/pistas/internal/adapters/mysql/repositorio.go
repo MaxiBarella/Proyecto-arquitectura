@@ -49,7 +49,11 @@ func (r *Repositorio) Migrar(ctx context.Context) error {
 	return r.db.WithContext(ctx).AutoMigrate(&pistaModelo{}, &slotModelo{}, &outboxModelo{}, &mensajeProcesadoModelo{})
 }
 
-// CargarPistasIniciales crea las dos pistas con las que arranca el sistema, si no hay ninguna (2.1).
+// PistasIniciales son las dos pistas con las que arranca el sistema (RN-02), con el nombre sin barra
+// de la 4.11.
+var PistasIniciales = []string{"05-23", "18-36"}
+
+// CargarPistasIniciales crea las pistas iniciales, si no hay ninguna.
 func (r *Repositorio) CargarPistasIniciales(ctx context.Context) error {
 	var cantidad int64
 	if err := r.db.WithContext(ctx).Model(&pistaModelo{}).Count(&cantidad).Error; err != nil {
@@ -58,10 +62,11 @@ func (r *Repositorio) CargarPistasIniciales(ctx context.Context) error {
 	if cantidad > 0 {
 		return nil
 	}
-	return r.db.WithContext(ctx).Create(&[]pistaModelo{
-		{Nombre: "Pista 1", Abierta: true},
-		{Nombre: "Pista 2", Abierta: true},
-	}).Error
+	filas := make([]pistaModelo, len(PistasIniciales))
+	for i, id := range PistasIniciales {
+		filas[i] = pistaModelo{ID: id, Abierta: true}
+	}
+	return r.db.WithContext(ctx).Create(&filas).Error
 }
 
 // EnTransaccion implementa ports.Repositorio.
@@ -95,7 +100,7 @@ func (r *Repositorio) Pendientes(ctx context.Context, limite int) ([]ports.Event
 			Evento: domain.Evento{
 				ID:            f.ID,
 				Tipo:          f.Tipo,
-				Fecha:         f.Fecha.In(domain.ZonaCordoba),
+				Fecha:         f.Fecha.UTC(),
 				CorrelacionID: f.CorrelacionID,
 			},
 			Secuencia: f.Secuencia,
@@ -124,9 +129,9 @@ func (t *transaccion) SlotsOcupados(ctx context.Context, desde, hasta time.Time)
 	return slotsOcupados(t.db.WithContext(ctx), desde, hasta)
 }
 
-func (t *transaccion) Pista(ctx context.Context, id int64) (domain.Pista, error) {
+func (t *transaccion) Pista(ctx context.Context, id string) (domain.Pista, error) {
 	var p pistaModelo
-	err := t.db.WithContext(ctx).First(&p, id).Error
+	err := t.db.WithContext(ctx).Where("id = ?", id).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return domain.Pista{}, domain.ErrPistaInexistente
 	}
@@ -136,14 +141,17 @@ func (t *transaccion) Pista(ctx context.Context, id int64) (domain.Pista, error)
 	return p.aDominio(), nil
 }
 
+// SlotDelVuelo también usa FOR UPDATE: una lectura con bloqueo ve lo último guardado. Una lectura
+// común vería la foto de la base del comienzo de la transacción (REPEATABLE READ) y no se enteraría
+// de un pedido simultáneo del mismo vuelo que ya terminó.
 func (t *transaccion) SlotDelVuelo(ctx context.Context, vueloID string) (*domain.Slot, error) {
-	return primerSlot(t.db.WithContext(ctx).Where("vuelo_id = ?", vueloID))
+	return primerSlot(t.db.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("vuelo_id = ?", vueloID))
 }
 
 // OcupanteConBloqueo usa SELECT ... FOR UPDATE. Si el slot tiene vuelo, bloquea esa fila: otro
 // pedido por el mismo slot espera a que esta transacción termine. Si está libre, MySQL bloquea el
 // hueco del índice; si dos pedidos llegan a la vez, uno de los dos falla al insertar y se reintenta.
-func (t *transaccion) OcupanteConBloqueo(ctx context.Context, pistaID int64, inicio time.Time) (*domain.Slot, error) {
+func (t *transaccion) OcupanteConBloqueo(ctx context.Context, pistaID string, inicio time.Time) (*domain.Slot, error) {
 	return primerSlot(t.db.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("pista_id = ? AND inicio_bloque = ?", pistaID, inicio.UTC()))
 }

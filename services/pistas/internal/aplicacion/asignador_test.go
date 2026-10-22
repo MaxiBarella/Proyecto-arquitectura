@@ -18,12 +18,15 @@ type repoEnMemoria struct {
 	eventos    []domain.Evento
 	proximoID  int64
 	conflictos int // cuántas veces Ocupar va a fallar con ErrConflicto antes de funcionar
+	// fotoVieja hace que SlotDelVuelo no vea los slots, como una lectura sin bloqueo que todavía no
+	// ve lo que guardó un pedido simultáneo.
+	fotoVieja bool
 }
 
 func nuevoRepo() *repoEnMemoria {
 	return &repoEnMemoria{pistas: []domain.Pista{
-		{ID: 1, Nombre: "Pista 1", Abierta: true},
-		{ID: 2, Nombre: "Pista 2", Abierta: true},
+		{ID: "05-23", Abierta: true},
+		{ID: "18-36", Abierta: true},
 	}}
 }
 
@@ -60,7 +63,7 @@ func (t *txEnMemoria) SlotsOcupados(_ context.Context, desde, hasta time.Time) (
 	return filtrar(t.slots, desde, hasta), nil
 }
 
-func (t *txEnMemoria) Pista(_ context.Context, id int64) (domain.Pista, error) {
+func (t *txEnMemoria) Pista(_ context.Context, id string) (domain.Pista, error) {
 	for _, p := range t.repo.pistas {
 		if p.ID == id {
 			return p, nil
@@ -70,6 +73,9 @@ func (t *txEnMemoria) Pista(_ context.Context, id int64) (domain.Pista, error) {
 }
 
 func (t *txEnMemoria) SlotDelVuelo(_ context.Context, vueloID string) (*domain.Slot, error) {
+	if t.repo.fotoVieja {
+		return nil, nil
+	}
 	for _, s := range t.slots {
 		if s.VueloID == vueloID {
 			return &s, nil
@@ -78,7 +84,7 @@ func (t *txEnMemoria) SlotDelVuelo(_ context.Context, vueloID string) (*domain.S
 	return nil, nil
 }
 
-func (t *txEnMemoria) OcupanteConBloqueo(_ context.Context, pistaID int64, inicio time.Time) (*domain.Slot, error) {
+func (t *txEnMemoria) OcupanteConBloqueo(_ context.Context, pistaID string, inicio time.Time) (*domain.Slot, error) {
 	for _, s := range t.slots {
 		if s.MismoLugar(pistaID, inicio) {
 			return &s, nil
@@ -128,9 +134,9 @@ func filtrar(slots []domain.Slot, desde, hasta time.Time) []domain.Slot {
 	return res
 }
 
-var catorce = time.Date(2026, 10, 23, 14, 0, 0, 0, domain.ZonaCordoba)
+var catorce = time.Date(2026, 10, 23, 17, 0, 0, 0, time.UTC)
 
-func pedido(vuelo string, tipo domain.TipoOperacion, pista int64, inicio time.Time) domain.PedidoDeSlot {
+func pedido(vuelo string, tipo domain.TipoOperacion, pista string, inicio time.Time) domain.PedidoDeSlot {
 	return domain.PedidoDeSlot{VueloID: vuelo, TipoOperacion: tipo, PistaID: pista, InicioBloque: inicio}
 }
 
@@ -147,7 +153,7 @@ func TestAsignarSlotLibre(t *testing.T) {
 	repo := nuevoRepo()
 	ctx := ConCorrelacion(context.Background(), "traza-1")
 
-	res, err := NuevoPistas(repo).Asignar(ctx, pedido("AR1550", domain.Despegue, 1, catorce))
+	res, err := NuevoPistas(repo).Asignar(ctx, pedido("AR1550", domain.Despegue, "05-23", catorce))
 	if err != nil {
 		t.Fatalf("no se esperaba error: %v", err)
 	}
@@ -166,9 +172,9 @@ func TestAsignarSlotLibre(t *testing.T) {
 func TestPedidoRepetidoEsIdempotente(t *testing.T) {
 	repo := nuevoRepo()
 	p := NuevoPistas(repo)
-	primero, _ := p.Asignar(context.Background(), pedido("AR1550", domain.Despegue, 1, catorce))
+	primero, _ := p.Asignar(context.Background(), pedido("AR1550", domain.Despegue, "05-23", catorce))
 
-	segundo, err := p.Asignar(context.Background(), pedido("AR1550", domain.Despegue, 1, catorce))
+	segundo, err := p.Asignar(context.Background(), pedido("AR1550", domain.Despegue, "05-23", catorce))
 	if err != nil {
 		t.Fatalf("el pedido repetido no debería fallar: %v", err)
 	}
@@ -180,12 +186,29 @@ func TestPedidoRepetidoEsIdempotente(t *testing.T) {
 	}
 }
 
-// 18.8: un vuelo con slot no puede pedir otro.
+// CA-06: la copia simultánea de un pedido que no llega a ver el slot del vuelo, pero lo encuentra
+// ocupando el slot pedido, es un pedido repetido y no un rechazo.
+func TestCopiaSimultaneaDelMismoPedido(t *testing.T) {
+	repo := nuevoRepo()
+	p := NuevoPistas(repo)
+	_, _ = p.Asignar(context.Background(), pedido("AR1550", domain.Arribo, "05-23", catorce))
+	repo.fotoVieja = true
+
+	res, err := p.Asignar(context.Background(), pedido("AR1550", domain.Arribo, "05-23", catorce))
+	if err != nil || !res.YaAsignado {
+		t.Fatalf("se esperaba el slot ya asignado, vino %+v, %v", res, err)
+	}
+	if len(repo.eventos) != 1 {
+		t.Fatalf("no tiene que publicar de nuevo: hay %d eventos", len(repo.eventos))
+	}
+}
+
+// RN-28: un vuelo con slot no puede pedir otro.
 func TestVueloConSlotNoPidaOtro(t *testing.T) {
 	p := NuevoPistas(nuevoRepo())
-	_, _ = p.Asignar(context.Background(), pedido("AR1550", domain.Despegue, 1, catorce))
+	_, _ = p.Asignar(context.Background(), pedido("AR1550", domain.Despegue, "05-23", catorce))
 
-	_, err := p.Asignar(context.Background(), pedido("AR1550", domain.Despegue, 2, catorce))
+	_, err := p.Asignar(context.Background(), pedido("AR1550", domain.Despegue, "18-36", catorce))
 	if !errors.Is(err, domain.ErrVueloConSlot) {
 		t.Fatalf("se esperaba ErrVueloConSlot, vino %v", err)
 	}
@@ -195,9 +218,9 @@ func TestVueloConSlotNoPidaOtro(t *testing.T) {
 func TestDespegueRechazadoConLibresCercanos(t *testing.T) {
 	repo := nuevoRepo()
 	p := NuevoPistas(repo)
-	_, _ = p.Asignar(context.Background(), pedido("AR1000", domain.Arribo, 1, catorce))
+	_, _ = p.Asignar(context.Background(), pedido("AR1000", domain.Arribo, "05-23", catorce))
 
-	_, err := p.Asignar(context.Background(), pedido("LA2000", domain.Despegue, 1, catorce))
+	_, err := p.Asignar(context.Background(), pedido("LA2000", domain.Despegue, "05-23", catorce))
 	var ocupado domain.ErrSlotOcupado
 	if !errors.As(err, &ocupado) {
 		t.Fatalf("se esperaba ErrSlotOcupado, vino %v", err)
@@ -205,8 +228,8 @@ func TestDespegueRechazadoConLibresCercanos(t *testing.T) {
 	if len(ocupado.Libres) != domain.CantidadDeLibresCercanos {
 		t.Fatalf("se esperaban %d libres, vinieron %d", domain.CantidadDeLibresCercanos, len(ocupado.Libres))
 	}
-	if l := ocupado.Libres[0]; l.PistaID != 2 || !l.InicioBloque.Equal(catorce) {
-		t.Fatalf("el más cercano es la pista 2 a la misma hora, vino %+v", l)
+	if l := ocupado.Libres[0]; l.PistaID != "18-36" || !l.InicioBloque.Equal(catorce) {
+		t.Fatalf("el más cercano es la pista 18-36 a la misma hora, vino %+v", l)
 	}
 	if repo.slots[0].VueloID != "AR1000" {
 		t.Fatalf("el slot tiene que seguir con su vuelo original")
@@ -216,9 +239,9 @@ func TestDespegueRechazadoConLibresCercanos(t *testing.T) {
 // CA-04: entre dos arribos gana el primero.
 func TestArriboNoLeQuitaElSlotAOtroArribo(t *testing.T) {
 	p := NuevoPistas(nuevoRepo())
-	_, _ = p.Asignar(context.Background(), pedido("AR1000", domain.Arribo, 1, catorce))
+	_, _ = p.Asignar(context.Background(), pedido("AR1000", domain.Arribo, "05-23", catorce))
 
-	_, err := p.Asignar(context.Background(), pedido("AR2000", domain.Arribo, 1, catorce))
+	_, err := p.Asignar(context.Background(), pedido("AR2000", domain.Arribo, "05-23", catorce))
 	var ocupado domain.ErrSlotOcupado
 	if !errors.As(err, &ocupado) {
 		t.Fatalf("se esperaba ErrSlotOcupado, vino %v", err)
@@ -229,9 +252,9 @@ func TestArriboNoLeQuitaElSlotAOtroArribo(t *testing.T) {
 func TestArriboLeQuitaElSlotAUnDespegue(t *testing.T) {
 	repo := nuevoRepo()
 	p := NuevoPistas(repo)
-	_, _ = p.Asignar(context.Background(), pedido("LA2000", domain.Despegue, 1, catorce))
+	_, _ = p.Asignar(context.Background(), pedido("LA2000", domain.Despegue, "05-23", catorce))
 
-	res, err := p.Asignar(context.Background(), pedido("AR1000", domain.Arribo, 1, catorce))
+	res, err := p.Asignar(context.Background(), pedido("AR1000", domain.Arribo, "05-23", catorce))
 	if err != nil {
 		t.Fatalf("no se esperaba error: %v", err)
 	}
@@ -260,10 +283,10 @@ func TestArriboLeQuitaElSlotAUnDespegue(t *testing.T) {
 // El despegue que perdió su slot puede pedir otro (RN-19, CA-14).
 func TestDespegueDesplazadoPuedePedirOtro(t *testing.T) {
 	p := NuevoPistas(nuevoRepo())
-	_, _ = p.Asignar(context.Background(), pedido("LA2000", domain.Despegue, 1, catorce))
-	_, _ = p.Asignar(context.Background(), pedido("AR1000", domain.Arribo, 1, catorce))
+	_, _ = p.Asignar(context.Background(), pedido("LA2000", domain.Despegue, "05-23", catorce))
+	_, _ = p.Asignar(context.Background(), pedido("AR1000", domain.Arribo, "05-23", catorce))
 
-	if _, err := p.Asignar(context.Background(), pedido("LA2000", domain.Despegue, 2, catorce)); err != nil {
+	if _, err := p.Asignar(context.Background(), pedido("LA2000", domain.Despegue, "18-36", catorce)); err != nil {
 		t.Fatalf("el despegue demorado tiene que poder pedir un slot nuevo: %v", err)
 	}
 }
@@ -273,14 +296,14 @@ func TestPistaCerrada(t *testing.T) {
 	repo := nuevoRepo()
 	repo.pistas[0].Abierta = false
 
-	_, err := NuevoPistas(repo).Asignar(context.Background(), pedido("AR1000", domain.Arribo, 1, catorce))
+	_, err := NuevoPistas(repo).Asignar(context.Background(), pedido("AR1000", domain.Arribo, "05-23", catorce))
 	if !errors.Is(err, domain.ErrPistaCerrada) {
 		t.Fatalf("se esperaba ErrPistaCerrada, vino %v", err)
 	}
 }
 
 func TestPistaInexistente(t *testing.T) {
-	_, err := NuevoPistas(nuevoRepo()).Asignar(context.Background(), pedido("AR1000", domain.Arribo, 9, catorce))
+	_, err := NuevoPistas(nuevoRepo()).Asignar(context.Background(), pedido("AR1000", domain.Arribo, "99-99", catorce))
 	if !errors.Is(err, domain.ErrPistaInexistente) {
 		t.Fatalf("se esperaba ErrPistaInexistente, vino %v", err)
 	}
@@ -288,7 +311,7 @@ func TestPistaInexistente(t *testing.T) {
 
 func TestPedidoInvalidoNoTocaLaBase(t *testing.T) {
 	repo := nuevoRepo()
-	_, err := NuevoPistas(repo).Asignar(context.Background(), pedido("AR1000", domain.Arribo, 1, catorce.Add(7*time.Minute)))
+	_, err := NuevoPistas(repo).Asignar(context.Background(), pedido("AR1000", domain.Arribo, "05-23", catorce.Add(7*time.Minute)))
 	var invalidos domain.ErrDatosInvalidos
 	if !errors.As(err, &invalidos) || len(repo.slots) != 0 {
 		t.Fatalf("se esperaba ErrDatosInvalidos sin cambios, vino %v", err)
@@ -300,7 +323,7 @@ func TestReintentaAnteUnConflicto(t *testing.T) {
 	repo := nuevoRepo()
 	repo.conflictos = 1
 
-	res, err := NuevoPistas(repo).Asignar(context.Background(), pedido("AR1000", domain.Arribo, 1, catorce))
+	res, err := NuevoPistas(repo).Asignar(context.Background(), pedido("AR1000", domain.Arribo, "05-23", catorce))
 	if err != nil || res.Slot.ID == 0 {
 		t.Fatalf("después de un conflicto tiene que reintentar y asignar: %+v, %v", res, err)
 	}
@@ -310,7 +333,7 @@ func TestConflictoPersistenteSeDevuelve(t *testing.T) {
 	repo := nuevoRepo()
 	repo.conflictos = intentosPorConflicto
 
-	_, err := NuevoPistas(repo).Asignar(context.Background(), pedido("AR1000", domain.Arribo, 1, catorce))
+	_, err := NuevoPistas(repo).Asignar(context.Background(), pedido("AR1000", domain.Arribo, "05-23", catorce))
 	if !errors.Is(err, ports.ErrConflicto) {
 		t.Fatalf("agotados los intentos se esperaba ErrConflicto, vino %v", err)
 	}
@@ -319,30 +342,3 @@ func TestConflictoPersistenteSeDevuelve(t *testing.T) {
 	}
 }
 
-// Un bloque de una pista cerrada o con vuelo no figura como libre.
-func TestListarSlots(t *testing.T) {
-	repo := nuevoRepo()
-	repo.pistas[1].Abierta = false
-	p := NuevoPistas(repo)
-	_, _ = p.Asignar(context.Background(), pedido("AR1000", domain.Arribo, 1, catorce))
-
-	bloques, err := p.ListarSlots(context.Background(), catorce, 0)
-	if err != nil {
-		t.Fatalf("no se esperaba error: %v", err)
-	}
-	if len(bloques) != 2*96 {
-		t.Fatalf("se esperaban 96 bloques por pista, vinieron %d", len(bloques))
-	}
-	for _, b := range bloques {
-		ocupado := b.PistaID == 1 && b.InicioBloque.Equal(catorce)
-		esperado := b.PistaID == 1 && !ocupado
-		if b.Libre != esperado {
-			t.Fatalf("pista %d a las %s: libre = %v, se esperaba %v", b.PistaID, b.InicioBloque.Format("15:04"), b.Libre, esperado)
-		}
-	}
-
-	soloUna, _ := p.ListarSlots(context.Background(), catorce, 1)
-	if len(soloUna) != 96 {
-		t.Fatalf("filtrando por pista se esperaban 96 bloques, vinieron %d", len(soloUna))
-	}
-}
