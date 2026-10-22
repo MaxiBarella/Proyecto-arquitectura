@@ -66,8 +66,11 @@ type Flight struct {
 	Status      Status
 	Slot        *Slot
 	DivertedTo  string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// Version sube con cada cambio guardado. Los eventos la llevan como versión
+	// del dato, para que el que los recibe descarte uno viejo (4.8).
+	Version   int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // NewFlight valida los datos y crea el vuelo en "pendiente de slot", sin slot (RN-06).
@@ -123,6 +126,7 @@ func NewFlight(id, airline string, d NewFlightData, now time.Time) (*Flight, err
 		Destination: destination,
 		ScheduledAt: d.ScheduledAt.UTC(),
 		Status:      PendingSlot,
+		Version:     1,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}, nil

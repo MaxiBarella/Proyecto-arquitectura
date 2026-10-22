@@ -9,7 +9,7 @@ import (
 var (
 	now     = time.Date(2026, 10, 19, 18, 0, 0, 0, time.UTC)
 	block   = time.Date(2026, 10, 23, 14, 30, 0, 0, time.UTC)
-	slot05  = Slot{RunwayID: "05", BlockStart: block}
+	slot05  = Slot{RunwayID: "05-23", BlockStart: block}
 	allStat = []Status{PendingSlot, Scheduled, Delayed, Completed, Diverted, Cancelled}
 )
 
@@ -151,7 +151,7 @@ func TestValidateSlot(t *testing.T) {
 	if err := ValidateSlot(slot05); err != nil {
 		t.Errorf("slot válido: %v", err)
 	}
-	if err := ValidateSlot(Slot{RunwayID: "05", BlockStart: block.Add(7 * time.Minute)}); !errors.Is(err, ErrInvalidFlight) {
+	if err := ValidateSlot(Slot{RunwayID: "05-23", BlockStart: block.Add(7 * time.Minute)}); !errors.Is(err, ErrInvalidFlight) {
 		t.Errorf("bloque fuera de un múltiplo de 15 minutos: got %v", err)
 	}
 	if err := ValidateSlot(Slot{BlockStart: block}); !errors.Is(err, ErrInvalidFlight) {
@@ -159,7 +159,7 @@ func TestValidateSlot(t *testing.T) {
 	}
 	// 11:30 en Córdoba (UTC-3) es 14:30 UTC: tiene que valer igual.
 	cordoba := time.FixedZone("ART", -3*60*60)
-	if err := ValidateSlot(Slot{RunwayID: "05", BlockStart: block.In(cordoba)}); err != nil {
+	if err := ValidateSlot(Slot{RunwayID: "05-23", BlockStart: block.In(cordoba)}); err != nil {
 		t.Errorf("bloque en otra zona horaria: %v", err)
 	}
 }
@@ -306,7 +306,7 @@ func TestEffectiveTime(t *testing.T) {
 	}
 
 	// Publicado para las 14:30 y con el bloque de las 18:00 (CA-33).
-	evening := Slot{RunwayID: "23", BlockStart: time.Date(2026, 10, 23, 18, 0, 0, 0, time.UTC)}
+	evening := Slot{RunwayID: "18-36", BlockStart: time.Date(2026, 10, 23, 18, 0, 0, 0, time.UTC)}
 	if err := f.AssignSlot(evening, now); err != nil {
 		t.Fatalf("AssignSlot: %v", err)
 	}

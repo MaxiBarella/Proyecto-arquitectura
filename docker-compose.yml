@@ -6,12 +6,20 @@ services:
     build: ./services/vuelos
     environment:
       PORT: "8080"
+      MYSQL_DSN: ${MYSQL_VUELOS_USER:?falta en .env}:${MYSQL_VUELOS_PASSWORD:?falta en .env}@tcp(mysql-vuelos:3306)/vuelos?parseTime=true&loc=UTC
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
     ports:
       - "8081:8080"
     depends_on:
-      - mysql-vuelos
-      - rabbitmq
-      - solr
+      # Vuelos arranca recién cuando MySQL acepta conexiones.
+      mysql-vuelos:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      solr:
+        condition: service_started
+      grafana:
+        condition: service_started
 
   pistas:
     build: ./services/pistas
@@ -49,8 +57,18 @@ services:
     environment:
       MYSQL_DATABASE: vuelos
       MYSQL_ROOT_PASSWORD: ${MYSQL_VUELOS_ROOT_PASSWORD:?falta en .env}
+      # Usuario propio de Vuelos, con acceso solo a la base vuelos.
+      MYSQL_USER: ${MYSQL_VUELOS_USER:?falta en .env}
+      MYSQL_PASSWORD: ${MYSQL_VUELOS_PASSWORD:?falta en .env}
     volumes:
       - mysql-vuelos-data:/var/lib/mysql
+      # Las tablas se crean la primera vez que arranca la base.
+      - ./services/vuelos/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   mysql-pistas:
     image: mysql:8.4
