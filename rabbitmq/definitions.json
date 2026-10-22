@@ -12,7 +12,7 @@
     { "name": "pistas.eventos.fallidos", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
     {
       "name": "vuelos.eventos", "vhost": "/", "durable": true, "auto_delete": false,
-      "arguments": { "x-dead-letter-exchange": "aeropuerto.fallidos", "x-dead-letter-routing-key": "vuelos.eventos.fallidos" }
+      "arguments": { "x-dead-letter-exchange": "aeropuerto.fallidos", "x-dead-letter-routing-key": "vuelos.eventos.fallidos", "x-single-active-consumer": true }
     },
     { "name": "vuelos.eventos.fallidos", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
   ],

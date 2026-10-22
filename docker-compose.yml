@@ -9,6 +9,7 @@ services:
       MYSQL_DSN: ${MYSQL_VUELOS_USER:?falta en .env}:${MYSQL_VUELOS_PASSWORD:?falta en .env}@tcp(mysql-vuelos:3306)/vuelos?parseTime=true&loc=UTC
       OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
       PISTAS_URL: http://pistas:8080
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:?falta en .env}:${RABBITMQ_PASSWORD:?falta en .env}@rabbitmq:5672
     ports:
       - "8081:8080"
     depends_on:

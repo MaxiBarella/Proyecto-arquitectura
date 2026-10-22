@@ -5,7 +5,7 @@
 | Cola | Consumidor | Recibe | Fallidos en |
 |---|---|---|---|
 | `pistas.eventos` | Pistas | `clima.#` y `vuelos.vuelo.cancelado` | `pistas.eventos.fallidos` |
-| `vuelos.eventos` | Vuelos | `pistas.#` | `vuelos.eventos.fallidos` |
+| `vuelos.eventos` | Vuelos, con un solo consumidor activo (4.23) | `pistas.#` | `vuelos.eventos.fallidos` |
 
 **Cómo se carga.** RabbitMQ arranca con el usuario del `.env`. Cuando está listo, el contenedor `rabbitmq-init` del Docker Compose sube este archivo por la API de administración, una sola vez, y termina. Los servicios arrancan recién después.
 
@@ -14,3 +14,5 @@ No se usa `load_definitions` al arrancar porque, si RabbitMQ carga un archivo as
 **Mensajes fallidos.** Un consumidor que no puede procesar un mensaje después de sus reintentos (4.5) lo rechaza sin volver a encolarlo (`nack` con `requeue=false`). RabbitMQ lo pasa solo, por el exchange `aeropuerto.fallidos`, a la cola de fallidos de ese consumidor (11.4).
 
 **Sumar un consumidor o un evento.** Se agrega la cola, su cola de fallidos y las uniones en este archivo, y se reinicia con `docker compose up rabbitmq-init`. Importar el archivo de nuevo no borra nada de lo que ya existe.
+
+**Los consumidores no declaran su cola.** La crea este archivo con sus argumentos (`x-dead-letter-*` y, en `vuelos.eventos`, `x-single-active-consumer`). Si un servicio la declarara con otros, RabbitMQ cerraría el canal con `PRECONDITION_FAILED`. Por la misma razón, si se cambian los argumentos de una cola que ya existe, hay que bajar RabbitMQ (`docker compose down`) antes de volver a cargar el archivo.

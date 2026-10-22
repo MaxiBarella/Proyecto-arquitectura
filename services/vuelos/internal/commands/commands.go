@@ -4,9 +4,8 @@ import (
 	"context"
 	"time"
 
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/domain"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/observability"
 )
 
 // Claves de ruteo de los eventos que publica Vuelos (4.14).
@@ -71,6 +70,7 @@ func (s *Service) event(ctx context.Context, eventType string, data any) domain.
 		Type:          eventType,
 		OccurredAt:    s.now(),
 		CorrelationID: correlationID(ctx),
+		TraceParent:   observability.TraceParent(ctx),
 		Data:          data,
 	}
 }
@@ -78,8 +78,8 @@ func (s *Service) event(ctx context.Context, eventType string, data any) domain.
 // correlationID es el identificador de la traza en curso (11.2), o uno nuevo si
 // no hay traza.
 func correlationID(ctx context.Context) string {
-	if sc := trace.SpanContextFromContext(ctx); sc.HasTraceID() {
-		return sc.TraceID().String()
+	if id := observability.TraceID(ctx); id != "" {
+		return id
 	}
 	return domain.NewID()
 }
