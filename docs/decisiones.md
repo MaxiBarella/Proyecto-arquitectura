@@ -289,7 +289,7 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 | 14.9 | Fecha del filtro del tablero | **El día en hora de Argentina (UTC−3)** | Un vuelo de las 23:30 en Córdoba es de ese día, aunque en UTC sean las 02:30 del siguiente. Es lo que espera quien mira el tablero. El resto de los horarios de la API siguen en UTC. |
 | 14.10 | Si Solr no responde al actualizar el índice | **Igual que los demás consumidores** | Se hacen 3 reintentos, a 1, 2 y 4 segundos (4.24), y el evento pasa a `vuelos.indice.fallidos`, con la alerta de la 11.4. Cuando Solr vuelve, se corre la reconstrucción (14.3). Se descartó reintentar sin límite, porque se comportaría distinto que el resto y los eventos se acumularían. |
 
-Maxi eligió las decisiones 14.5 a 14.10 el 22/10/2026, al escribir el ADR-006, entre las opciones que propuso el agente. La 14.7 tiene la marca "(agente)" porque el valor de 5 segundos lo propuso el agente. Quedan confirmadas al mergearse el pull request de la rama `docs/adr-006`.
+Maxi eligió las decisiones 14.5 a 14.10 el 22/10/2026, al escribir el ADR-006, entre las opciones que propuso el agente. La 14.7 tiene la marca "(agente)" porque el valor de 5 segundos lo propuso el agente. Quedan confirmadas al mergearse el pull request #30.
 
 ## 15. API gateway
 
