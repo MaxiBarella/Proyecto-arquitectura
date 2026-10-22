@@ -8,24 +8,39 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/aplicacion"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/domain"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/observability"
+	"github.com/gin-gonic/gin"
 )
+
+// TestMain configura OpenTelemetry como en el arranque, sin colector: así la traza que llega en
+// traceparent se lee igual que en el servicio.
+func TestMain(m *testing.M) {
+	gin.SetMode(gin.TestMode)
+	if _, err := observability.Setup(context.Background(), "pistas"); err != nil {
+		panic(err)
+	}
+	os.Exit(m.Run())
+}
 
 type casosDePrueba struct {
 	res         domain.Resultado
 	err         error
 	pedido      domain.PedidoDeSlot
 	correlacion string
+	traceparent string
 }
 
 func (c *casosDePrueba) Asignar(ctx context.Context, p domain.PedidoDeSlot) (domain.Resultado, error) {
 	c.pedido = p
 	c.correlacion = aplicacion.CorrelacionDe(ctx)
+	c.traceparent = aplicacion.TraceParentDe(ctx)
 	return c.res, c.err
 }
 
@@ -134,13 +149,17 @@ func TestCuerpoMalFormado(t *testing.T) {
 	}
 }
 
-// 11.2: el identificador de la traza que llega en traceparent es el de correlación.
+// 11.2 y 11.6: la traza que llega de Vuelos en traceparent es la del evento: su identificador va en
+// el correlation_id y el traceparent se guarda para el mensaje.
 func TestTomaLaCorrelacionDelTraceparent(t *testing.T) {
 	casos := &casosDePrueba{}
 	pedir(t, casos, cuerpoValido, map[string]string{
 		"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
 	})
 	if casos.correlacion != "4bf92f3577b34da6a3ce929d0e0e4736" {
-		t.Fatalf("vino %q", casos.correlacion)
+		t.Fatalf("correlación: vino %q", casos.correlacion)
+	}
+	if !strings.HasPrefix(casos.traceparent, "00-4bf92f3577b34da6a3ce929d0e0e4736-") {
+		t.Fatalf("el traceparent tiene que seguir la misma traza, vino %q", casos.traceparent)
 	}
 }

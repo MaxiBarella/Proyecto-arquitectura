@@ -1,51 +1,24 @@
 package httpadapter
 
 import (
-	"log/slog"
-	"strings"
-	"time"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/aplicacion"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/observability"
 )
 
-// correlacion toma el identificador de la traza del encabezado traceparent de W3C, que es el que
-// propaga OpenTelemetry (11.2). Si el pedido no lo trae, genera uno.
-func correlacion() gin.HandlerFunc {
+// traza le pasa al caso de uso la traza que abrió observability.Middleware, que viene de Vuelos en el
+// encabezado traceparent. Los eventos la guardan en el outbox: el identificador va en el
+// correlation_id (11.2) y el traceparent sigue en el mensaje (11.6). Si no hay traza (por ejemplo,
+// sin colector y sin traceparent en el pedido), se genera un identificador.
+func traza() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := idDeTraza(c.GetHeader("traceparent"))
+		ctx := c.Request.Context()
+		id := observability.TraceID(ctx)
 		if id == "" {
 			id = aplicacion.NuevoIDDeTraza()
 		}
-		c.Request = c.Request.WithContext(aplicacion.ConCorrelacion(c.Request.Context(), id))
+		c.Request = c.Request.WithContext(aplicacion.ConTraza(ctx, id, observability.TraceParent(ctx)))
 		c.Next()
-	}
-}
-
-// idDeTraza extrae el trace id de "00-<trace id>-<span id>-<flags>".
-func idDeTraza(traceparent string) string {
-	partes := strings.Split(traceparent, "-")
-	if len(partes) != 4 || len(partes[1]) != 32 {
-		return ""
-	}
-	return partes[1]
-}
-
-// registrarPedido escribe una línea de log por pedido (11.5).
-func registrarPedido(log *slog.Logger) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		inicio := time.Now()
-		c.Next()
-		if c.Request.URL.Path == "/health" {
-			return
-		}
-		log.InfoContext(c.Request.Context(), "pedido atendido",
-			"metodo", c.Request.Method,
-			"ruta", c.FullPath(),
-			"estado", c.Writer.Status(),
-			"duracion_ms", time.Since(inicio).Milliseconds(),
-			"correlation_id", aplicacion.CorrelacionDe(c.Request.Context()),
-		)
 	}
 }

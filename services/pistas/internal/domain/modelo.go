@@ -75,7 +75,9 @@ type Evento struct {
 	Tipo          string
 	Fecha         time.Time
 	CorrelacionID string
-	Datos         any
+	// TraceParent es la traza del pedido que lo causó, para que siga en el mensaje (11.6).
+	TraceParent string
+	Datos       any
 }
 
 // DatosSlotAsignado son los datos de "slot asignado" (4.12).

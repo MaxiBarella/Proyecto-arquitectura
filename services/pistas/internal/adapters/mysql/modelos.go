@@ -52,6 +52,7 @@ type outboxModelo struct {
 	Tipo          string     `gorm:"size:50;not null"`
 	Fecha         time.Time  `gorm:"not null"`
 	CorrelacionID string     `gorm:"size:64;not null"`
+	TraceParent   string     `gorm:"column:traceparent;size:55;not null"`
 	Datos         []byte     `gorm:"type:json;not null"`
 	PublicadoEn   *time.Time `gorm:"index"`
 }

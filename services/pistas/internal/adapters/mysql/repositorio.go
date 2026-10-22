@@ -87,6 +87,7 @@ func (r *Repositorio) Pendientes(ctx context.Context, limite int) ([]ports.Event
 				Tipo:          f.Tipo,
 				Fecha:         f.Fecha.UTC(),
 				CorrelacionID: f.CorrelacionID,
+				TraceParent:   f.TraceParent,
 			},
 			Secuencia: f.Secuencia,
 			DatosJSON: f.Datos,
@@ -170,6 +171,7 @@ func (t *transaccion) GuardarEvento(ctx context.Context, e domain.Evento) error 
 		Tipo:          e.Tipo,
 		Fecha:         e.Fecha.UTC(),
 		CorrelacionID: e.CorrelacionID,
+		TraceParent:   e.TraceParent,
 		Datos:         datos,
 	}).Error
 }

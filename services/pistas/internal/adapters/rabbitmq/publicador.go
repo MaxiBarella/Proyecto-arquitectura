@@ -10,6 +10,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/observability"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/ports"
 )
 
@@ -71,8 +72,12 @@ func Codificar(e ports.EventoGuardado) ([]byte, error) {
 }
 
 // Publicar implementa ports.Publicador. Devuelve nil solo si RabbitMQ confirmó el mensaje y lo dejó
-// en al menos una cola: recién ahí se puede marcar como publicado.
-func (p *Publicador) Publicar(ctx context.Context, e ports.EventoGuardado) error {
+// en al menos una cola: recién ahí se puede marcar como publicado. Publica dentro de la traza que
+// guardó el evento y la pone en el encabezado traceparent del mensaje (11.6).
+func (p *Publicador) Publicar(ctx context.Context, e ports.EventoGuardado) (err error) {
+	ctx, span := observability.StartPublish(ctx, e.TraceParent, e.Tipo)
+	defer func() { observability.EndSpan(span, err) }()
+
 	cuerpo, err := Codificar(e)
 	if err != nil {
 		return err
@@ -96,6 +101,7 @@ func (p *Publicador) Publicar(ctx context.Context, e ports.EventoGuardado) error
 		Type:          e.Tipo,
 		CorrelationId: e.CorrelacionID,
 		Timestamp:     e.Fecha,
+		Headers:       amqp.Table(observability.MessageHeaders(ctx)),
 		Body:          cuerpo,
 	})
 	if err != nil {

@@ -10,36 +10,64 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	httpadapter "github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/adapters/http"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/adapters/mysql"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/adapters/rabbitmq"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/aplicacion"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/observability"
 )
 
-func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("servicio", "pistas")
+const servicio = "pistas"
 
+func main() {
+	// El logger se arma antes que nada, para que hasta un error de arranque salga en JSON (11.5).
+	log := observability.NewLogger(servicio)
+	slog.SetDefault(log)
+	if err := correr(log); err != nil {
+		log.Error("el servicio se detuvo con error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func correr(log *slog.Logger) error {
 	port := variable("PORT", "8080")
 	dsn := variable("MYSQL_DSN", "")
 	rabbitURL := variable("RABBITMQ_URL", "")
 	if dsn == "" || rabbitURL == "" {
-		log.Error("faltan MYSQL_DSN o RABBITMQ_URL")
-		os.Exit(1)
+		return errors.New("faltan MYSQL_DSN o RABBITMQ_URL")
 	}
 
 	ctx, cancelar := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancelar()
 
+	// Trazas, métricas y logs a Grafana (11.1). Sin OTEL_EXPORTER_OTLP_ENDPOINT, solo logs.
+	apagarTelemetria, err := observability.Setup(ctx, servicio)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		envio, cancelar := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelar()
+		if err := apagarTelemetria(envio); err != nil {
+			log.Error("no se pudo enviar la telemetría pendiente", "error", err)
+		}
+	}()
+
 	repo, err := conectarConEspera(ctx, dsn, log)
 	if err != nil {
-		log.Error("no se pudo preparar la base", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	publicador := rabbitmq.NuevoPublicador(rabbitURL)
 	defer publicador.Cerrar()
 	go aplicacion.NuevoRelay(repo, publicador, log).Correr(ctx)
 
+	// Sin GIN_MODE, Gin escribe avisos en texto que se mezclarían con los logs JSON.
+	if os.Getenv(gin.EnvGinMode) == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	servidor := &http.Server{
 		Addr:              ":" + port,
 		Handler:           httpadapter.NuevoRouter(aplicacion.NuevoPistas(repo), log),
@@ -54,9 +82,9 @@ func main() {
 
 	log.Info("pistas escuchando", "puerto", port)
 	if err := servidor.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Error("el servidor se detuvo", "error", err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
 
 // conectarConEspera reintenta mientras MySQL arranca. En Docker Compose, Pistas ya espera a que la

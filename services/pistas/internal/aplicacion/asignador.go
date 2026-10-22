@@ -165,6 +165,7 @@ func (a *Pistas) evento(ctx context.Context, tipo string, datos any) domain.Even
 		Tipo:          tipo,
 		Fecha:         a.reloj().UTC(),
 		CorrelacionID: CorrelacionDe(ctx),
+		TraceParent:   TraceParentDe(ctx),
 		Datos:         datos,
 	}
 }

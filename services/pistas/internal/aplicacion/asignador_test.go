@@ -151,7 +151,7 @@ func tiposDeEvento(eventos []domain.Evento) []string {
 // CA-02: un slot libre se asigna y se guarda "slot.asignado" en la misma transacción.
 func TestAsignarSlotLibre(t *testing.T) {
 	repo := nuevoRepo()
-	ctx := ConCorrelacion(context.Background(), "traza-1")
+	ctx := ConTraza(context.Background(), "traza-1", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
 
 	res, err := NuevoPistas(repo).Asignar(ctx, pedido("AR1550", domain.Despegue, "05-23", catorce))
 	if err != nil {
@@ -165,6 +165,9 @@ func TestAsignarSlotLibre(t *testing.T) {
 	}
 	if repo.eventos[0].CorrelacionID != "traza-1" {
 		t.Fatalf("el evento tiene que llevar la correlación del pedido, vino %q", repo.eventos[0].CorrelacionID)
+	}
+	if repo.eventos[0].TraceParent != "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" {
+		t.Fatalf("el evento tiene que guardar la traza del pedido (11.6), vino %q", repo.eventos[0].TraceParent)
 	}
 }
 
@@ -341,4 +344,3 @@ func TestConflictoPersistenteSeDevuelve(t *testing.T) {
 		t.Fatalf("una transacción fallida no puede dejar nada guardado")
 	}
 }
-

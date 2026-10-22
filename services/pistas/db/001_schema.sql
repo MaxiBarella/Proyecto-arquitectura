@@ -35,6 +35,9 @@ CREATE TABLE outbox (
   tipo           VARCHAR(50) NOT NULL,
   fecha          DATETIME(6) NOT NULL,
   correlacion_id VARCHAR(64) NOT NULL,
+  -- La traza del pedido que lo causó; el relay la pone en el mensaje (11.6).
+  -- Vacío si el evento no salió de un pedido con traza.
+  traceparent    VARCHAR(55) NOT NULL DEFAULT '',
   datos          JSON        NOT NULL,
   publicado_en   DATETIME(6) NULL,
   PRIMARY KEY (secuencia),

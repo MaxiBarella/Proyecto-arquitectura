@@ -11,6 +11,7 @@ import (
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/aplicacion"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/domain"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/observability"
 )
 
 // CasosDeUso es lo que el adaptador HTTP necesita del núcleo.
@@ -18,11 +19,16 @@ type CasosDeUso interface {
 	Asignar(ctx context.Context, p domain.PedidoDeSlot) (domain.Resultado, error)
 }
 
-// NuevoRouter arma las rutas de services/pistas/openapi.yaml.
+// NuevoRouter arma las rutas de services/pistas/openapi.yaml, con la observabilidad de la 11.1:
+// una traza y una línea de log por pedido, y un 500 en JSON si un handler entra en pánico.
 func NuevoRouter(casos CasosDeUso, log *slog.Logger) *gin.Engine {
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.Use(gin.Recovery(), correlacion(), registrarPedido(log))
+	r.Use(
+		observability.Middleware("pistas"),
+		observability.RequestLogger(log),
+		observability.Recovery(log),
+		traza(),
+	)
 
 	h := &handlers{casos: casos, log: log}
 	r.GET("/health", func(c *gin.Context) {
