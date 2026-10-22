@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Clima API
-  version: 2.0.0
+  version: 2.0.1
   summary: Condiciones meteorológicas actuales y aptitud operativa de aeropuertos.
   description: |
     Devuelve las condiciones actuales de un aeropuerto y si se puede operar en él
@@ -21,6 +21,8 @@ info:
     La guía de uso con ejemplos está en `docs/contracts/README.md`.
 
 servers:
+  - url: https://clima-aeropuerto.onrender.com
+    description: Clima real, publicado en Render. Se duerme sin uso; el primer pedido tarda cerca de un minuto.
   - url: http://localhost:4010
     description: Mock local generado con Prism a partir de este archivo.
 
@@ -212,7 +214,7 @@ components:
         precipitation_mm:
           type: number
           minimum: 0
-          description: Precipitación de la última hora, en milímetros.
+          description: Precipitación de los últimos 15 minutos, en milímetros.
           example: 0.0
         thunderstorm:
           type: boolean

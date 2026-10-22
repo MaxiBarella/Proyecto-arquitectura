@@ -1,0 +1,755 @@
+openapi: 3.1.0
+
+info:
+  title: Vuelos API
+  version: 0.1.0
+  summary: Publicación de vuelos, pedido de slot, cancelación y tablero.
+  description: |
+    API interna del servicio Vuelos. La usan el frontend y, a través del gateway, las
+    aerolíneas. No la consume ningún otro grupo.
+
+    - **Identidad:** el servicio lee quién hace el pedido de los encabezados `X-User-Id`,
+      `X-User-Role` y `X-Airline` (decisión 15.6). Cuando esté el gateway los pone NGINX;
+      hasta entonces, en las pruebas se mandan a mano.
+    - **Permisos:** cada aerolínea ve y opera solo sus vuelos (RN-30, RN-31). El tablero
+      es público.
+    - **Estados:** los de la sección 6 del `SPEC.md`. Un vuelo nace en `pending_slot`.
+    - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio, igual
+      que Clima (6.14).
+    - **Versionado:** la versión es la de este contrato (`info.version`), como en Clima
+      (9.10). La ruta no lleva versión.
+
+servers:
+  - url: http://localhost:8081
+    description: Vuelos en el arranque local, sin gateway.
+
+# Vuelos no valida credenciales: el token lo verifica el gateway, que pasa la
+# identidad en los encabezados X-User-* (15.4, 15.6).
+security: []
+
+tags:
+  - name: Vuelos
+    description: Lo que hace una aerolínea con sus vuelos.
+  - name: Tablero
+    description: Consulta pública de arribos y partidas.
+
+paths:
+  /flights:
+    post:
+      operationId: publishFlight
+      tags: [Vuelos]
+      summary: Publicar un vuelo (F-02)
+      description: |
+        Crea el vuelo en `pending_slot`, sin slot (RN-06). La aerolínea dueña es la del
+        encabezado `X-Airline`.
+
+        Para un despegue (`departure`), el origen tiene que ser Córdoba; para un arribo
+        (`arrival`), el destino. El origen y el destino no pueden ser iguales (RN-40), y el
+        horario no puede estar en el pasado (RN-41).
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleAirline'
+        - $ref: '#/components/parameters/XAirline'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewFlight'
+            example:
+              flight_number: AR1550
+              type: departure
+              scope: domestic
+              origin: Córdoba
+              destination: Buenos Aires
+              scheduled_at: '2026-10-23T14:30:00Z'
+      responses:
+        '201':
+          description: Vuelo publicado.
+          headers:
+            Location:
+              description: Ruta del vuelo creado.
+              schema:
+                type: string
+              example: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flight'
+              example:
+                id: 7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b
+                flight_number: AR1550
+                airline: AR
+                type: departure
+                scope: domestic
+                origin: Córdoba
+                destination: Buenos Aires
+                scheduled_at: '2026-10-23T14:30:00Z'
+                status: pending_slot
+                slot: null
+                diverted_to: null
+                created_at: '2026-10-19T18:00:00Z'
+                updated_at: '2026-10-19T18:00:00Z'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    get:
+      operationId: listOwnFlights
+      tags: [Vuelos]
+      summary: Ver el estado de sus vuelos (F-07)
+      description: |
+        Devuelve solo los vuelos de la aerolínea del encabezado `X-Airline` (RN-30), de a
+        20 por página, ordenados por horario. Lee de la base de Vuelos, así que muestra el
+        estado al instante, sin el atraso del índice del tablero.
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleAirline'
+        - $ref: '#/components/parameters/XAirline'
+        - name: status
+          in: query
+          required: false
+          description: Filtra por estado.
+          schema:
+            $ref: '#/components/schemas/FlightStatus'
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Vuelos de la aerolínea.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightPage'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /flights/{id}:
+    get:
+      operationId: getOwnFlight
+      tags: [Vuelos]
+      summary: Ver uno de sus vuelos
+      parameters:
+        - $ref: '#/components/parameters/FlightId'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleAirline'
+        - $ref: '#/components/parameters/XAirline'
+      responses:
+        '200':
+          description: El vuelo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flight'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/NotOwner'
+        '404':
+          $ref: '#/components/responses/FlightNotFound'
+
+  /flights/{id}/slot-request:
+    post:
+      operationId: requestSlot
+      tags: [Vuelos]
+      summary: Pedir un slot para un vuelo (F-03, F-05)
+      description: |
+        Vuelos le pide a Pistas el slot exacto que eligió la aerolínea: una pista y un
+        bloque (RN-07). La llamada a Pistas tiene un timeout de 2 segundos y hasta 2
+        reintentos (4.5), y pasa por el circuit breaker (13.1).
+
+        Vale para un vuelo en `pending_slot` o en `delayed`. Un vuelo `scheduled` no
+        cambia de slot (RN-28).
+
+        El bloque no tiene que coincidir con `scheduled_at`: puede ser antes o después.
+        Con el slot asignado, el horario que vale es el del bloque (RN-38).
+
+        **Si Pistas asigna el slot, la respuesta es `202`, no el vuelo programado.** El
+        vuelo pasa a `scheduled` cuando llega el evento "slot asignado" (4.1). Hasta
+        entonces sigue en el estado que tenía.
+
+        Repetir el mismo pedido para el mismo vuelo y el mismo slot devuelve el mismo
+        resultado, sin ocupar otro slot (4.6, CA-06).
+      parameters:
+        - $ref: '#/components/parameters/FlightId'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleAirline'
+        - $ref: '#/components/parameters/XAirline'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Slot'
+            example:
+              runway_id: '05-23'
+              block_start: '2026-10-23T14:30:00Z'
+      responses:
+        '202':
+          description: |
+            Pistas asignó el slot. El vuelo pasa a `scheduled` cuando llega el evento.
+            Si es un arribo que se quedó con el slot de un despegue (RN-11), la
+            respuesta es la misma.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotAccepted'
+              example:
+                flight_id: 7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b
+                slot:
+                  runway_id: '05-23'
+                  block_start: '2026-10-23T14:30:00Z'
+                status: pending_slot
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/NotOwner'
+        '404':
+          $ref: '#/components/responses/FlightOrRunwayNotFound'
+        '409':
+          $ref: '#/components/responses/SlotRejected'
+        '503':
+          $ref: '#/components/responses/RunwaysUnavailable'
+
+  /flights/{id}/cancel:
+    post:
+      operationId: cancelFlight
+      tags: [Vuelos]
+      summary: Cancelar uno de sus vuelos (F-06)
+      description: |
+        Pasa el vuelo a `cancelled` y publica "vuelo cancelado", con el que Pistas libera
+        el slot (RN-23). Solo la aerolínea dueña puede cancelar (RN-31). Vale para un
+        vuelo en `pending_slot`, `scheduled` o `delayed`.
+      parameters:
+        - $ref: '#/components/parameters/FlightId'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleAirline'
+        - $ref: '#/components/parameters/XAirline'
+      responses:
+        '200':
+          description: Vuelo cancelado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flight'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/NotOwner'
+        '404':
+          $ref: '#/components/responses/FlightNotFound'
+        '409':
+          $ref: '#/components/responses/InvalidTransition'
+
+  /board:
+    get:
+      operationId: searchBoard
+      tags: [Tablero]
+      summary: Tablero de arribos y partidas (F-13, F-14)
+      description: |
+        Público: no necesita los encabezados de identidad. Muestra los vuelos de todas las
+        aerolíneas (RN-30).
+
+        Lee del índice de búsqueda, con una caché de 60 segundos: un cambio puede tardar
+        hasta 2 minutos en aparecer (RN-37). El índice con Solr y la caché se muestran
+        funcionando en noviembre.
+
+        El horario de cada vuelo es el de su bloque si tiene slot, y `scheduled_at` si no
+        (RN-39). Con ese horario se ordena y se filtra por `date`.
+
+        Filtros, búsqueda por texto, orden y paginación: RN-33 a RN-36.
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: Tipo de operación.
+          schema:
+            $ref: '#/components/schemas/FlightType'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/FlightStatus'
+        - name: airline
+          in: query
+          required: false
+          description: Código de la aerolínea.
+          schema:
+            type: string
+          example: AR
+        - name: date
+          in: query
+          required: false
+          description: Día del horario del vuelo (RN-39), en hora de Argentina (UTC−3), aunque el resto de los horarios de la API vayan en UTC (RN-33).
+          schema:
+            type: string
+            format: date
+          example: '2026-10-23'
+        - name: q
+          in: query
+          required: false
+          description: Texto a buscar en el número de vuelo y en las ciudades de origen y destino. Encuentra por el comienzo y no distingue mayúsculas ni tildes, así que `ar15` encuentra AR1550 y `cordoba`, Córdoba (RN-34).
+          schema:
+            type: string
+          example: AR1550
+        - name: sort
+          in: query
+          required: false
+          description: Orden de los resultados. Por defecto, por horario (RN-39).
+          schema:
+            type: string
+            enum: [scheduled_at, airline, scope]
+            default: scheduled_at
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Una página del tablero.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightPage'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '503':
+          $ref: '#/components/responses/BoardUnavailable'
+
+components:
+  parameters:
+    FlightId:
+      name: id
+      in: path
+      required: true
+      description: Identificador del vuelo que genera Vuelos al publicarlo.
+      schema:
+        type: string
+        format: uuid
+    XUserId:
+      name: X-User-Id
+      in: header
+      required: true
+      description: Identificador del usuario. Lo pone el gateway (15.6).
+      schema:
+        type: string
+    XUserRoleAirline:
+      name: X-User-Role
+      in: header
+      required: true
+      description: Rol del usuario. Estas operaciones son solo para aerolíneas.
+      schema:
+        type: string
+        enum: [airline]
+    XAirline:
+      name: X-Airline
+      in: header
+      required: true
+      description: Código de la aerolínea del usuario. Lo pone el gateway (15.6).
+      schema:
+        type: string
+      example: AR
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Número de página, desde 1. Cada página trae hasta 20 vuelos (14.4).
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+  schemas:
+    FlightType:
+      type: string
+      description: '`arrival` es un arribo y `departure` un despegue. No cambia (RN-20).'
+      enum: [arrival, departure]
+
+    FlightScope:
+      type: string
+      description: Ámbito del vuelo.
+      enum: [domestic, international]
+
+    FlightStatus:
+      type: string
+      description: |
+        | Valor | Estado del SPEC |
+        |---|---|
+        | `pending_slot` | Pendiente de slot |
+        | `scheduled` | Programado |
+        | `delayed` | Demorado |
+        | `completed` | Finalizado |
+        | `diverted` | Desviado |
+        | `cancelled` | Cancelado |
+      enum: [pending_slot, scheduled, delayed, completed, diverted, cancelled]
+
+    NewFlight:
+      type: object
+      required: [flight_number, type, scope, origin, destination, scheduled_at]
+      properties:
+        flight_number:
+          type: string
+          pattern: '^[A-Z0-9]{2}[0-9]{1,4}$'
+          description: Número de vuelo.
+          example: AR1550
+        type:
+          $ref: '#/components/schemas/FlightType'
+        scope:
+          $ref: '#/components/schemas/FlightScope'
+        origin:
+          type: string
+          description: Ciudad de origen.
+          example: Córdoba
+        destination:
+          type: string
+          description: Ciudad de destino.
+          example: Buenos Aires
+        scheduled_at:
+          type: string
+          format: date-time
+          description: |
+            Horario en que la aerolínea quiere operar, en UTC. Cuando el vuelo tiene slot,
+            vale el horario del bloque (RN-38).
+
+    Slot:
+      type: object
+      required: [runway_id, block_start]
+      properties:
+        runway_id:
+          type: string
+          description: Nombre de la pista, sin barra, como lo carga Pistas (4.11).
+          example: '05-23'
+        block_start:
+          type: string
+          format: date-time
+          description: Comienzo del bloque, en UTC. Tiene que caer justo en un múltiplo de 15 minutos (RN-03, 4.11).
+          example: '2026-10-23T14:30:00Z'
+
+    Flight:
+      type: object
+      required:
+        - id
+        - flight_number
+        - airline
+        - type
+        - scope
+        - origin
+        - destination
+        - scheduled_at
+        - status
+        - slot
+        - diverted_to
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        flight_number:
+          type: string
+          example: AR1550
+        airline:
+          type: string
+          description: Código de la aerolínea dueña.
+          example: AR
+        type:
+          $ref: '#/components/schemas/FlightType'
+        scope:
+          $ref: '#/components/schemas/FlightScope'
+        origin:
+          type: string
+        destination:
+          type: string
+        scheduled_at:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/FlightStatus'
+        slot:
+          description: El slot asignado. `null` si el vuelo no tiene.
+          oneOf:
+            - $ref: '#/components/schemas/Slot'
+            - type: 'null'
+        diverted_to:
+          description: Código ICAO del aeropuerto alternativo, solo si el vuelo está `diverted` (RN-25).
+          oneOf:
+            - type: string
+              pattern: '^[A-Z]{4}$'
+            - type: 'null'
+          example: null
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FlightPage:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flight'
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          description: Cantidad total de vuelos que cumplen los filtros.
+          example: 57
+
+    SlotAccepted:
+      type: object
+      required: [flight_id, slot, status]
+      properties:
+        flight_id:
+          type: string
+          format: uuid
+        slot:
+          $ref: '#/components/schemas/Slot'
+        status:
+          $ref: '#/components/schemas/FlightStatus'
+
+    Problem:
+      type: object
+      description: Error en formato Problem Details (RFC 9457).
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+          description: Código propio del error.
+          enum:
+            - INVALID_REQUEST
+            - MISSING_IDENTITY
+            - FORBIDDEN_ROLE
+            - NOT_FLIGHT_OWNER
+            - FLIGHT_NOT_FOUND
+            - RUNWAY_NOT_FOUND
+            - SLOT_TAKEN
+            - RUNWAY_CLOSED
+            - INVALID_TRANSITION
+            - RUNWAYS_UNAVAILABLE
+            - BOARD_UNAVAILABLE
+        nearest_free_slots:
+          type: array
+          description: Solo en `SLOT_TAKEN`. Los 3 slots libres más cercanos al pedido (RN-09).
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/Slot'
+
+  responses:
+    InvalidRequest:
+      description: Faltan datos o tienen mal formato. **No reintentar** sin corregirlos.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/invalid-request
+            title: Pedido inválido
+            status: 400
+            detail: block_start tiene que caer en un múltiplo de 15 minutos.
+            instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/slot-request
+            code: INVALID_REQUEST
+
+    Unauthenticated:
+      description: Faltan los encabezados de identidad.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/missing-identity
+            title: Falta la identidad
+            status: 401
+            detail: El pedido no incluye X-User-Id, X-User-Role o X-Airline.
+            instance: /flights
+            code: MISSING_IDENTITY
+
+    Forbidden:
+      description: El rol no puede hacer esta operación (CA-18, CA-19).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/forbidden-role
+            title: Operación no permitida para el rol
+            status: 403
+            detail: Solo una aerolínea puede publicar vuelos.
+            instance: /flights
+            code: FORBIDDEN_ROLE
+
+    NotOwner:
+      description: El rol no puede hacer la operación, o el vuelo es de otra aerolínea (RN-30, CA-26).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/not-flight-owner
+            title: El vuelo es de otra aerolínea
+            status: 403
+            detail: El vuelo 7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b no es de la aerolínea FO.
+            instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/cancel
+            code: NOT_FLIGHT_OWNER
+
+    FlightNotFound:
+      description: No existe un vuelo con ese identificador.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/flight-not-found
+            title: Vuelo no encontrado
+            status: 404
+            instance: /flights/00000000-0000-0000-0000-000000000000
+            code: FLIGHT_NOT_FOUND
+
+    FlightOrRunwayNotFound:
+      description: No existe el vuelo o la pista.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            flight:
+              summary: Vuelo inexistente
+              value:
+                type: /problems/flight-not-found
+                title: Vuelo no encontrado
+                status: 404
+                code: FLIGHT_NOT_FOUND
+            runway:
+              summary: Pista inexistente
+              value:
+                type: /problems/runway-not-found
+                title: Pista no encontrada
+                status: 404
+                detail: No existe la pista 99.
+                code: RUNWAY_NOT_FOUND
+
+    SlotRejected:
+      description: El pedido de slot se rechaza. **No reintentar** el mismo slot.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            taken:
+              summary: Slot ocupado (RN-09, CA-03, CA-04)
+              value:
+                type: /problems/slot-taken
+                title: Slot ocupado
+                status: 409
+                detail: La pista 05-23 ya tiene un vuelo a las 14:30.
+                instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/slot-request
+                code: SLOT_TAKEN
+                nearest_free_slots:
+                  - runway_id: '18-36'
+                    block_start: '2026-10-23T14:30:00Z'
+                  - runway_id: '05-23'
+                    block_start: '2026-10-23T14:15:00Z'
+                  - runway_id: '05-23'
+                    block_start: '2026-10-23T14:45:00Z'
+            closed:
+              summary: Pista cerrada (RN-27, CA-23)
+              value:
+                type: /problems/runway-closed
+                title: Pista cerrada
+                status: 409
+                detail: La pista 05-23 está cerrada.
+                instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/slot-request
+                code: RUNWAY_CLOSED
+            state:
+              summary: El vuelo no admite pedir slot (RN-21, RN-28)
+              value:
+                type: /problems/invalid-transition
+                title: Transición no permitida
+                status: 409
+                detail: El vuelo está programado y no puede cambiar de slot.
+                instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/slot-request
+                code: INVALID_TRANSITION
+
+    InvalidTransition:
+      description: El estado del vuelo no permite la operación (RN-21, CA-15).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/invalid-transition
+            title: Transición no permitida
+            status: 409
+            detail: Un vuelo desviado no se puede cancelar.
+            instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/cancel
+            code: INVALID_TRANSITION
+
+    RunwaysUnavailable:
+      description: |
+        Pistas no respondió a tiempo después de los reintentos, o el circuit breaker está
+        abierto (13.1). El vuelo sigue en el estado que tenía. **Reintentar** después de
+        `Retry-After`.
+      headers:
+        Retry-After:
+          description: Segundos que conviene esperar antes de reintentar.
+          schema:
+            type: integer
+            minimum: 1
+          example: 30
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/runways-unavailable
+            title: Pistas no disponible
+            status: 503
+            detail: No se pudo pedir el slot. El vuelo sigue pendiente de slot.
+            instance: /flights/7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b/slot-request
+            code: RUNWAYS_UNAVAILABLE
+
+    BoardUnavailable:
+      description: |
+        El índice de búsqueda no responde. **Reintentar** después de `Retry-After`. Si solo
+        falla la caché, el tablero responde igual, consultando el índice directo (10.4).
+      headers:
+        Retry-After:
+          description: Segundos que conviene esperar antes de reintentar.
+          schema:
+            type: integer
+            minimum: 1
+          example: 30
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/board-unavailable
+            title: Tablero no disponible
+            status: 503
+            detail: El índice de búsqueda no responde.
+            instance: /board
+            code: BOARD_UNAVAILABLE

@@ -12,7 +12,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/controllers"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/models"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/observability"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/repositories"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/services"
 )
 
 const serviceName = "clima"
@@ -54,10 +58,38 @@ func run(logger *slog.Logger) (err error) {
 		}
 	}()
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
 	}
+	port := cfg.port
+
+	mongoClient, db, err := repositories.Connect(ctx, cfg.mongoURI)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		disconnectCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		_ = mongoClient.Disconnect(disconnectCtx)
+	}()
+
+	aptitude := repositories.NewAptitudeRepository(db)
+	weather := services.NewWeatherService(
+		models.Cordoba,
+		repositories.NewOpenMeteo(),
+		repositories.NewObservationRepository(db),
+		aptitude,
+		cfg.rabbitEnabled,
+	)
+	if cfg.rabbitEnabled {
+		publisher := repositories.NewRabbitPublisher(cfg.rabbitURL)
+		defer publisher.Close()
+		relay := services.NewRelay(aptitude, publisher)
+		go runEvery(ctx, relayInterval, relayInterval, "publicación de eventos", relay.PublishPending)
+	}
+	go runEvery(ctx, pollInterval, pollRetryInterval, "consulta a Open-Meteo", weather.Poll)
+	go runEvery(ctx, refreshInterval, refreshInterval, "revisión de la aptitud", weather.Refresh)
 
 	// Sin GIN_MODE, Gin escribe avisos en texto que se mezclarían con los logs JSON.
 	if os.Getenv(gin.EnvGinMode) == "" {
@@ -72,6 +104,16 @@ func run(logger *slog.Logger) (err error) {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": serviceName})
 	})
+
+	conditions := controllers.NewConditionsController(weather)
+	public := router.Group("", controllers.RequireAPIKey(cfg.apiKeys), controllers.RateLimit())
+	public.GET("/airports/:icao/conditions", conditions.Get)
+	if cfg.rabbitEnabled {
+		// La ruta del forzado solo existe en la copia del Docker Compose (9.13).
+		internal := router.Group("/internal", controllers.RequireOperator())
+		internal.PUT("/airports/:icao/forced-conditions", conditions.PutForced)
+		internal.DELETE("/airports/:icao/forced-conditions", conditions.DeleteForced)
+	}
 
 	server := &http.Server{
 		Addr:              ":" + port,
