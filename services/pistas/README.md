@@ -14,3 +14,5 @@ Es la estructura inicial: el servicio arranca y responde `GET /health`. Todavía
 | `internal/adapters/rabbitmq` | Adaptador de mensajería: publica y consume eventos en RabbitMQ. |
 
 Puerto en el arranque local: `8082`.
+
+El contrato del pedido de slot que hace Vuelos está en [openapi.yaml](openapi.yaml) (4.15).

@@ -1,0 +1,216 @@
+openapi: 3.1.0
+
+info:
+  title: Pistas API
+  version: 0.1.0
+  summary: Asignación de slots de pista.
+  description: |
+    API interna del servicio Pistas. Por ahora tiene solo el pedido de slot que hace
+    Vuelos (4.1). Las operaciones del operador (cerrar y reabrir pistas) se suman cuando
+    se programen.
+
+    - **Ruta interna:** todo lo que está bajo `/internal` lo llama otro servicio, no
+      una persona. El gateway no la expone (15.7), así que no lleva encabezados de
+      identidad.
+    - **Pista y bloque:** la pista se identifica con un nombre sin barra, como `05-23`,
+      y el bloque con su hora de inicio en UTC, en múltiplos de 15 minutos (4.11).
+    - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio, igual
+      que Clima y Vuelos (6.14).
+    - **Versionado:** la versión es la de este contrato (`info.version`), como en Clima
+      (9.10).
+
+servers:
+  - url: http://localhost:8082
+    description: Pistas en el arranque local.
+
+# Ruta interna entre servicios: no lleva credenciales (15.7).
+security: []
+
+paths:
+  /internal/slots:
+    post:
+      operationId: assignSlot
+      summary: Pedir un slot para un vuelo (4.1, 4.15)
+      description: |
+        Asigna el slot exacto que se pide (RN-07) o rechaza el pedido.
+
+        - Si el slot está libre, es del vuelo (RN-08).
+        - Si lo tiene un despegue y el que pide es un arribo, el arribo se lo queda
+          (RN-11): la respuesta trae `displaced_flight_id` y Pistas publica
+          `pistas.slot.cedido`.
+        - En cualquier otro caso ocupado, se rechaza con los 3 libres más cercanos
+          (RN-09).
+
+        Cuando lo asigna, Pistas publica `pistas.slot.asignado` (4.12, 4.14).
+
+        **Se puede repetir.** Pedir de nuevo el mismo slot para el mismo vuelo devuelve
+        `200` con el mismo resultado y no ocupa otro (4.6, CA-06). Vuelos lo reintenta
+        ante una falla pasajera (4.5).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlotRequest'
+            example:
+              flight_id: 7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b
+              flight_type: departure
+              runway_id: '05-23'
+              block_start: '2026-10-23T14:30:00Z'
+      responses:
+        '200':
+          description: El slot es del vuelo, recién asignado o porque ya lo tenía con el mismo pedido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assignment'
+              example:
+                flight_id: 7f1c2a3e-5b6d-4e8f-9a0b-1c2d3e4f5a6b
+                runway_id: '05-23'
+                block_start: '2026-10-23T14:30:00Z'
+                displaced_flight_id: null
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '404':
+          $ref: '#/components/responses/RunwayNotFound'
+        '409':
+          $ref: '#/components/responses/Rejected'
+
+components:
+  schemas:
+    SlotRequest:
+      type: object
+      required: [flight_id, flight_type, runway_id, block_start]
+      properties:
+        flight_id:
+          type: string
+          format: uuid
+          description: Identificador del vuelo en Vuelos.
+        flight_type:
+          type: string
+          enum: [arrival, departure]
+          description: Pistas lo guarda para la prioridad de los arribos (RN-11).
+        runway_id:
+          type: string
+          example: '05-23'
+        block_start:
+          type: string
+          format: date-time
+          description: En UTC, en un múltiplo de 15 minutos (RN-03).
+
+    Slot:
+      type: object
+      required: [runway_id, block_start]
+      properties:
+        runway_id:
+          type: string
+        block_start:
+          type: string
+          format: date-time
+
+    Assignment:
+      type: object
+      required: [flight_id, runway_id, block_start, displaced_flight_id]
+      properties:
+        flight_id:
+          type: string
+          format: uuid
+        runway_id:
+          type: string
+        block_start:
+          type: string
+          format: date-time
+        displaced_flight_id:
+          description: El despegue que perdió el slot ante este arribo (RN-11), o `null`.
+          oneOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+
+    Problem:
+      type: object
+      description: Error en formato Problem Details (RFC 9457).
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+          enum:
+            - INVALID_REQUEST
+            - RUNWAY_NOT_FOUND
+            - SLOT_TAKEN
+            - RUNWAY_CLOSED
+            - FLIGHT_ALREADY_HAS_SLOT
+        nearest_free_slots:
+          type: array
+          description: Solo en `SLOT_TAKEN`. Los 3 slots libres más cercanos al pedido, antes o después y en cualquier pista (RN-09).
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/Slot'
+
+  responses:
+    InvalidRequest:
+      description: Faltan datos o tienen mal formato, por ejemplo un bloque fuera de un múltiplo de 15 minutos.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    RunwayNotFound:
+      description: No existe la pista.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/runway-not-found
+            title: Pista no encontrada
+            status: 404
+            detail: No existe la pista 99-99.
+            code: RUNWAY_NOT_FOUND
+
+    Rejected:
+      description: El pedido se rechaza. Vuelos no lo reintenta.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            taken:
+              summary: Slot ocupado (RN-09)
+              value:
+                type: /problems/slot-taken
+                title: Slot ocupado
+                status: 409
+                code: SLOT_TAKEN
+                nearest_free_slots:
+                  - runway_id: '18-36'
+                    block_start: '2026-10-23T14:30:00Z'
+                  - runway_id: '05-23'
+                    block_start: '2026-10-23T14:15:00Z'
+                  - runway_id: '05-23'
+                    block_start: '2026-10-23T14:45:00Z'
+            closed:
+              summary: Pista cerrada (RN-27)
+              value:
+                type: /problems/runway-closed
+                title: Pista cerrada
+                status: 409
+                code: RUNWAY_CLOSED
+            has_slot:
+              summary: El vuelo ya tiene otro slot (4.6)
+              value:
+                type: /problems/flight-already-has-slot
+                title: El vuelo ya tiene un slot
+                status: 409
+                detail: El vuelo ya tiene la pista 05-23 a las 14:30.
+                code: FLIGHT_ALREADY_HAS_SLOT

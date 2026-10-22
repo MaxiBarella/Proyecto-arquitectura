@@ -8,6 +8,7 @@ services:
       PORT: "8080"
       MYSQL_DSN: ${MYSQL_VUELOS_USER:?falta en .env}:${MYSQL_VUELOS_PASSWORD:?falta en .env}@tcp(mysql-vuelos:3306)/vuelos?parseTime=true&loc=UTC
       OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
+      PISTAS_URL: http://pistas:8080
     ports:
       - "8081:8080"
     depends_on:
@@ -19,6 +20,8 @@ services:
       solr:
         condition: service_started
       grafana:
+        condition: service_started
+      pistas:
         condition: service_started
 
   pistas:
