@@ -19,6 +19,10 @@ type Event struct {
 	Data        any
 }
 
+// Change es un cambio sobre un vuelo: lo modifica y devuelve los eventos que hay
+// que publicar. Si devuelve un error, no se guarda nada.
+type Change func(f *Flight) ([]Event, error)
+
 // NewID genera un identificador aleatorio con forma de UUID versión 4. Es la misma
 // función que usa Clima, para no sumar una librería.
 func NewID() string {

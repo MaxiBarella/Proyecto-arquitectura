@@ -18,6 +18,7 @@ Tests: `go test ./...`. Los del adaptador de MySQL levantan un MySQL real con te
 | `internal/adapters/mysql` | Guarda los vuelos, el outbox y los mensajes procesados en MySQL. |
 | `db` | Las tablas de MySQL. La base las crea la primera vez que arranca; si cambian, hay que borrar el volumen con `docker compose down -v`. |
 | `internal/adapters/rabbitmq` | Publica y consume eventos en RabbitMQ. |
+| `internal/observability` | Logs en JSON, trazas y métricas con OpenTelemetry. Es una copia de la carpeta de Clima: se copia, no se importa. |
 | `internal/adapters/solr` | Mantiene y consulta el índice de búsqueda en Solr. |
 
 Puerto en el arranque local: `8081`.
