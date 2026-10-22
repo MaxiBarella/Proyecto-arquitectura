@@ -15,8 +15,8 @@ services:
       # Vuelos arranca recién cuando MySQL acepta conexiones.
       mysql-vuelos:
         condition: service_healthy
-      rabbitmq:
-        condition: service_started
+      rabbitmq-init:
+        condition: service_completed_successfully
       solr:
         condition: service_started
       grafana:
@@ -31,8 +31,10 @@ services:
     ports:
       - "8082:8080"
     depends_on:
-      - mysql-pistas
-      - rabbitmq
+      mysql-pistas:
+        condition: service_started
+      rabbitmq-init:
+        condition: service_completed_successfully
 
   clima:
     build: ./services/clima
@@ -42,9 +44,12 @@ services:
     ports:
       - "8083:8080"
     depends_on:
-      - mongo-clima
-      - rabbitmq
-      - grafana
+      mongo-clima:
+        condition: service_started
+      rabbitmq-init:
+        condition: service_completed_successfully
+      grafana:
+        condition: service_started
 
   usuarios:
     build: ./services/usuarios
@@ -104,6 +109,35 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?falta en .env}
     ports:
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Carga las colas, sus uniones y las colas de fallidos (rabbitmq/README.md, 4.13).
+  # Corre una vez, cuando RabbitMQ está listo, y termina. Los servicios esperan a que termine.
+  rabbitmq-init:
+    image: curlimages/curl:8.11.1
+    environment:
+      RABBITMQ_USER: ${RABBITMQ_USER:?falta en .env}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?falta en .env}
+    volumes:
+      - ./rabbitmq/definitions.json:/definitions.json:ro
+    command:
+      - sh
+      - -c
+      - >-
+        curl --fail --silent --show-error
+        --retry 20 --retry-delay 2 --retry-all-errors
+        -u "$$RABBITMQ_USER:$$RABBITMQ_PASSWORD"
+        -H "content-type: application/json"
+        -X POST --data @/definitions.json
+        http://rabbitmq:15672/api/definitions
+        && echo "definiciones de RabbitMQ cargadas"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   solr:
     image: solr:9

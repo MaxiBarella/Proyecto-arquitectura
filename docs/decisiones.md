@@ -102,6 +102,15 @@ La 4.14 la tomó Maxi el 21/10/2026 y queda confirmada al mergearse el pull requ
 | 4.15 | Cómo pide Vuelos el slot a Pistas | **`POST /internal/slots` en Pistas** | Con `flight_id`, `flight_type`, `runway_id` y `block_start`. Responde `200` con el slot asignado (también si se repite el mismo pedido, 4.6), o `409` con `SLOT_TAKEN` y los 3 libres, `RUNWAY_CLOSED` o `FLIGHT_ALREADY_HAS_SLOT`, o `404` con `RUNWAY_NOT_FOUND`. Es interna: el gateway no la expone (15.7). El contrato está en `services/pistas/openapi.yaml`. La eligió Maxi por Carola, que le delegó la elección. |
 | 4.16 | Los 2 segundos del pedido de slot (4.5) | **Son por intento** | Cada llamada a Pistas tiene 2 segundos. Si Pistas no contesta nunca, la aerolínea espera unos 7 segundos: 3 intentos más las esperas. Así los reintentos sirven también cuando Pistas está lento. |
 
+Las decisiones 4.17 a 4.20 detallan la 4.13. Las tomó Male el 22/10/2026, con las opciones y recomendaciones del agente, y quedan confirmadas al mergearse el pull request de la rama `feat/rabbitmq-definiciones`. El archivo y su explicación están en [rabbitmq/](../rabbitmq/README.md).
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 4.17 | Cómo se cargan las definiciones de RabbitMQ | **Un contenedor de un solo uso, `rabbitmq-init`** | RabbitMQ arranca con el usuario del `.env`; cuando está listo, `rabbitmq-init` sube `rabbitmq/definitions.json` por la API de administración y termina, y recién ahí arrancan los servicios. Se descartó cargarlo al arrancar RabbitMQ (`load_definitions`): se probó, y así RabbitMQ no crea el usuario del `.env`; ponerlo en el archivo dejaría la contraseña en el repositorio. |
+| 4.18 | Nombres de las colas | **`<consumidor>.eventos` y `<consumidor>.eventos.fallidos`** | `pistas.eventos`, `pistas.eventos.fallidos`, `vuelos.eventos` y `vuelos.eventos.fallidos`. |
+| 4.19 | Qué recibe cada cola | **Lo que sale de la 4.3, la 4.14 y la 9.14** | `pistas.eventos` recibe `clima.#` y `vuelos.vuelo.cancelado`; `vuelos.eventos` recibe `pistas.#`. |
+| 4.20 | Cómo llega un mensaje a la cola de fallidos | **Por el exchange `aeropuerto.fallidos` de RabbitMQ** | Cada cola tiene configurado ese exchange para los mensajes rechazados. El consumidor, después de sus 3 intentos (4.5), rechaza el mensaje sin volver a encolarlo, y RabbitMQ lo pasa solo a su cola de fallidos (11.4). |
+
 ## 5. Datos
 
 | # | Decisión | Elegido | Qué significa |
@@ -232,6 +241,7 @@ Quién eligió cada cosa:
 | 11.3 | Objetivo de servicio | **Pedido de slot: el 95 % en menos de 500 ms** | Medido sobre los últimos 5 minutos. Es una primera versión: todo corre en una sola computadora y en los picos de la prueba de carga algunos pedidos van a tardar más. |
 | 11.4 | Mensajes fallidos (pendiente de la Entrega 1) | **Log de error y alerta en Grafana** (agente) | Cuando un consumidor manda un mensaje a la cola de fallidos, escribe un log de error con el identificador de correlación, y Grafana alerta cuando aparece uno. Se revisan a mano desde el panel de RabbitMQ. Sirve como la alerta que pide el ADR D11. |
 | 11.5 | Formato de los logs | **JSON con `log/slog`** (agente) | Es la librería de logs que trae Go. Cada línea lleva el identificador de la traza. |
+| 11.6 | Cómo sigue la traza en los eventos | **El encabezado `traceparent` en el mensaje, guardado en el outbox** (Male, 22/10/2026) | Detalla la 11.2. Con solo el `correlation_id`, Grafana muestra trazas separadas. Por eso, al guardar un evento en el outbox se guarda también el `traceparent` de la traza en curso; el relay lo pone como encabezado del mensaje de RabbitMQ, y el consumidor lo lee para seguir la misma traza. Las funciones para escribirlo y leerlo van en la carpeta de observabilidad (11.1), que cada servicio copia: la escribe Male en Clima, y la pareja 1 la usa en los relays y consumidores de Vuelos y Pistas. Queda confirmada al mergearse el pull request de la rama `feat/rabbitmq-definiciones`. |
 
 ## 12. Balanceo de carga (ADR D12)
 
