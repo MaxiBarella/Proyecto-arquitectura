@@ -79,9 +79,9 @@ Solr y Memcached guardan copias derivadas de los vuelos para el tablero; no son 
 
 El detalle, con timeouts, reintentos e idempotencia, está en el [ADR-005](adr/ADR-005.md).
 
-**Llamada directa.** Hay una sola entre servicios propios: Vuelos le pide a Pistas un slot exacto y espera la respuesta (4.1). Además, el frontend llega a cada servicio a través del gateway.
+**Llamada directa.** Hay una sola entre servicios propios: Vuelos le pide a Pistas un slot exacto con `POST /internal/slots` y espera la respuesta (4.1, 4.15). Es una ruta interna: el gateway no la expone. Además, el frontend llega a cada servicio a través del gateway.
 
-**Eventos.** Todo lo demás se avisa por RabbitMQ, publicado con Transactional Outbox (4.4):
+**Eventos.** Todo lo demás se avisa por RabbitMQ, publicado con Transactional Outbox (4.4), en el exchange `aeropuerto.eventos` (4.10). La clave de ruteo dice servicio, cosa y qué pasó, por ejemplo `pistas.slot.asignado` (4.14):
 
 | Evento | Lo publica | Lo recibe |
 |---|---|---|
@@ -95,7 +95,7 @@ El detalle, con timeouts, reintentos e idempotencia, está en el [ADR-005](adr/A
 
 "Clima sin datos" se suma en la Entrega 2 (pendiente 17 de la sección 18): avisa que Clima no puede obtener el clima, para que Pistas muestre el aviso y el operador decida a mano (6.19).
 
-**Hacia afuera.** El grupo consumidor llama directo a la copia pública de Clima, en Render, con `GET /v1/airports/{icao}/conditions` y su clave en `X-API-Key` (ADR-008). No pasa por nuestro gateway (9.9). Cuando consumamos la capacidad del grupo proveedor, la llamada va a salir del servicio dueño de la funcionalidad que la usa, nunca del frontend ni del gateway (enunciado, sección 4).
+**Hacia afuera.** El grupo consumidor llama directo a la copia pública de Clima, en Render, con `GET /airports/{icao}/conditions` y su clave en `X-API-Key` (ADR-015). Por indicación del profe, la versión no va en la ruta: es el número del contrato (9.10). No pasa por nuestro gateway (9.9). Cuando consumamos la capacidad del grupo proveedor, la llamada va a salir del servicio dueño de la funcionalidad que la usa, nunca del frontend ni del gateway (enunciado, sección 4).
 
 ### Flujo principal: publicar un vuelo
 
@@ -130,7 +130,7 @@ La copia pública de Clima no está detrás de este gateway: tiene su propia cla
 
 Así no se sube a la nube más de lo necesario. Las dos consultan a Open-Meteo cada 15 minutos por su cuenta (9.1, 9.2), así que pueden mostrar datos distintos durante unos minutos. No rompe nada, porque cada una atiende a un público distinto.
 
-El grupo consumidor entra **directo a la copia pública**, sin pasar por nuestro gateway (9.9): Clima ya autentica con su propia clave y tiene su propio límite de pedidos (ADR-008), y así no hace falta desplegar el gateway en la nube. El gateway queda como punto de entrada único de nuestros usuarios. En el plan gratuito, Render duerme el servicio cuando no se usa, y el primer pedido después de un rato tarda cerca de un minuto (9.4).
+El grupo consumidor entra **directo a la copia pública**, sin pasar por nuestro gateway (9.9): Clima ya autentica con su propia clave y tiene su propio límite de pedidos (ADR-015), y así no hace falta desplegar el gateway en la nube. El gateway queda como punto de entrada único de nuestros usuarios. En el plan gratuito, Render duerme el servicio cuando no se usa, y el primer pedido después de un rato tarda cerca de un minuto (9.4).
 
 **Balanceo.** NGINX reparte los pedidos por turnos entre dos instancias de Vuelos (12.1, 12.2). Se eligió Vuelos porque es el que más tráfico recibe y tiene el tablero cacheado, así que el balanceo y la caché se muestran sobre el mismo flujo. Por eso Vuelos no puede guardar nada importante en la memoria de una sola instancia, y la caché es un Memcached compartido (10.2).
 
