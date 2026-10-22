@@ -65,6 +65,7 @@ Con Usuarios, los microservicios pasan de tres a **cuatro**, más el API gateway
 | 4.7 | Dónde se aplica el Outbox | **En los tres servicios que publican** | Pistas y Vuelos guardan el evento en una tabla de outbox, en la misma transacción de MySQL. Clima guarda el evento pendiente dentro del documento de aptitud, en la misma escritura. |
 | 4.8 | Mensajes | **JSON, un exchange topic** | Cada mensaje lleva identificador único, tipo, versión, fecha, identificador de correlación, datos y un número de versión del dato. Se publican en un único exchange de tipo topic; cada consumidor tiene su cola durable y su cola de mensajes fallidos. |
 | 4.9 | Consumidores | **Idempotentes** | Confirman el mensaje después de guardar su efecto, y guardan el identificador del mensaje en la misma transacción para no aplicarlo dos veces. |
+| 4.10 | Nombre del exchange y campos del mensaje | **`aeropuerto.eventos`; `id`, `type`, `version`, `occurred_at`, `correlation_id`, `data_version` y `data`** | Detalla la 4.8. El exchange es de tipo topic y durable. `type` es la clave de ruteo, `version` es la versión del formato del evento (empieza en 1) y `data_version` es el número de versión del dato. Lo propuso Male el 19/10/2026 al programar Clima; queda confirmada al mergearse el pull request #20. |
 
 Las decisiones 4.5 a 4.9 las tomó Salvador el 8/10/2026, al escribir el [ADR-005](adr/ADR-005.md). Quedaron confirmadas al mergearse el pull request #8.
 
@@ -94,13 +95,31 @@ Las decisiones 4.11 a 4.13 las tomó Maxi el 21/10/2026, al cerrar el contrato e
 | Vuelo cancelado | Vuelos | Pistas: libera el slot. |
 | Clima sin datos | Clima | Pistas: deja de cerrar y reabrir solo y muestra el aviso al operador (6.19). Se sumó en la Entrega 2 (sección 18, pendiente 17). |
 
-La 4.14 la tomó Maxi el 21/10/2026 y queda confirmada al mergearse el pull request #26; la 4.15 y la 4.16, al mergearse el pull request de la rama `feat/pedido-de-slot`. Las claves y la ruta de Pistas las eligió por Carola, que le delegó la elección.
+La 4.14 la tomó Maxi el 21/10/2026 y queda confirmada al mergearse el pull request #26; la 4.15 y la 4.16, al mergearse el pull request #27. Las claves y la ruta de Pistas las eligió por Carola, que le delegó la elección.
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 4.14 | Claves de ruteo de los eventos | **Servicio, cosa y qué pasó, en español, como las de Clima (9.14)** | `vuelos.vuelo.cancelado`; `pistas.slot.asignado`, `pistas.slot.cedido`, `pistas.slot.liberado_por_cierre`, `pistas.pista.cerrada` y `pistas.pista.reabierta`. Así un consumidor puede pedir todo lo de un servicio con `pistas.#`. |
 | 4.15 | Cómo pide Vuelos el slot a Pistas | **`POST /internal/slots` en Pistas** | Con `flight_id`, `flight_type`, `runway_id` y `block_start`. Responde `200` con el slot asignado (también si se repite el mismo pedido, 4.6), o `409` con `SLOT_TAKEN` y los 3 libres, `RUNWAY_CLOSED` o `FLIGHT_ALREADY_HAS_SLOT`, o `404` con `RUNWAY_NOT_FOUND`. Es interna: el gateway no la expone (15.7). El contrato está en `services/pistas/openapi.yaml`. La eligió Maxi por Carola, que le delegó la elección. |
 | 4.16 | Los 2 segundos del pedido de slot (4.5) | **Son por intento** | Cada llamada a Pistas tiene 2 segundos. Si Pistas no contesta nunca, la aerolínea espera unos 7 segundos: 3 intentos más las esperas. Así los reintentos sirven también cuando Pistas está lento. |
+
+Las decisiones 4.17 a 4.20 detallan la 4.13. Las tomó Male el 22/10/2026, con las opciones y recomendaciones del agente, y quedan confirmadas al mergearse el pull request de la rama `feat/rabbitmq-definiciones`. El archivo y su explicación están en [rabbitmq/](../rabbitmq/README.md).
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 4.17 | Cómo se cargan las definiciones de RabbitMQ | **Un contenedor de un solo uso, `rabbitmq-init`** | RabbitMQ arranca con el usuario del `.env`; cuando está listo, `rabbitmq-init` sube `rabbitmq/definitions.json` por la API de administración y termina, y recién ahí arrancan los servicios. Se descartó cargarlo al arrancar RabbitMQ (`load_definitions`): se probó, y así RabbitMQ no crea el usuario del `.env`; ponerlo en el archivo dejaría la contraseña en el repositorio. |
+| 4.18 | Nombres de las colas | **`<consumidor>.eventos` y `<consumidor>.eventos.fallidos`** | `pistas.eventos`, `pistas.eventos.fallidos`, `vuelos.eventos` y `vuelos.eventos.fallidos`. |
+| 4.19 | Qué recibe cada cola | **Lo que sale de la 4.3, la 4.14 y la 9.14** | `pistas.eventos` recibe `clima.#` y `vuelos.vuelo.cancelado`; `vuelos.eventos` recibe `pistas.#`. |
+| 4.20 | Cómo llega un mensaje a la cola de fallidos | **Por el exchange `aeropuerto.fallidos` de RabbitMQ** | Cada cola tiene configurado ese exchange para los mensajes rechazados. El consumidor, después de sus 3 intentos (4.5), rechaza el mensaje sin volver a encolarlo, y RabbitMQ lo pasa solo a su cola de fallidos (11.4). |
+
+Las decisiones 4.21 a 4.24 las tomó Maxi el 22/10/2026, al programar el relay y el consumidor de Vuelos. Quedan confirmadas al mergearse el pull request #29.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 4.21 | Relay con dos instancias de Vuelos | **Cada una toma eventos que la otra no tiene** | El relay lee el outbox con `SELECT ... FOR UPDATE SKIP LOCKED`: si una instancia está publicando unos eventos, la otra los saltea. Ninguno sale dos veces y, si una instancia se cae, la otra sigue sola. |
+| 4.22 | Evento que no se puede aplicar | **Se confirma y queda un aviso en el log** | Por ejemplo, "slot asignado" para un vuelo que la aerolínea ya canceló, o un tipo de evento que Vuelos no conoce. Reintentar no lo arregla, y mandarlo a fallidos dispararía la alerta de la 11.4 sin un error real. Pistas igual libera el slot al recibir "vuelo cancelado". |
+| 4.23 | Orden de los eventos que recibe Vuelos | **Un solo consumidor activo en `vuelos.eventos`** | La cola tiene `x-single-active-consumer`: RabbitMQ la entrega a una instancia por vez y la otra queda de reserva. Así los eventos de un mismo vuelo se aplican en orden; por ejemplo, "slot asignado" antes que "slot cedido". |
+| 4.24 | Esperas entre reintentos del consumidor (4.5) | **1, 2 y 4 segundos** | Ante una falla pasajera, como MySQL sin responder. Después del tercer reintento el mensaje va a fallidos (4.20). |
 
 ## 5. Datos
 
@@ -214,6 +233,21 @@ Quién eligió cada cosa:
 | 9.10 | Versionado del contrato de Clima | **Sin versión en la ruta; con el número del contrato** | Por indicación del profe, la ruta queda `GET /airports/{icao}/conditions`. La versión es el número del contrato (`info.version`, con el formato mayor.menor.parche) y el historial de la guía. Un cambio que rompe sube el número mayor y se avisa en la guía. Reemplaza a la 6.5. Lo decidió el equipo en una llamada. |
 | 9.11 | Timeout recomendado al consumidor | **Al menos 60 segundos en el primer pedido** | Por el servicio dormido de Render (9.4), el primer pedido después de un rato sin uso tarda cerca de un minuto. Se recomienda en la guía del contrato. Lo decidió el equipo en una llamada. |
 
+Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10/2026, con las opciones y recomendaciones del agente; la 9.14 la revisa la pareja 1 en el pull request, porque Pistas consume esos eventos.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 9.12 | Qué se fuerza | **Valores de clima** | El operador fuerza viento, ráfagas, visibilidad o tormenta, y la aptitud se calcula con los umbrales de la 6.11. Así se prueban los umbrales de punta a punta. |
+| 9.13 | Ruta interna del forzado | **`PUT` y `DELETE` en `/internal/airports/SACO/forced-conditions`** | `PUT` pone la condición forzada y `DELETE` la quita. Solo la acepta con `X-User-Role: operator` (15.6). La copia de la nube no la expone. |
+| 9.14 | Eventos de Clima | **`clima.aptitud.cambio` y `clima.sin_datos`** | Son las claves de ruteo. "Aptitud cambió" lleva aeropuerto, `operable`, motivos, fecha de la observación y si es forzada; se publica solo cuando `operable` cambia, y también cuando vuelven los datos después de un "sin datos". "Sin datos" se publica cuando el último dato pasa los 30 minutos (9.2), y lleva solo el aeropuerto y la fecha del último dato. En "aptitud cambió", `reasons` va siempre, como lista, vacía si se puede operar. Si ninguna cola recibe un evento, queda en el outbox hasta que exista una: no se pierde. |
+| 9.15 | Variables de entorno de Clima | **`CLIMA_API_KEYS`, `MONGO_URI`, `RABBITMQ_URL` y `RABBITMQ_ENABLED`** | Las claves van como `grupo1:clave1,grupo2:clave2`. `RABBITMQ_ENABLED=false` apaga la publicación de eventos en la copia de la nube (9.3). |
+| 9.16 | Historial de observaciones | **Se borran solas a los 7 días** | Con un índice TTL de MongoDB. El servicio solo usa la última, y así el plan gratuito de Atlas no se llena. |
+| 9.17 | Cómo se cuenta el límite de 60 por minuto | **Un balde de 60 que se rellena de a 1 por segundo** | Permite ráfagas de hasta 60 y en promedio son 60 por minuto; en el primer minuto, con el balde lleno, pueden pasar hasta 119. `Retry-After` dice los segundos hasta que haya lugar; en el `503` dice 60. |
+| 9.18 | Precipitación | **La de los últimos 15 minutos** | Es lo que informa Open-Meteo. Se corrige el texto del contrato, que decía "última hora": pasa a 2.0.1, una aclaración. |
+| 9.19 | Si falla una consulta a Open-Meteo | **Se reintenta al minuto** | En vez de esperar los 15 minutos. Como el dato ya puede tener hasta 15 minutos, una sola falla no llega a dejarlo viejo. Surgió en la revisión del pull request #20; lo eligió Male el 20/10/2026. |
+| 9.20 | Plazo de cada tarea periódica de Clima | **30 segundos** | La consulta, la revisión de la aptitud y el relay se cortan a los 30 segundos y vuelven a intentar. Así, si MongoDB o RabbitMQ se cuelgan, la tarea no queda trabada. Un mismo error se registra como mucho una vez por minuto. Surgió en la revisión del pull request #20; lo eligió Male el 20/10/2026. |
+| 9.21 | Qué revisa `/health` de Clima | **Solo que el servicio esté vivo; no mira MongoDB** | Clima no está detrás del balanceador (el que se balancea es Vuelos, 12.1). Si mirara MongoDB, una caída de Atlas haría que Render reiniciara Clima una y otra vez, cuando Clima igual puede responder `503` con un error claro. Surgió en la revisión del pull request #20; lo eligió Male el 20/10/2026. |
+
 ## 10. Caché (ADR D7)
 
 | # | Decisión | Elegido | Qué significa |
@@ -232,6 +266,7 @@ Quién eligió cada cosa:
 | 11.3 | Objetivo de servicio | **Pedido de slot: el 95 % en menos de 500 ms** | Medido sobre los últimos 5 minutos. Es una primera versión: todo corre en una sola computadora y en los picos de la prueba de carga algunos pedidos van a tardar más. |
 | 11.4 | Mensajes fallidos (pendiente de la Entrega 1) | **Log de error y alerta en Grafana** (agente) | Cuando un consumidor manda un mensaje a la cola de fallidos, escribe un log de error con el identificador de correlación, y Grafana alerta cuando aparece uno. Se revisan a mano desde el panel de RabbitMQ. Sirve como la alerta que pide el ADR D11. |
 | 11.5 | Formato de los logs | **JSON con `log/slog`** (agente) | Es la librería de logs que trae Go. Cada línea lleva el identificador de la traza. |
+| 11.6 | Cómo sigue la traza en los eventos | **El encabezado `traceparent` en el mensaje, guardado en el outbox** (Male, 22/10/2026) | Detalla la 11.2. Con solo el `correlation_id`, Grafana muestra trazas separadas. Por eso, al guardar un evento en el outbox se guarda también el `traceparent` de la traza en curso; el relay lo pone como encabezado del mensaje de RabbitMQ, y el consumidor lo lee para seguir la misma traza. Las funciones para escribirlo y leerlo van en la carpeta de observabilidad (11.1), que cada servicio copia: la escribe Male en Clima, y la pareja 1 la usa en los relays y consumidores de Vuelos y Pistas. Queda confirmada al mergearse el pull request de la rama `feat/rabbitmq-definiciones`. |
 
 ## 12. Balanceo de carga (ADR D12)
 
@@ -246,7 +281,7 @@ Quién eligió cada cosa:
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 13.1 | Dónde va el mecanismo de protección | **B. Circuit breaker de Vuelos a Pistas** | Si Pistas viene fallando, Vuelos deja de llamarla un rato y los vuelos quedan "pendiente de slot". Se suma al timeout y los reintentos de la 4.5. Por qué: el efecto se ve en el frontend. |
-| 13.2 | Valores del circuit breaker | **5 fallas seguidas, 30 segundos abierto, 1 pedido de prueba** (Maxi, 21/10/2026) | Cuenta como falla un pedido que no consiguió respuesta de Pistas después de los reintentos, o al que Pistas respondió con un error suyo (por ejemplo, `500`). Un rechazo, como slot ocupado o pista cerrada, no cuenta. Abierto, Vuelos responde `503` enseguida, con `Retry-After: 30`. Pasados los 30 segundos deja pasar un pedido: si anda, se cierra; si falla, se abre otra vez. Queda confirmada al mergearse el pull request de la rama `feat/pedido-de-slot`. |
+| 13.2 | Valores del circuit breaker | **5 fallas seguidas, 30 segundos abierto, 1 pedido de prueba** (Maxi, 21/10/2026) | Cuenta como falla un pedido que no consiguió respuesta de Pistas después de los reintentos, o al que Pistas respondió con un error suyo (por ejemplo, `500`). Un rechazo, como slot ocupado o pista cerrada, no cuenta. Abierto, Vuelos responde `503` enseguida, con `Retry-After: 30`. Pasados los 30 segundos deja pasar un pedido: si anda, se cierra; si falla, se abre otra vez. Queda confirmada al mergearse el pull request #27. |
 
 ## 14. Búsqueda (ADR D6)
 
@@ -256,6 +291,14 @@ Quién eligió cada cosa:
 | 14.2 | Atraso máximo del índice | **60 segundos** | Desde que cambia un vuelo hasta que se ve en la búsqueda. Por qué: es una espera razonable para un tablero. |
 | 14.3 | Cómo se reconstruye el índice | **A. Comando manual** | Lee los vuelos de MySQL y los vuelve a cargar en Solr. Por qué: si fuera automático al arrancar, las dos instancias de Vuelos lo harían a la vez. |
 | 14.4 | Paginación | **20 vuelos por página** (agente) | El enunciado pide paginación sin dar un valor. |
+| 14.5 | Cómo se entera el índice de cada cambio | **Un evento de Vuelos por RabbitMQ** | Cada cambio de un vuelo guarda en el outbox, en la misma transacción, el evento `vuelos.vuelo.actualizado`, con los datos que muestra el tablero. El relay lo publica y Vuelos lo lee de la cola `vuelos.indice` para escribirlo en Solr. Si algo falla, se reintenta y termina en `vuelos.indice.fallidos`. Suma una clave de ruteo a la 4.14 y una cola a la 4.19. La cola va aparte de `vuelos.eventos` para que, si Solr se cae, no se frenen los eventos de Pistas. Las dos instancias de Vuelos la consumen. Se descartaron dos opciones: que el relay escriba directo en Solr, porque habría que programar los reintentos aparte, y revisar MySQL cada 30 segundos, porque no es "a partir de eventos" (3.2). |
+| 14.6 | Un cambio viejo no pisa uno nuevo | **Solr descarta una escritura con versión menor o igual a la que tiene** | Cada vuelo lleva su número de versión, que es el `data_version` del evento (4.10). Si llega tarde un evento viejo, si llega dos veces el mismo o si el comando de reconstrucción corre al mismo tiempo, Solr se queda con el dato más nuevo. Por eso la cola `vuelos.indice` no necesita un solo consumidor activo, como la 4.23. |
+| 14.7 | Cuándo Solr muestra lo escrito | **En hasta 5 segundos** (agente) | Solr hace visible lo escrito cada 5 segundos. Así un cambio llega a la búsqueda bastante antes de los 60 segundos de la 14.2: se suma hasta 1 segundo del relay (4.5) y, si algo falla, 7 de reintentos (4.24). |
+| 14.8 | Cómo encuentra la búsqueda por texto | **Por el comienzo, sin distinguir mayúsculas ni tildes** | "AR15" encuentra AR1550, "Bue" encuentra Buenos Aires y "cordoba" encuentra Córdoba. Se descartaron la palabra completa, porque obliga a escribir el número entero, y cualquier parte de la palabra, porque agranda el índice y trae resultados de más. |
+| 14.9 | Fecha del filtro del tablero | **El día en hora de Argentina (UTC−3)** | Un vuelo de las 23:30 en Córdoba es de ese día, aunque en UTC sean las 02:30 del siguiente. Es lo que espera quien mira el tablero. El resto de los horarios de la API siguen en UTC. |
+| 14.10 | Si Solr no responde al actualizar el índice | **Igual que los demás consumidores** | Se hacen 3 reintentos, a 1, 2 y 4 segundos (4.24), y el evento pasa a `vuelos.indice.fallidos`, con la alerta de la 11.4. Cuando Solr vuelve, se corre la reconstrucción (14.3). Se descartó reintentar sin límite, porque se comportaría distinto que el resto y los eventos se acumularían. |
+
+Maxi eligió las decisiones 14.5 a 14.10 el 22/10/2026, al escribir el ADR-006, entre las opciones que propuso el agente. La 14.7 tiene la marca "(agente)" porque el valor de 5 segundos lo propuso el agente. Quedan confirmadas al mergearse el pull request #30.
 
 ## 15. API gateway
 
@@ -429,7 +472,7 @@ Sin respuesta registrada:
 | D5 | Comunicación entre servicios | 4.1 a 4.9 | Entrega 1, versión inicial; se valida en la 2 |
 | D2 | Arquitectura interna | 7.3, 7.5, 7.6, 20 | Entrega 2 |
 | D4 | Consistencia y concurrencia | 2.3, 2.7, 4.4 | Sin entrega asignada |
-| D6 | Búsqueda | 3.2, 14.1 a 14.4 | Entrega 2 |
+| D6 | Búsqueda | 3.2, 7.2, 10.4, 14.1 a 14.10 | Entrega 2 |
 | D7 | Caché | 10.1 a 10.4 | Entrega 2 |
 | D9 | Consumo del proveedor | Depende de la asignación de la cátedra | Entrega 2 |
 | D10 | Resiliencia | 4.5, 13.1 | Entrega 2 |

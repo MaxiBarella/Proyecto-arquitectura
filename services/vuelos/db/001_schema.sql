@@ -36,6 +36,8 @@ CREATE TABLE outbox (
   type           VARCHAR(64) NOT NULL,
   occurred_at    DATETIME(6) NOT NULL,
   correlation_id VARCHAR(64) NOT NULL,
+  -- La traza en curso al guardar el evento: el relay publica dentro de ella (11.6).
+  traceparent    VARCHAR(64) NULL,
   data_version   BIGINT      NOT NULL,
   data           JSON        NOT NULL,
   PRIMARY KEY (id),

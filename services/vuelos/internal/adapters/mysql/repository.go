@@ -183,6 +183,7 @@ func insertEvents(tx *gorm.DB, version int64, events []domain.Event) error {
 			Type:          e.Type,
 			OccurredAt:    e.OccurredAt.UTC(),
 			CorrelationID: e.CorrelationID,
+			TraceParent:   nullable(e.TraceParent),
 			DataVersion:   version,
 			// Como texto: MySQL rechaza un JSON que llega como bytes.
 			Data: string(data),
@@ -192,4 +193,50 @@ func insertEvents(tx *gorm.DB, version int64, events []domain.Event) error {
 		}
 	}
 	return nil
+}
+
+func nullable(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// relayBatch es cuántos eventos toma el relay por vuelta.
+const relayBatch = 100
+
+// PublishPending publica los eventos del outbox en orden y borra los que salieron
+// (4.4). Los toma con SELECT ... FOR UPDATE SKIP LOCKED: si la otra instancia de
+// Vuelos está publicando unos, esta los saltea, así ninguno sale dos veces (4.21).
+// Si uno falla, se detiene ahí y lo deja para la próxima vuelta, con los que siguen;
+// los que ya salieron se borran igual.
+func (r *Repository) PublishPending(ctx context.Context, publish func(context.Context, domain.Event) error) (published int, err error) {
+	var publishErr error
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var rows []outboxRow
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Order("occurred_at, id").Limit(relayBatch).Find(&rows).Error
+		if err != nil {
+			return fmt.Errorf("leer el outbox: %w", err)
+		}
+		var done []string
+		for _, row := range rows {
+			if publishErr = publish(ctx, row.toEvent()); publishErr != nil {
+				break
+			}
+			done = append(done, row.ID)
+		}
+		if len(done) > 0 {
+			if err := tx.Delete(&outboxRow{}, "id IN ?", done).Error; err != nil {
+				return fmt.Errorf("borrar los eventos publicados: %w", err)
+			}
+		}
+		published = len(done)
+		// Se devuelve nil para que la transacción confirme el borrado de lo publicado.
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return published, publishErr
 }

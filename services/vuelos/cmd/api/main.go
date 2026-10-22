@@ -15,7 +15,9 @@ import (
 	httpadapter "github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/http"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/mysql"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/pistas"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/rabbitmq"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/commands"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/domain"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/observability"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/queries"
 )
@@ -74,6 +76,10 @@ func run(logger *slog.Logger) (err error) {
 	if pistasURL == "" {
 		return errors.New("falta la variable PISTAS_URL")
 	}
+	rabbitURL := os.Getenv("RABBITMQ_URL")
+	if rabbitURL == "" {
+		return errors.New("falta la variable RABBITMQ_URL")
+	}
 
 	connectCtx, cancel := context.WithTimeout(ctx, dbConnectTimeout)
 	db, err := mysql.Open(connectCtx, dsn)
@@ -102,7 +108,29 @@ func run(logger *slog.Logger) (err error) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": serviceName})
 	})
 	slots := pistas.NewClient(pistas.DefaultConfig(pistasURL))
-	httpadapter.Register(router, commands.New(flights, slots), queries.New(flights))
+	cmds := commands.New(flights, slots)
+	httpadapter.Register(router, cmds, queries.New(flights))
+
+	// Relay: publica el outbox cada segundo (4.4, 4.5). Corre en las dos instancias;
+	// SKIP LOCKED evita que publiquen el mismo evento (4.21).
+	publisher := rabbitmq.NewPublisher(rabbitURL)
+	defer publisher.Close()
+	go runEvery(ctx, relayInterval, relayInterval, "publicación de eventos", func(ctx context.Context) error {
+		_, err := flights.PublishPending(ctx, func(ctx context.Context, e domain.Event) error {
+			// Se publica dentro de la traza que guardó el evento (11.6).
+			pubCtx, span := observability.StartPublish(ctx, e.TraceParent, e.Type)
+			err := publisher.Publish(pubCtx, e)
+			observability.EndSpan(span, err)
+			return err
+		})
+		return err
+	})
+
+	// Consumidor de los eventos de Pistas (4.1, 4.3).
+	consumer := rabbitmq.NewConsumer(rabbitURL, func(ctx context.Context, m commands.Message) error {
+		return cmds.HandleEvent(ctx, flights, m)
+	})
+	go consumer.Run(ctx)
 
 	server := &http.Server{
 		Addr:              ":" + port,
