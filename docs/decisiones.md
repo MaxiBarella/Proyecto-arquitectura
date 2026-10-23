@@ -274,7 +274,9 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 |---|---|---|---|
 | 12.1 | Qué servicio se balancea | **A. Vuelos** | Dos instancias de Vuelos detrás de NGINX. Por qué: es el que más tráfico recibe y tiene el tablero cacheado, así que caché y balanceo se muestran sobre el mismo flujo. |
 | 12.2 | Cómo reparte | **A. Por turnos** | El comportamiento por defecto de NGINX. Una instancia caída se detecta de forma pasiva, porque la verificación activa es de la versión paga; el ADR explica por qué alcanza. Por qué: es lo más simple. |
-| 12.3 | Eventos duplicados con dos instancias | **Se aceptan** (agente) | Las dos instancias revisan la misma tabla de outbox y pueden publicar dos veces un evento. No rompe nada porque los consumidores son idempotentes (4.9), y no hay que programar nada extra. Las dos leen de la misma cola, así que cada evento que le llega a Vuelos lo procesa una sola. |
+| 12.3 | Eventos duplicados con dos instancias | **Se aceptan** (agente) | Las dos instancias revisan la misma tabla de outbox, pero no publican a la vez el mismo evento: cada una toma los que la otra no tiene (4.21). Un evento todavía puede salir dos veces si una instancia se cae entre publicarlo y borrarlo. No rompe nada porque los consumidores son idempotentes (4.9). De `vuelos.eventos` consume una sola instancia por vez (4.23), así que cada evento que le llega a Vuelos lo procesa una sola. |
+
+La 12.3 se actualizó el 23/10/2026 con la 4.21 y la 4.23, que cambiaron cómo se reparten el outbox y la cola entre las dos instancias. La decisión de fondo no cambió: un evento todavía puede salir dos veces, y se acepta.
 
 ## 13. Resiliencia (ADR D10)
 
