@@ -173,14 +173,14 @@ Es una sugerencia para que una pareja no trabe a la otra.
 
 ## Cuándo está terminada la entrega
 
-- [ ] Clima, Vuelos y Pistas operativos
-- [ ] Clima real funcionando y publicado en la nube
-- [ ] Almacenamiento integrado al flujo: MongoDB en Clima y MySQL en Vuelos y Pistas
-- [ ] Logs estructurados y correlacionados
-- [ ] Primera traza distribuida del flujo principal
-- [ ] ADR-002, ADR-006, ADR-007, ADR-009, ADR-010, ADR-012 y ADR-013
-- [ ] ADR-011, primera versión
-- [ ] ADR-001, ADR-003 y ADR-005 validados
-- [ ] ADR-008 actualizado
-- [ ] `SPEC.md` 0.3, con el anuncio de que no hay bonus
-- [ ] Todo mergeado en `main` y el tag `entrega-2`
+- [x] Clima, Vuelos y Pistas operativos
+- [x] Clima real funcionando y publicado en la nube
+- [x] Almacenamiento integrado al flujo: MongoDB en Clima y MySQL en Vuelos y Pistas
+- [x] Logs estructurados y correlacionados
+- [x] Primera traza distribuida del flujo principal
+- [x] ADR-002, ADR-006, ADR-007, ADR-009, ADR-010, ADR-012 y ADR-013
+- [x] ADR-011, primera versión
+- [x] ADR-001, ADR-003 y ADR-005 validados
+- [x] ADR-008 actualizado: lo reemplaza el ADR-015, por el cambio de versionado (9.10)
+- [x] `SPEC.md` 0.3, con el anuncio de que no hay bonus (hoy va por la 0.4)
+- [x] Todo mergeado en `main` y el tag `entrega-2`
