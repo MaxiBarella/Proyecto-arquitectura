@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Vuelos API
-  version: 0.1.0
+  version: 0.2.0
   summary: Publicación de vuelos, pedido de slot, cancelación y tablero.
   description: |
     API interna del servicio Vuelos. La usan el frontend y, a través del gateway, las
@@ -15,7 +15,8 @@ info:
       es público.
     - **Estados:** los de la sección 6 del `SPEC.md`. Un vuelo nace en `pending_slot`.
     - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio, igual
-      que Clima (6.14).
+      que Clima (6.14). Un error inesperado responde `500` con `INTERNAL_ERROR`, sin
+      el detalle: lo que pasó queda en el log de Vuelos.
     - **Versionado:** la versión es la de este contrato (`info.version`), como en Clima
       (9.10). La ruta no lleva versión.
 
@@ -96,6 +97,8 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
     get:
       operationId: listOwnFlights
@@ -129,6 +132,8 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /flights/{id}:
     get:
@@ -153,6 +158,8 @@ paths:
           $ref: '#/components/responses/NotOwner'
         '404':
           $ref: '#/components/responses/FlightNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /flights/{id}/slot-request:
     post:
@@ -216,6 +223,8 @@ paths:
           $ref: '#/components/responses/FlightOrRunwayNotFound'
         '409':
           $ref: '#/components/responses/SlotRejected'
+        '500':
+          $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/RunwaysUnavailable'
 
@@ -248,6 +257,8 @@ paths:
           $ref: '#/components/responses/FlightNotFound'
         '409':
           $ref: '#/components/responses/InvalidTransition'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /board:
     get:
@@ -551,6 +562,7 @@ components:
             - INVALID_TRANSITION
             - RUNWAYS_UNAVAILABLE
             - BOARD_UNAVAILABLE
+            - INTERNAL_ERROR
         nearest_free_slots:
           type: array
           description: Solo en `SLOT_TAKEN`. Los 3 slots libres más cercanos al pedido (RN-09).
@@ -753,3 +765,18 @@ components:
             detail: El índice de búsqueda no responde.
             instance: /board
             code: BOARD_UNAVAILABLE
+
+    InternalError:
+      description: |
+        Falló algo que Vuelos no esperaba. La respuesta no trae el detalle: queda en el
+        log de Vuelos.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/internal-error
+            title: Error interno
+            status: 500
+            instance: /flights
+            code: INTERNAL_ERROR
