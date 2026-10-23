@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Pistas API
-  version: 0.1.0
+  version: 0.2.0
   summary: Asignación de slots de pista.
   description: |
     API interna del servicio Pistas. Por ahora tiene solo el pedido de slot que hace
@@ -75,6 +75,8 @@ paths:
           $ref: '#/components/responses/RunwayNotFound'
         '409':
           $ref: '#/components/responses/Rejected'
+        '503':
+          $ref: '#/components/responses/Unavailable'
 
 components:
   schemas:
@@ -150,6 +152,7 @@ components:
             - SLOT_TAKEN
             - RUNWAY_CLOSED
             - FLIGHT_ALREADY_HAS_SLOT
+            - UNAVAILABLE
         nearest_free_slots:
           type: array
           description: Solo en `SLOT_TAKEN`. Los 3 slots libres más cercanos al pedido, antes o después y en cualquier pista (RN-09).
@@ -158,6 +161,21 @@ components:
             $ref: '#/components/schemas/Slot'
 
   responses:
+    Unavailable:
+      description: |
+        Falla pasajera de Pistas, por ejemplo su base no responde. Vuelos la reintenta (4.5):
+        repetir el pedido es seguro (4.6).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/unavailable
+            title: Pistas no está disponible
+            status: 503
+            detail: Se puede reintentar.
+            code: UNAVAILABLE
+
     InvalidRequest:
       description: Faltan datos o tienen mal formato, por ejemplo un bloque fuera de un múltiplo de 15 minutos.
       content:
