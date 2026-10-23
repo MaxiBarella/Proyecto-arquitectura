@@ -90,7 +90,7 @@ Los dos: la traza del flujo completo, de Vuelos a Pistas y de vuelta.
 
 **Qué falta decidir**
 
-- Nada que frene esta entrega. Los endpoints quedaron en las decisiones 4.14 a 4.16.
+- Nada que frene esta entrega. Los endpoints de Pistas quedaron en las decisiones 4.14 a 4.16, y los de Vuelos en su contrato, `services/vuelos/openapi.yaml`.
 
 **Ojo con**
 
