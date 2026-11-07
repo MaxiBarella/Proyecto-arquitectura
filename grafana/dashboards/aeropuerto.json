@@ -12,14 +12,14 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "Pedido de slot: p95 (objetivo < 500 ms)",
-      "description": "Percentil 95 de los pedidos de slot en los últimos 5 minutos, medido en Vuelos (11.3). Si no hubo pedidos, muestra \"Sin datos\".",
+      "title": "Pedido de slot: p95 actual",
+      "description": "Percentil 95 de los pedidos de slot en los últimos 5 minutos, medido en Vuelos. Verde si está bajo el objetivo de 500 ms (11.3), rojo si lo pasa. Si no hubo pedidos, muestra \"Sin datos\" en gris.",
       "gridPos": { "x": 0, "y": 0, "w": 8, "h": 6 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"vuelos\", http_route=\"/flights/:id/slot-request\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=\"vuelos\", http_route=\"/flights/:id/slot-request\"}[5m]))) or vector(NaN)",
           "instant": true
         }
       ],
@@ -28,6 +28,12 @@
           "unit": "s",
           "decimals": 3,
           "noValue": "Sin datos",
+          "mappings": [
+            {
+              "type": "special",
+              "options": { "match": "null+nan", "result": { "text": "Sin datos", "color": "#6e7079" } }
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
