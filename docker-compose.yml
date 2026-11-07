@@ -175,6 +175,8 @@ services:
     volumes:
       # Las alertas guardadas en el repo se cargan al arrancar (20.4).
       - ./grafana/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
+      - ./grafana/dashboards/aeropuerto.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/aeropuerto.yaml:ro
+      - ./grafana/dashboards:/otel-lgtm/aeropuerto-dashboards:ro
 
 volumes:
   mysql-vuelos-data:
