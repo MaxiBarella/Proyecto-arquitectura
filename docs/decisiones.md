@@ -371,6 +371,7 @@ Todo lo de esta sección lo eligió el agente, para que las dos parejas usen lo 
 | 20.1 | Librerías comunes | Ver la tabla de abajo | Las mismas en todos los servicios. |
 | 20.2 | Carpetas nuevas | `nginx/` y `tests/carga/` | En la raíz. `nginx/` tiene los dos archivos de configuración y el script del token; `tests/carga/`, los escenarios de k6. |
 | 20.3 | Cobertura de tests unitarios | **60 % sobre las reglas de negocio** | Se mide sobre el código de reglas de Pistas y Vuelos, no sobre todo el repo. Se ajusta si el profe pide otro número. |
+| 20.4 | Configuración de Grafana | **Una carpeta `grafana/` en la raíz** (Male, 7/11/2026) | Como `rabbitmq/` y `nginx/`. El `docker-compose.yml` la monta en el contenedor de Grafana, que carga al arrancar lo que hay adentro: hoy, la alerta de mensajes fallidos (11.4) en `grafana/alerting/`; después, el tablero. Se descartó guardarla en `docs/`, que es documentación. Las opciones las preparó el agente; queda confirmada al mergearse el pull request que la registra. |
 
 | Para qué | Librería |
 |---|---|
