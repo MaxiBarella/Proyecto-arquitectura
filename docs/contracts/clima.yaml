@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Clima API
-  version: 2.0.1
+  version: 2.1.0
   summary: Condiciones meteorológicas actuales y aptitud operativa de aeropuertos.
   description: |
     Devuelve las condiciones actuales de un aeropuerto y si se puede operar en él
@@ -13,7 +13,8 @@ info:
     - **Datos:** siempre son observaciones reales de Open-Meteo.
     - **Autenticación:** una clave por consumidor, en el header `X-API-Key`.
     - **Límite:** 60 pedidos por minuto por clave. Al pasarlo se responde `429` con `Retry-After`.
-    - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio.
+    - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio. Un error
+      inesperado responde `500` con `INTERNAL_ERROR`, sin el detalle.
     - **Versionado:** la versión es la de este contrato (`info.version`), con el formato
       mayor.menor.parche. La ruta no lleva versión. Un cambio que rompe sube el número
       mayor y se avisa en el historial de la guía.
@@ -109,6 +110,8 @@ paths:
           $ref: '#/components/responses/AirportNotSupported'
         '429':
           $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/WeatherSourceUnavailable'
 
@@ -268,6 +271,7 @@ components:
             - AIRPORT_NOT_SUPPORTED
             - RATE_LIMIT_EXCEEDED
             - WEATHER_SOURCE_UNAVAILABLE
+            - INTERNAL_ERROR
 
   responses:
     InvalidAirportCode:
@@ -357,3 +361,16 @@ components:
             detail: El último dato de clima tiene más de 30 minutos y no se pudo renovar.
             instance: /airports/SACO/conditions
             code: WEATHER_SOURCE_UNAVAILABLE
+
+    InternalError:
+      description: Falló algo que no esperábamos. La respuesta no trae el detalle. **Reintentar** con espera creciente.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/internal-error
+            title: Error interno
+            status: 500
+            instance: /airports/SACO/conditions
+            code: INTERNAL_ERROR
