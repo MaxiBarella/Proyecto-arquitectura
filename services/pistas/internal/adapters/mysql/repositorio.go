@@ -115,9 +115,12 @@ func (t *transaccion) SlotsOcupados(ctx context.Context, desde, hasta time.Time)
 	return slotsOcupados(t.db.WithContext(ctx), desde, hasta)
 }
 
+// Pista usa SELECT ... FOR SHARE: los pedidos de slot no se frenan entre sí, pero un cierre de la
+// pista, que la bloquea con FOR UPDATE, espera a que terminen. Sin el bloqueo, un pedido podría leer
+// la pista abierta y ocupar un slot justo mientras se cierra (ADR-004).
 func (t *transaccion) Pista(ctx context.Context, id string) (domain.Pista, error) {
 	var p pistaModelo
-	err := t.db.WithContext(ctx).Where("id = ?", id).First(&p).Error
+	err := t.db.WithContext(ctx).Clauses(clause.Locking{Strength: "SHARE"}).Where("id = ?", id).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return domain.Pista{}, domain.ErrPistaInexistente
 	}
@@ -125,6 +128,60 @@ func (t *transaccion) Pista(ctx context.Context, id string) (domain.Pista, error
 		return domain.Pista{}, err
 	}
 	return p.aDominio(), nil
+}
+
+// PistasConBloqueo usa SELECT ... FOR UPDATE sobre todas las pistas: un pedido de slot simultáneo
+// espera a que termine el cierre o la reapertura.
+func (t *transaccion) PistasConBloqueo(ctx context.Context) ([]domain.Pista, error) {
+	return pistas(t.db.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}))
+}
+
+func (t *transaccion) GuardarPista(ctx context.Context, p domain.Pista) error {
+	m := pistaDesdeDominio(p)
+	return t.db.WithContext(ctx).Model(&pistaModelo{}).Where("id = ?", p.ID).
+		Updates(map[string]any{"abierta": m.Abierta, "cerrada_por": m.CerradaPor}).Error
+}
+
+// SlotsDePista lee con bloqueo, como el resto de la transacción del cierre.
+func (t *transaccion) SlotsDePista(ctx context.Context, pistaID string) ([]domain.Slot, error) {
+	var filas []slotModelo
+	err := t.db.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("pista_id = ?", pistaID).Order("inicio_bloque").Find(&filas).Error
+	if err != nil {
+		return nil, err
+	}
+	res := make([]domain.Slot, len(filas))
+	for i, f := range filas {
+		res[i] = f.aDominio()
+	}
+	return res, nil
+}
+
+func (t *transaccion) Alternativos(ctx context.Context) ([]domain.Alternativo, error) {
+	var filas []alternativoModelo
+	if err := t.db.WithContext(ctx).Order("orden").Find(&filas).Error; err != nil {
+		return nil, err
+	}
+	res := make([]domain.Alternativo, len(filas))
+	for i, f := range filas {
+		res[i] = domain.Alternativo{ICAO: f.ICAO, Nombre: f.Nombre, Disponible: f.Disponible}
+	}
+	return res, nil
+}
+
+func (t *transaccion) Clima(ctx context.Context) (domain.EstadoClima, error) {
+	var c climaModelo
+	err := t.db.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("aeropuerto = ?", domain.NuestroAeropuerto).First(&c).Error
+	if err != nil {
+		return domain.EstadoClima{}, err
+	}
+	return domain.EstadoClima{Operable: c.Operable, ConDatos: c.ConDatos}, nil
+}
+
+func (t *transaccion) GuardarClima(ctx context.Context, c domain.EstadoClima) error {
+	return t.db.WithContext(ctx).Model(&climaModelo{}).Where("aeropuerto = ?", domain.NuestroAeropuerto).
+		Updates(map[string]any{"operable": c.Operable, "con_datos": c.ConDatos, "actualizado_en": time.Now().UTC()}).Error
 }
 
 // SlotDelVuelo también usa FOR UPDATE: una lectura con bloqueo ve lo último guardado. Una lectura
