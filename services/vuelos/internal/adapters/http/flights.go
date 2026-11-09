@@ -27,6 +27,8 @@ func Register(r gin.IRouter, cmds *commands.Service, qs *queries.Service) {
 	flights.GET("/:id", h.getOwn)
 	flights.POST("/:id/cancel", h.cancel)
 	flights.POST("/:id/slot-request", h.requestSlot)
+	// Público: el gateway lo deja pasar sin token (15.7).
+	r.GET("/board", h.board)
 }
 
 type handlers struct {
