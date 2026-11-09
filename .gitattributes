@@ -1,0 +1,5 @@
+# Los scripts se guardan con finales de línea de Linux (LF) en cualquier sistema.
+# Git en Windows los convierte a CRLF al bajarlos, y dentro del contenedor Linux un
+# script con CRLF no corre: NGINX no arrancaba ("verifica-jwt-secret.sh: not found").
+*.sh text eol=lf
+nginx/** text eol=lf

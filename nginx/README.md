@@ -38,7 +38,7 @@ Prueba automática, sin levantar el sistema: NGINX delante de un servicio falso 
 nginx/prueba/prueba.sh
 ```
 
-Con el sistema levantado (`docker compose up --build`):
+Con el sistema levantado (`docker compose up --build`). Antes, poné en el `.env` una clave propia: `JWT_SECRET=` y lo que da `openssl rand -base64 32`. Con la del ejemplo NGINX no arranca (15.21).
 
 ```sh
 TOKEN=$(nginx/token-de-prueba.sh airline AR)
