@@ -10,6 +10,11 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
       PISTAS_URL: http://pistas:8080
       RABBITMQ_URL: amqp://${RABBITMQ_USER:?falta en .env}:${RABBITMQ_PASSWORD:?falta en .env}@rabbitmq:5672
+      # Proveedor de los avisos por mail (27.1, ADR-009). Sin NOTIFICACIONES_URL en el
+      # .env se usa el mock local; para la presentación, la URL real de Recién hecho.
+      NOTIFICACIONES_URL: ${NOTIFICACIONES_URL:-http://notificaciones-mock:4010}
+      NOTIFICACIONES_API_KEY: ${NOTIFICACIONES_API_KEY:-prueba}
+      AEROLINEAS_EMAILS: ${AEROLINEAS_EMAILS:?falta en .env}
     ports:
       - "8081:8080"
     depends_on:
@@ -193,6 +198,16 @@ services:
       - solr-data:/var/solr
       - ./solr/vuelos:/opt/solr/server/solr/configsets/vuelos:ro
 
+  # Mock del proveedor de notificaciones (Recién hecho), hecho con Prism a partir de su
+  # contrato (ADR-009). Valida cada pedido contra el contrato y no manda mails. Sirve
+  # para el desarrollo, las pruebas de carga (su límite es de 60 por minuto) y para
+  # simular la caída del proveedor: docker compose stop notificaciones-mock.
+  notificaciones-mock:
+    image: stoplight/prism:5
+    command: ["mock", "-h", "0.0.0.0", "-p", "4010", "-m", "false", "/contrato/notificaciones.yaml"]
+    volumes:
+      - ./services/vuelos/internal/adapters/notificaciones/testdata/notificaciones.yaml:/contrato/notificaciones.yaml:ro
+
   grafana:
     image: grafana/otel-lgtm:0.37.0
     ports:
@@ -201,6 +216,8 @@ services:
     volumes:
       # Las alertas guardadas en el repo se cargan al arrancar (20.4).
       - ./grafana/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
+      - ./grafana/dashboards/aeropuerto.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/aeropuerto.yaml:ro
+      - ./grafana/dashboards:/otel-lgtm/aeropuerto-dashboards:ro
 
 volumes:
   mysql-vuelos-data:

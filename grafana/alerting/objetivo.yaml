@@ -1,0 +1,45 @@
+# Alerta del objetivo de servicio (11.3, 11.9, ADR-011). Grafana la carga al arrancar.
+# Se dispara cuando el percentil 95 del pedido de slot pasa los 500 ms durante 5 minutos
+# seguidos. Se mide en Vuelos, así incluye la llamada a Pistas.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: objetivo
+    folder: Aeropuerto
+    interval: 1m
+    rules:
+      - uid: objetivo-pedido-de-slot
+        title: Pedido de slot más lento que el objetivo
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              refId: A
+              instant: true
+              expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name="vuelos", http_route="/flights/:id/slot-request"}[5m])))'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        # Sin pedidos de slot no hay un p95 que medir: no se dispara (11.10).
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: El 95 % de los pedidos de slot tarda más de 500 ms desde hace 5 minutos.
+          description: |
+            Mirar el panel "Pedido de slot: p95" del tablero "Aeropuerto: estado general" y
+            las trazas del pedido de slot en Tempo, para ver si la demora está en Vuelos o en Pistas.

@@ -272,6 +272,15 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 | 11.5 | Formato de los logs | **JSON con `log/slog`** (agente) | Es la librería de logs que trae Go. Cada línea lleva el identificador de la traza. |
 | 11.6 | Cómo sigue la traza en los eventos | **El encabezado `traceparent` en el mensaje, guardado en el outbox** (Male, 22/10/2026) | Detalla la 11.2. Con solo el `correlation_id`, Grafana muestra trazas separadas. Por eso, al guardar un evento en el outbox se guarda también el `traceparent` de la traza en curso; el relay lo pone como encabezado del mensaje de RabbitMQ, y el consumidor lo lee para seguir la misma traza. Las funciones para escribirlo y leerlo van en la carpeta de observabilidad (11.1), que cada servicio copia: la escribe Male en Clima, y la pareja 1 la usa en los relays y consumidores de Vuelos y Pistas. Queda confirmada al mergearse el pull request de la rama `feat/rabbitmq-definiciones`. |
 
+Las decisiones 11.7 a 11.10 son los pendientes del ADR-011. Las propuso Male al grupo el 7/11/2026, con las opciones del agente, y las confirmó Maxi en la revisión del pull request #46 el 9/11/2026.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 11.7 | Qué muestra el tablero | **Pedidos y errores por servicio, el p95 del pedido de slot contra el objetivo, el reparto entre las instancias de Vuelos y los eventos enviados a fallidos** | Es el tablero "Aeropuerto: estado general", en `grafana/dashboards/`, que Grafana carga al arrancar (20.4). |
+| 11.8 | La alerta de fallidos se apaga sola | **Se acepta, como limitación** | La alerta de la 11.4 mira los últimos 5 minutos de logs: si nadie revisa el mensaje, deja de sonar aunque siga en la cola. Alertar por la cantidad de mensajes en las colas `.fallidos` necesita sacar métricas de RabbitMQ, y no entraba antes de la presentación. |
+| 11.9 | Alerta por el objetivo de servicio | **Si el p95 del pedido de slot pasa los 500 ms durante 5 minutos seguidos** | Está en `grafana/alerting/objetivo.yaml`. Usa la misma consulta que la 11.3. |
+| 11.10 | Si en 5 minutos no hubo pedidos de slot | **El tablero muestra "Sin datos", en gris, y la alerta no se dispara** | Sin pedidos no hay un p95 que medir: mostrar 0 diría que se cumple el objetivo, y disparar la alerta avisaría de un problema que no existe. |
+
 ## 12. Balanceo de carga (ADR D12)
 
 | # | Decisión | Elegido | Qué significa |
@@ -461,6 +470,19 @@ Las decisiones 23.2 a 23.5 las tomó Carola el 9/11/2026, al proponer el contrat
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 27.1 | Qué capacidad del proveedor se consume y en qué flujo | **Las notificaciones por email de Recién hecho, para avisarle a la aerolínea cuando el clima le demora o le desvía un vuelo** | El proveedor asignado es Recién hecho, un ecommerce de alimentos, y solo ofrece mandar emails (`POST /notificaciones`). Cuando se cierran las pistas por el clima y un vuelo queda demorado o desviado (RN-17, RN-18), se le manda un mail a la aerolínea dueña. Por qué: tiene consecuencias de negocio, sale de un evento que ya existe y, como el envío es asincrónico, si el proveedor está dormido o falla no frena el cierre de las pistas. Cada envío lleva una `Idempotency-Key` armada con el vuelo y el evento, así un reintento no manda el mail dos veces. La clave del proveedor no va al repo: va en `.env` y en Render (9.5). Qué servicio lo manda, el mail de cada aerolínea, el timeout y los reintentos se definen en el ADR-009. Cierra el pendiente 14 del SPEC. |
+
+Las decisiones 27.2 a 27.9 las tomó Male el 9/11/2026, al escribir el ADR-009 y programar el aviso, con las opciones y las recomendaciones del agente. La 27.2, la 27.3 y la 27.4 se consultaron al grupo por WhatsApp porque tocan Vuelos. Quedan confirmadas al mergearse el pull request que las registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 27.2 | Qué servicio manda el mail | **Vuelos** | Es donde el vuelo pasa a demorado o desviado, cuando le llega "slot liberado por cierre" de Pistas, y sabe de qué aerolínea es. Se descartó Pistas, que no conoce a las aerolíneas. |
+| 27.3 | Dónde está el mail de cada aerolínea | **La variable `AEROLINEAS_EMAILS` de Vuelos** | Con la forma `AR:mail,LA:mail`. No suma llamadas entre servicios. Se descartó guardarlo en Usuarios, que obligaba a Vuelos a llamarlo en cada aviso. |
+| 27.4 | Cómo se manda sin frenar el cierre | **Un evento en el outbox, `vuelos.vuelo.afectado_por_cierre`, y un consumidor de Vuelos en la cola `vuelos.avisos`** | Se guarda en la misma transacción que deja el vuelo demorado o desviado: si el cambio se guarda, el aviso sale. Se descartó una llamada directa en segundo plano, que se pierde si Vuelos se reinicia. |
+| 27.5 | Timeout y reintentos | **3 segundos por llamada y 6 reintentos con 2, 4, 8, 16, 32 y 64 segundos** | Unos 2 minutos, lo que recomienda el proveedor para despertarlo. Después, a `vuelos.avisos.fallidos` y la alerta de la 11.4. Sin circuit breaker: el envío no bloquea nada. |
+| 27.6 | `Idempotency-Key` | **El id del evento** | Es único por aviso y no cambia entre reintentos: el proveedor no manda el mismo mail dos veces. |
+| 27.7 | Test de contrato y doble para las pruebas | **Una copia de su contrato y su mock con Prism** | El contrato está en `services/vuelos/internal/adapters/notificaciones/testdata/`. El test levanta el mock con testcontainers y verifica que lo que mandamos lo cumple. El mismo mock corre en el Docker Compose (`notificaciones-mock`) para el desarrollo y las pruebas de carga; el real se usa en la presentación, con `NOTIFICACIONES_URL` en el `.env`. |
+| 27.8 | Qué cierres avisan | **Todos, del clima o del operador** | El evento de Pistas no dice el motivo del cierre. El mail dice "por el cierre de la pista", sin nombrar el clima. |
+| 27.9 | Qué ve el usuario si el proveedor falla | **El vuelo cambia igual; solo el mail llega tarde o no llega** | La aerolínea ve el vuelo demorado o desviado en su pantalla y en el tablero. Si se agotan los reintentos, el aviso queda en fallidos y la alerta avisa al equipo. |
 
 ## 28. Vuelos para la presentación
 
