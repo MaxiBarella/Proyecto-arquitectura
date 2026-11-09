@@ -2,8 +2,8 @@
 
 Alcance, reglas de negocio y criterios de aceptación del sistema.
 
-- **Versión:** 0.4, para la Entrega 2 (23/10/2026).
-- **De dónde sale:** de las decisiones del equipo registradas en [docs/decisiones.md](docs/decisiones.md), puntos 1, 2.1 a 2.9, 6.7, 6.18, 6.19, 14.1, 14.2, 14.4, 14.8, 14.9, 17.1 y 18. Este documento las desarrolla; no agrega decisiones nuevas.
+- **Versión:** 0.5, para la presentación grupal (11/11/2026).
+- **De dónde sale:** de las decisiones del equipo registradas en [docs/decisiones.md](docs/decisiones.md), puntos 1, 2.1 a 2.9, 6.7, 6.18, 6.19, 14.1, 14.2, 14.4, 14.8, 14.9, 17.1, 18 y 27.1. Este documento las desarrolla; no agrega decisiones nuevas.
 - **Qué no cubre:** cómo se construye. Los servicios, las bases de datos y la comunicación están en `docs/ARCHITECTURE.md` y en los ADR de `docs/adr/`.
 - **Bonus:** no se toma ninguno de los bonus del enunciado (decisión 17.1).
 
@@ -91,7 +91,7 @@ Las cuentas no se registran desde el sistema: se cargan al arrancar. Hay un oper
 | ID | Funcionalidad |
 |---|---|
 | F-18 | Ofrecer a otro grupo las condiciones del clima y la aptitud operativa. El detalle está en `docs/contracts/`. |
-| F-19 | Usar en un flujo importante la capacidad que publique el grupo proveedor. Todavía no fue asignada. |
+| F-19 | Avisarle por email a la aerolínea cuando el clima le demora o le desvía un vuelo, con las notificaciones que publica el grupo proveedor (Recién hecho). |
 
 ## 5. Reglas de negocio
 
@@ -177,9 +177,9 @@ Las cuentas no se registran desde el sistema: se cargan al arrancar. Hay un oper
 
 | ID | Regla |
 |---|---|
-| RN-33 | El tablero se filtra por tipo de operación, estado, aerolínea y fecha. La fecha es el día en hora de Argentina (UTC−3). |
+| RN-33 | El tablero se filtra por tipo de operación, estado, aerolínea y fecha. La fecha es el día en hora de Argentina (UTC−3). Si no se filtra por fecha, se muestran los vuelos de hoy en adelante. |
 | RN-34 | Se puede buscar por texto en el número de vuelo y en la ciudad. La búsqueda encuentra por el comienzo y no distingue mayúsculas ni tildes: "ar15" encuentra AR1550 y "cordoba", Córdoba. |
-| RN-35 | El orden por defecto es por horario. También se puede ordenar por aerolínea y por ámbito. |
+| RN-35 | El orden por defecto es por horario. También se puede ordenar por aerolínea y por ámbito. Si dos vuelos empatan en el orden elegido, va primero el de horario más temprano y, si siguen empatados, el que va primero por número de vuelo. |
 | RN-36 | Los resultados se muestran de a 20 vuelos por página. |
 | RN-37 | Un cambio en un vuelo llega al índice de búsqueda en 60 segundos como máximo. El tablero guarda cada consulta otros 60 segundos, así que el visitante lo ve en 2 minutos como máximo. |
 | RN-39 | En el tablero, el horario de un vuelo es el de su bloque si tiene slot, y el publicado si no. Con ese horario se muestra, se ordena y se filtra por fecha. |
@@ -281,6 +281,8 @@ Cada criterio indica la regla que comprueba.
 | CA-33 | RN-38, RN-39 | Dado un vuelo publicado para las 14:30, cuando la aerolínea pide un slot libre en el bloque de las 18:00, entonces se le asigna y el tablero lo muestra a las 18:00. |
 | CA-36 | RN-34 | Dado un vuelo `AR1550` con origen Córdoba, cuando un visitante busca "ar15" o "cordoba", entonces el vuelo aparece en los resultados. |
 | CA-37 | RN-33, RN-39 | Dado un vuelo con horario a las 23:30 del 23/10 en hora de Argentina, cuando un visitante filtra por el 23/10, entonces el vuelo aparece en los resultados, aunque en UTC sea el 24/10. |
+| CA-38 | RN-33 | Dado un vuelo de ayer y uno de hoy, cuando un visitante abre el tablero sin elegir fecha, entonces ve solo el de hoy. |
+| CA-39 | RN-35 | Dados dos vuelos de la misma aerolínea, uno a las 10:00 y otro a las 09:00, cuando un visitante ordena por aerolínea, entonces el de las 09:00 aparece primero. Si tuvieran el mismo horario, aparecería primero el que va antes por número de vuelo. |
 
 ## 8. Fuera de alcance
 
@@ -314,14 +316,14 @@ Puntos que las decisiones tomadas no resuelven. Cada uno necesita una decisión 
 | 11 | **Resuelto en la versión 0.3:** filtros, búsqueda por texto, órdenes y paginación (decisiones 14.1 y 14.4). | RN-33 a RN-36, F-14 |
 | 12 | **Resuelto en la versión 0.3:** se suman número de vuelo y ámbito (decisión 18). | Sección 5, F-02 |
 | 13 | **Resuelto en la versión 0.2:** la aptitud operativa es una sola (decisión 6.7). | RN-15, F-18 |
-| 14 | Qué capacidad del grupo proveedor se consume y en qué flujo entra. Depende de la asignación de la cátedra. | F-19 |
+| 14 | **Resuelto en la versión 0.5:** se consumen las notificaciones por email de Recién hecho, para avisarle a la aerolínea cuando el clima le demora o le desvía un vuelo (decisión 27.1). | F-19 |
 | 15 | **Resuelto en la versión 0.3:** la lista de alternativos es SAOU, SAAR, SAME, SABE y SAEZ (decisión 18). | RN-25, F-20 |
 | 16 | **Resuelto en la versión 0.3:** no se contempla; se asume que siempre hay un alternativo disponible (decisión 18). | RN-25, RN-26 |
 | 17 | **Resuelto en la versión 0.3:** la condición forzada dura hasta que el operador la quita y manda sobre el dato real (decisión 18). Cómo se entera el sistema de que Clima no tiene datos es de arquitectura: es el evento "Clima sin datos" de la sección 4 de decisiones.md, que se suma al ADR-005 en su validación. | RN-24, RN-29, F-12, F-21 |
 | 18 | **Resuelto en la versión 0.3:** el bloque pedido no tiene que coincidir con el horario publicado; con slot, vale el horario del bloque (decisión 18). Apareció al escribir los endpoints de Vuelos. | RN-38, RN-39 |
 | 19 | **Resuelto en la versión 0.3:** un vuelo no puede tener el mismo origen y destino (decisión 18). Apareció en la revisión del pull request #19. | RN-40 |
 | 20 | **Resuelto en la versión 0.3:** no se publica un vuelo con horario en el pasado (decisión 18). Apareció en la revisión del pull request #19. | RN-41 |
-| 21 | Qué muestra el tablero si no se filtra por fecha (todos los vuelos o solo desde hoy) y cómo se desempata al ordenar por aerolínea o por ámbito. Apareció al escribir el ADR-006. | RN-33, RN-35 |
+| 21 | **Resuelto en la versión 0.5:** sin filtro de fecha se muestran los vuelos de hoy en adelante, y los empates se ordenan por horario y después por número de vuelo (decisión 18). Apareció al escribir el ADR-006. | RN-33, RN-35 |
 
 ## 10. Historial de cambios
 
@@ -333,3 +335,4 @@ Cuando una regla cambia, no se borra: se agrega una fila acá que dice qué camb
 | 0.2 | 8/10/2026 | Incorpora las decisiones que entraron con el contrato de Clima. El aeropuerto es Córdoba (2.8, RN-01). La aptitud es una sola y cierra todas las pistas (6.7, RN-15, CA-10). Los arribos desviados van al alternativo más cercano disponible (2.9, RN-18, RN-25, RN-26, F-20). Si Clima no tiene datos, decide el operador (6.19, RN-24, F-21). El clima forzado no sale hacia otros grupos (6.18, F-12). Se cierra el pendiente 13 y se abren el 15, el 16 y el 17. |
 | 0.3 | 19/10/2026 | Incorpora las decisiones 14.1, 14.2, 14.4, 17.1 y 18. Bloques de 15 minutos (RN-03). Se informan los 3 libres más cercanos (RN-09, F-04, CA-03). El cierre alcanza a los vuelos de ahí en adelante (RN-17, RN-18). Nuevas reglas: no se pide slot en pista cerrada (RN-27), no se cambia el slot (RN-28), duración de la condición forzada (RN-29), cada aerolínea opera solo sus vuelos (RN-30, RN-31), finalizado automático (RN-32, F-22) las del tablero (RN-33 a RN-37) el horario que vale cuando el vuelo tiene slot (RN-38, RN-39) y dos validaciones al publicar (RN-40, RN-41). El atraso del tablero queda en 2 minutos: 60 segundos del índice más 60 de la caché (RN-37, 10.3). Se suman los datos del vuelo, la lista de alternativos (RN-25), las cuentas cargadas al arrancar y los criterios CA-23 a CA-35. Se anuncia que no se toma ningún bonus. Se cierran todos los pendientes salvo el 14. |
 | 0.4 | 22/10/2026 | Incorpora las decisiones 14.8 y 14.9. La búsqueda por texto encuentra por el comienzo y no distingue mayúsculas ni tildes (RN-34). La fecha del tablero es el día en hora de Argentina (RN-33). Se suman los criterios CA-36 y CA-37, y se abre el pendiente 21. |
+| 0.5 | 30/10/2026 | Incorpora el pendiente 21 de la decisión 18. Sin filtro de fecha, el tablero muestra los vuelos de hoy en adelante (RN-33). Los empates se ordenan por horario y después por número de vuelo (RN-35). Se suman los criterios CA-38 y CA-39 y se cierra el pendiente 21. Incorpora también la 27.1: F-19 pasa a ser el aviso por email a la aerolínea cuando el clima le demora o le desvía un vuelo, y se cierra el pendiente 14. |
