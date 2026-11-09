@@ -92,7 +92,14 @@ func (s *Service) HandleEvent(ctx context.Context, store MessageStore, m Message
 			return nil, err
 		}
 		// El cambio de estado llega al tablero con "vuelo actualizado" (14.5).
-		return []domain.Event{s.updated(ctx, f)}, nil
+		events := []domain.Event{s.updated(ctx, f)}
+		if m.Type == EventSlotReleased {
+			// La aerolínea se entera por mail de que el cierre le demoró o le desvió
+			// el vuelo (27.1). Va en la misma transacción: si el cambio se guarda, el
+			// aviso sale (27.5).
+			events = append(events, s.closureHit(ctx, f, d))
+		}
+		return events, nil
 	})
 	switch {
 	case errors.Is(err, domain.ErrNotFound), errors.Is(err, domain.ErrInvalidTransition), errors.Is(err, domain.ErrInvalidFlight):
