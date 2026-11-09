@@ -274,11 +274,16 @@ func TestCancel(t *testing.T) {
 	if rec.Code != http.StatusOK || decode[flightResponse](t, rec).Status != "cancelled" {
 		t.Fatalf("la dueña: %d %s", rec.Code, rec.Body.String())
 	}
-	// Deja "vuelo cancelado" en el outbox, con los datos de la 4.12.
-	if len(s.store.outbox) != 1 {
-		t.Fatalf("eventos en el outbox: %d, want 1", len(s.store.outbox))
+	// Deja "vuelo cancelado" en el outbox, con los datos de la 4.12, y "vuelo
+	// actualizado" para el tablero (14.5). El primer evento es el "actualizado" de
+	// la publicación.
+	if len(s.store.outbox) != 3 {
+		t.Fatalf("eventos en el outbox: %d, want 3", len(s.store.outbox))
 	}
-	e := s.store.outbox[0]
+	if u := s.store.outbox[2]; u.Type != "vuelos.vuelo.actualizado" || u.DataVersion != 2 {
+		t.Errorf("vuelo actualizado: %+v", u)
+	}
+	e := s.store.outbox[1]
 	if e.Type != "vuelos.vuelo.cancelado" || e.DataVersion != 2 || e.ID == "" || e.CorrelationID == "" {
 		t.Errorf("evento: %+v", e)
 	}
@@ -291,7 +296,7 @@ func TestCancel(t *testing.T) {
 	if rec.Code != http.StatusConflict || decode[problem](t, rec).Code != codeInvalidTransition {
 		t.Errorf("dos veces: %d %s", rec.Code, rec.Body.String())
 	}
-	if len(s.store.outbox) != 1 {
+	if len(s.store.outbox) != 3 {
 		t.Errorf("el rechazo no tiene que dejar eventos: %d", len(s.store.outbox))
 	}
 }
@@ -367,6 +372,7 @@ func TestRequestSlotIsCheckedBeforeCallingPistas(t *testing.T) {
 	}{
 		{"bloque fuera de un múltiplo de 15 minutos", aerolineasArgentinas, slotBody("05-23", start.Add(7*time.Minute)), http.StatusBadRequest},
 		{"sin pista", aerolineasArgentinas, slotBody("", start), http.StatusBadRequest},
+		{"sin bloque", aerolineasArgentinas, map[string]any{"runway_id": "05-23"}, http.StatusBadRequest},
 		{"vuelo de otra aerolínea (CA-26)", latam, slotBody("05-23", start), http.StatusForbidden},
 	}
 	for _, c := range cases {

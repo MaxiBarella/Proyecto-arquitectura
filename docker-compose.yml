@@ -27,6 +27,11 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
       PISTAS_URL: http://pistas:8080
       RABBITMQ_URL: amqp://${RABBITMQ_USER:?falta en .env}:${RABBITMQ_PASSWORD:?falta en .env}@rabbitmq:5672
+      # Proveedor de los avisos por mail (27.1, ADR-009). Sin NOTIFICACIONES_URL en el
+      # .env se usa el mock local; para la presentación, la URL real de Recién hecho.
+      NOTIFICACIONES_URL: ${NOTIFICACIONES_URL:-http://notificaciones-mock:4010}
+      NOTIFICACIONES_API_KEY: ${NOTIFICACIONES_API_KEY:-prueba}
+      AEROLINEAS_EMAILS: ${AEROLINEAS_EMAILS:?falta en .env}
     ports:
       - "8081:8080"
     depends_on:
@@ -83,10 +88,22 @@ services:
     build: ./services/usuarios
     environment:
       PORT: "8080"
+      MYSQL_DSN: ${MYSQL_USUARIOS_USER:?falta en .env}:${MYSQL_USUARIOS_PASSWORD:?falta en .env}@tcp(mysql-usuarios:3306)/usuarios?parseTime=true&loc=UTC
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
+      # La misma clave la usa NGINX para verificar los tokens (15.17).
+      JWT_SECRET: ${JWT_SECRET:?falta en .env}
+      # Contraseñas de las cuentas de prueba (15.15).
+      USUARIOS_OPERADOR_PASSWORD: ${USUARIOS_OPERADOR_PASSWORD:?falta en .env}
+      USUARIOS_AEROLINEAS_PASSWORD: ${USUARIOS_AEROLINEAS_PASSWORD:?falta en .env}
+      USUARIOS_LATAM_PASSWORD: ${USUARIOS_LATAM_PASSWORD:?falta en .env}
     ports:
       - "8084:8080"
     depends_on:
-      - mysql-usuarios
+      # Usuarios arranca recién cuando MySQL acepta conexiones.
+      mysql-usuarios:
+        condition: service_healthy
+      grafana:
+        condition: service_started
 
   mysql-vuelos:
     image: mysql:8.4
@@ -129,8 +146,18 @@ services:
     environment:
       MYSQL_DATABASE: usuarios
       MYSQL_ROOT_PASSWORD: ${MYSQL_USUARIOS_ROOT_PASSWORD:?falta en .env}
+      # Usuario propio de Usuarios, con acceso solo a la base usuarios (15.16).
+      MYSQL_USER: ${MYSQL_USUARIOS_USER:?falta en .env}
+      MYSQL_PASSWORD: ${MYSQL_USUARIOS_PASSWORD:?falta en .env}
     volumes:
       - mysql-usuarios-data:/var/lib/mysql
+      # La tabla se crea la primera vez que arranca la base.
+      - ./services/usuarios/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   mongo-clima:
     image: mongo:7
@@ -179,16 +206,35 @@ services:
 
   solr:
     image: solr:9
+    # Crea el core "vuelos" con la configuración de solr/ (20.5), solo si todavía no existe.
+    # Si cambia la configuración, hay que borrar el volumen: docker volume rm <proyecto>_solr-data.
+    command: ["solr-precreate", "vuelos", "/opt/solr/server/solr/configsets/vuelos"]
     ports:
       - "8983:8983"
     volumes:
       - solr-data:/var/solr
+      - ./solr/vuelos:/opt/solr/server/solr/configsets/vuelos:ro
+
+  # Mock del proveedor de notificaciones (Recién hecho), hecho con Prism a partir de su
+  # contrato (ADR-009). Valida cada pedido contra el contrato y no manda mails. Sirve
+  # para el desarrollo, las pruebas de carga (su límite es de 60 por minuto) y para
+  # simular la caída del proveedor: docker compose stop notificaciones-mock.
+  notificaciones-mock:
+    image: stoplight/prism:5
+    command: ["mock", "-h", "0.0.0.0", "-p", "4010", "-m", "false", "/contrato/notificaciones.yaml"]
+    volumes:
+      - ./services/vuelos/internal/adapters/notificaciones/testdata/notificaciones.yaml:/contrato/notificaciones.yaml:ro
 
   grafana:
     image: grafana/otel-lgtm:0.37.0
     ports:
       - "3001:3000"
       - "4318:4318"
+    volumes:
+      # Las alertas guardadas en el repo se cargan al arrancar (20.4).
+      - ./grafana/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
+      - ./grafana/dashboards/aeropuerto.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/aeropuerto.yaml:ro
+      - ./grafana/dashboards:/otel-lgtm/aeropuerto-dashboards:ro
 
 volumes:
   mysql-vuelos-data:

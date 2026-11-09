@@ -54,14 +54,23 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 }
 
 // Recovery reemplaza a gin.Recovery: si un handler entra en pánico, responde 500
-// y deja el error en el log como JSON, con la traza, en lugar de texto suelto.
+// con INTERNAL_ERROR en formato Problem Details (21.1) y deja el error en el log
+// como JSON, con la traza, en lugar de texto suelto. La respuesta no lleva el
+// detalle: queda solo en el log.
 func Recovery(logger *slog.Logger) gin.HandlerFunc {
 	return gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, recovered any) {
 		logger.ErrorContext(c.Request.Context(), "pánico al atender un pedido",
 			"error", fmt.Sprint(recovered),
 			"stack", string(debug.Stack()),
 		)
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.Header("Content-Type", "application/problem+json")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"type":     "/problems/internal-error",
+			"title":    "Error interno",
+			"status":   http.StatusInternalServerError,
+			"instance": c.Request.URL.Path,
+			"code":     "INTERNAL_ERROR",
+		})
 	})
 }
 

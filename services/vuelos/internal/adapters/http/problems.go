@@ -37,10 +37,12 @@ const (
 	codeInvalidTransition  = "INVALID_TRANSITION"
 	codeRunwaysUnavailable = "RUNWAYS_UNAVAILABLE"
 	codeInternalError      = "INTERNAL_ERROR"
+	codeBoardUnavailable   = "BOARD_UNAVAILABLE"
 )
 
 var problemTypes = map[string]struct{ path, title string }{
 	codeInvalidRequest:     {"/problems/invalid-request", "Pedido inválido"},
+	codeBoardUnavailable:   {"/problems/board-unavailable", "Tablero no disponible"},
 	codeMissingIdentity:    {"/problems/missing-identity", "Falta la identidad"},
 	codeForbiddenRole:      {"/problems/forbidden-role", "Operación no permitida para el rol"},
 	codeNotFlightOwner:     {"/problems/not-flight-owner", "El vuelo es de otra aerolínea"},

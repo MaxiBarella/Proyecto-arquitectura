@@ -2,20 +2,27 @@ openapi: 3.1.0
 
 info:
   title: Pistas API
-  version: 0.2.0
-  summary: Asignación de slots de pista.
+  version: 0.4.0
+  summary: Asignación de slots de pista y administración de las pistas.
   description: |
-    API interna del servicio Pistas. Por ahora tiene solo el pedido de slot que hace
-    Vuelos (4.1). Las operaciones del operador (cerrar y reabrir pistas) se suman cuando
-    se programen.
+    API del servicio Pistas. Tiene dos partes:
 
-    - **Ruta interna:** todo lo que está bajo `/internal` lo llama otro servicio, no
-      una persona. El gateway no la expone (15.7), así que no lleva encabezados de
-      identidad.
+    - **El pedido de slot que hace Vuelos** (4.1), bajo `/internal`. Lo llama otro
+      servicio, no una persona: el gateway la bloquea (15.7, 15.19), así que no lleva
+      encabezados de identidad.
+    - **Las operaciones del operador** (F-09, F-10, F-11, F-20, F-21), fuera de
+      `/internal` para que pasen por el gateway (15.19). Desde afuera se llaman con el
+      prefijo `/api/pistas`, por ejemplo `/api/pistas/runways` (15.7). Llevan los
+      encabezados de identidad que pone el gateway (15.6), y solo las acepta el rol
+      `operator` (CA-19).
+
+    Además:
+
     - **Pista y bloque:** la pista se identifica con un nombre sin barra, como `05-23`,
       y el bloque con su hora de inicio en UTC, en múltiplos de 15 minutos (4.11).
     - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio, igual
-      que Clima y Vuelos (6.14).
+      que Clima y Vuelos (6.14). Un error inesperado responde `500` con `INTERNAL_ERROR`,
+      sin el detalle: lo que pasó queda en el log de Pistas (21.1).
     - **Versionado:** la versión es la de este contrato (`info.version`), como en Clima
       (9.10).
 
@@ -23,7 +30,8 @@ servers:
   - url: http://localhost:8082
     description: Pistas en el arranque local.
 
-# Ruta interna entre servicios: no lleva credenciales (15.7).
+# Por defecto no lleva credenciales: la identidad la pone el gateway en encabezados
+# (15.6), declarados en cada operación del operador.
 security: []
 
 paths:
@@ -75,10 +83,317 @@ paths:
           $ref: '#/components/responses/RunwayNotFound'
         '409':
           $ref: '#/components/responses/Rejected'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /runways:
+    get:
+      operationId: listRunways
+      summary: Ver las pistas y el estado del clima (F-21)
+      description: |
+        Devuelve todas las pistas con su estado, y lo último que Pistas sabe del clima
+        (4.2): si se puede operar y si Clima tiene datos. Es lo que necesita la pantalla
+        del operador, incluido el aviso de "Clima sin datos" (RN-24, 6.19).
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleOperator'
+      responses:
+        '200':
+          description: Las pistas y el estado del clima.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunwayList'
+              example:
+                runways:
+                  - id: '05-23'
+                    status: open
+                    closed_reason: null
+                  - id: '18-36'
+                    status: closed
+                    closed_reason: operator
+                weather:
+                  data_available: true
+                  operable: true
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+    post:
+      operationId: createRunway
+      summary: Dar de alta una pista (F-09)
+      description: |
+        La pista nace abierta, salvo que el último dato del clima diga que no se puede
+        operar: en ese caso nace cerrada por el clima, como las demás (RN-15).
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleOperator'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewRunway'
+            example:
+              id: '09-27'
+      responses:
+        '201':
+          description: La pista quedó dada de alta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Runway'
+              example:
+                id: '09-27'
+                status: open
+                closed_reason: null
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/RunwayAlreadyExists'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /runways/{id}/close:
+    post:
+      operationId: closeRunway
+      summary: Cerrar una pista a mano (F-10, RN-16)
+      description: |
+        Cierra la pista con `closed_reason: operator`. Una pista cerrada a mano no se
+        reabre sola cuando el clima lo permite: la reabre el operador (RN-16, CA-24).
+
+        Al cerrarla, los vuelos con slot en ella de ahí en adelante lo pierden: los
+        despegues quedan demorados (RN-17) y los arribos, desviados (RN-18). Pistas
+        publica `pistas.pista.cerrada` y un `pistas.slot.liberado` por cada vuelo (4.12).
+
+        - Si la pista estaba cerrada por el clima, pasa a cerrada por el operador: así no
+          se reabre sola cuando el clima mejore (RN-16).
+        - Si ya estaba cerrada por el operador, responde `200` sin cambiar nada.
+      parameters:
+        - $ref: '#/components/parameters/RunwayId'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleOperator'
+      responses:
+        '200':
+          description: La pista está cerrada por el operador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Runway'
+              example:
+                id: '05-23'
+                status: closed
+                closed_reason: operator
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/RunwayNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /runways/{id}/reopen:
+    post:
+      operationId: reopenRunway
+      summary: Reabrir una pista (F-11)
+      description: |
+        Reabre una pista cerrada por el operador. Una pista cerrada por el clima solo se
+        reabre a mano cuando Clima no tiene datos (RN-42, CA-40): mientras haya datos, la
+        reabre el clima, y se responde `409` con `RUNWAY_CLOSED_BY_WEATHER`. Una condición
+        forzada cuenta como dato: mientras esté puesta, manda sobre todo (RN-29) y tampoco
+        se reabre a mano. Para probar el cierre y la reapertura se usa el clima forzado (F-12). Pistas publica
+        `pistas.pista.reabierta`.
+
+        Los vuelos que perdieron su slot al cerrarse no lo recuperan: un despegue
+        demorado pide un slot nuevo (RN-19) y un arribo desviado ya no vuelve (RN-18).
+
+        Si la pista ya estaba abierta, responde `200` sin cambiar nada.
+      parameters:
+        - $ref: '#/components/parameters/RunwayId'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleOperator'
+      responses:
+        '200':
+          description: La pista está abierta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Runway'
+              example:
+                id: '05-23'
+                status: open
+                closed_reason: null
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/RunwayNotFound'
+        '409':
+          $ref: '#/components/responses/ClosedByWeather'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /alternate-airports:
+    get:
+      operationId: listAlternateAirports
+      summary: Ver los aeropuertos alternativos (RN-25, F-20)
+      description: |
+        La lista fija de alternativos, ordenada por distancia desde Córdoba (RN-25), con
+        si cada uno está disponible. Un arribo desviado va al primero disponible.
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleOperator'
+      responses:
+        '200':
+          description: Los alternativos, del más cercano al más lejano.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlternateAirportList'
+              example:
+                alternate_airports:
+                  - icao: SAOU
+                    name: San Luis
+                    available: true
+                  - icao: SAAR
+                    name: Rosario
+                    available: false
+                  - icao: SAME
+                    name: Mendoza
+                    available: true
+                  - icao: SABE
+                    name: Aeroparque
+                    available: true
+                  - icao: SAEZ
+                    name: Ezeiza
+                    available: true
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /alternate-airports/{icao}/disable:
+    post:
+      operationId: disableAlternateAirport
+      summary: Marcar un alternativo como no disponible (RN-26, F-20)
+      description: |
+        Los arribos que se desvíen de ahí en adelante lo saltean (RN-26, CA-22). No cambia
+        el destino de los que ya se desviaron. Si ya estaba no disponible, responde `200`
+        sin cambiar nada.
+      parameters:
+        - $ref: '#/components/parameters/Icao'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleOperator'
+      responses:
+        '200':
+          description: El alternativo quedó no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlternateAirport'
+              example:
+                icao: SAOU
+                name: San Luis
+                available: false
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AlternateNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /alternate-airports/{icao}/enable:
+    post:
+      operationId: enableAlternateAirport
+      summary: Volver a habilitar un alternativo (F-20)
+      description: Si ya estaba disponible, responde `200` sin cambiar nada.
+      parameters:
+        - $ref: '#/components/parameters/Icao'
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/XUserRoleOperator'
+      responses:
+        '200':
+          description: El alternativo quedó disponible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlternateAirport'
+              example:
+                icao: SAOU
+                name: San Luis
+                available: true
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AlternateNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/Unavailable'
 
 components:
+  parameters:
+    RunwayId:
+      name: id
+      in: path
+      required: true
+      description: Nombre de la pista, sin barra (4.11).
+      schema:
+        type: string
+      example: '05-23'
+    Icao:
+      name: icao
+      in: path
+      required: true
+      description: Código ICAO del aeropuerto alternativo (RN-25).
+      schema:
+        type: string
+      example: SAOU
+    XUserId:
+      name: X-User-Id
+      in: header
+      required: true
+      description: Identificador del usuario. Lo pone el gateway (15.6).
+      schema:
+        type: string
+    XUserRoleOperator:
+      name: X-User-Role
+      in: header
+      required: true
+      description: Rol del usuario. Lo pone el gateway (15.6, 15.9). Estas operaciones son solo para el operador.
+      schema:
+        type: string
+        enum: [operator]
+
   schemas:
     SlotRequest:
       type: object
@@ -129,6 +444,81 @@ components:
               format: uuid
             - type: 'null'
 
+    NewRunway:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          description: Nombre de la pista, sin barra (4.11). Letras, números y guiones, hasta 10 caracteres.
+          pattern: '^[A-Za-z0-9-]{1,10}$'
+
+    Runway:
+      type: object
+      required: [id, status, closed_reason]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [open, closed]
+        closed_reason:
+          description: |
+            Quién la cerró, con los mismos valores que el evento de pista cerrada (4.12):
+            `weather` si fue el clima, `operator` si fue el operador. `null` si está abierta.
+          oneOf:
+            - type: string
+              enum: [weather, operator]
+            - type: 'null'
+
+    Weather:
+      type: object
+      description: Lo último que Pistas sabe del clima, por los eventos de Clima (4.2, 9.14).
+      required: [data_available, operable]
+      properties:
+        data_available:
+          type: boolean
+          description: |
+            `false` después de un evento "Clima sin datos". Mientras dure, las pistas no
+            se cierran ni se reabren solas y la pantalla muestra el aviso (RN-24, 6.19).
+        operable:
+          description: Si se puede operar según el último dato, o `null` si todavía no llegó ninguno.
+          oneOf:
+            - type: boolean
+            - type: 'null'
+
+    RunwayList:
+      type: object
+      required: [runways, weather]
+      properties:
+        runways:
+          type: array
+          items:
+            $ref: '#/components/schemas/Runway'
+        weather:
+          $ref: '#/components/schemas/Weather'
+
+    AlternateAirport:
+      type: object
+      required: [icao, name, available]
+      properties:
+        icao:
+          type: string
+        name:
+          type: string
+        available:
+          type: boolean
+
+    AlternateAirportList:
+      type: object
+      required: [alternate_airports]
+      properties:
+        alternate_airports:
+          type: array
+          description: Ordenados por distancia desde Córdoba (RN-25).
+          items:
+            $ref: '#/components/schemas/AlternateAirport'
+
     Problem:
       type: object
       description: Error en formato Problem Details (RFC 9457).
@@ -148,11 +538,17 @@ components:
           type: string
           enum:
             - INVALID_REQUEST
+            - MISSING_IDENTITY
+            - FORBIDDEN_ROLE
             - RUNWAY_NOT_FOUND
+            - RUNWAY_ALREADY_EXISTS
+            - RUNWAY_CLOSED_BY_WEATHER
+            - ALTERNATE_NOT_FOUND
             - SLOT_TAKEN
             - RUNWAY_CLOSED
             - FLIGHT_ALREADY_HAS_SLOT
             - UNAVAILABLE
+            - INTERNAL_ERROR
         nearest_free_slots:
           type: array
           description: Solo en `SLOT_TAKEN`. Los 3 slots libres más cercanos al pedido, antes o después y en cualquier pista (RN-09).
@@ -164,7 +560,8 @@ components:
     Unavailable:
       description: |
         Falla pasajera de Pistas, por ejemplo su base no responde. Vuelos la reintenta (4.5):
-        repetir el pedido es seguro (4.6).
+        repetir el pedido es seguro (4.6). Las operaciones del operador también se pueden
+        repetir sin riesgo.
       content:
         application/problem+json:
           schema:
@@ -183,6 +580,34 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
 
+    Unauthenticated:
+      description: Faltan los encabezados de identidad.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/missing-identity
+            title: Falta la identidad
+            status: 401
+            detail: El pedido no incluye X-User-Id o X-User-Role.
+            instance: /runways
+            code: MISSING_IDENTITY
+
+    Forbidden:
+      description: El rol no puede hacer esta operación (CA-18, CA-19).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/forbidden-role
+            title: Operación no permitida para el rol
+            status: 403
+            detail: Solo el operador puede administrar las pistas.
+            instance: /runways/05-23/close
+            code: FORBIDDEN_ROLE
+
     RunwayNotFound:
       description: No existe la pista.
       content:
@@ -195,6 +620,50 @@ components:
             status: 404
             detail: No existe la pista 99-99.
             code: RUNWAY_NOT_FOUND
+
+    RunwayAlreadyExists:
+      description: Ya hay una pista con ese nombre.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/runway-already-exists
+            title: La pista ya existe
+            status: 409
+            detail: Ya existe la pista 05-23.
+            instance: /runways
+            code: RUNWAY_ALREADY_EXISTS
+
+    ClosedByWeather:
+      description: |
+        La pista la cerró el clima y Clima tiene datos: la reabre el clima cuando vuelva a
+        permitir la operación (23.4). Para probar, se fuerza el clima (F-12).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/runway-closed-by-weather
+            title: La pista la cerró el clima
+            status: 409
+            detail: La pista 05-23 se reabre sola cuando el clima lo permita.
+            instance: /runways/05-23/reopen
+            code: RUNWAY_CLOSED_BY_WEATHER
+
+    AlternateNotFound:
+      description: El código no es de ningún aeropuerto de la lista de alternativos (RN-25).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/alternate-not-found
+            title: Aeropuerto alternativo no encontrado
+            status: 404
+            detail: SACO no está en la lista de alternativos.
+            instance: /alternate-airports/SACO/disable
+            code: ALTERNATE_NOT_FOUND
 
     Rejected:
       description: El pedido se rechaza. Vuelos no lo reintenta.
@@ -232,3 +701,20 @@ components:
                 status: 409
                 detail: El vuelo ya tiene la pista 05-23 a las 14:30.
                 code: FLIGHT_ALREADY_HAS_SLOT
+
+    InternalError:
+      description: |
+        Falló algo que Pistas no esperaba, como un error de programación. La respuesta no
+        trae el detalle: queda en el log de Pistas. Vuelos no lo reintenta, porque
+        reintentar no lo arregla (21.1), pero cuenta como falla para el circuit breaker
+        (13.2).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/internal-error
+            title: Error interno
+            status: 500
+            instance: /internal/slots
+            code: INTERNAL_ERROR

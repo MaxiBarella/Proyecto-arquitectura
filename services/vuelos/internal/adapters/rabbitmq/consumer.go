@@ -14,13 +14,30 @@ import (
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/observability"
 )
 
-// QueueName es la cola de Vuelos (4.18). La crea rabbitmq/definitions.json: el
-// consumidor no la declara, para no chocar con sus argumentos.
-const QueueName = "vuelos.eventos"
+// Colas que lee Vuelos. Las crea rabbitmq/definitions.json: el consumidor no las
+// declara, para no chocar con sus argumentos.
+const (
+	// QueueName es la de los eventos de Pistas (4.18). Tiene un solo consumidor
+	// activo (4.23): si corren dos instancias, una procesa y la otra espera de
+	// reserva, así los eventos de un mismo vuelo se aplican en orden.
+	QueueName = "vuelos.eventos"
+	// IndexQueueName es la de "vuelo actualizado", para el índice del tablero
+	// (14.5). La pueden leer las dos instancias a la vez: Solr descarta lo viejo (14.6).
+	IndexQueueName = "vuelos.indice"
+	// NoticeQueueName es la de los avisos a las aerolíneas por mail (27.4). La
+	// pueden leer las dos instancias a la vez: cada aviso es independiente.
+	NoticeQueueName = "vuelos.avisos"
+)
 
 // DefaultRetryWaits son las esperas entre intentos ante una falla pasajera: hasta
 // 3 reintentos (4.5), con 1, 2 y 4 segundos (4.24).
 var DefaultRetryWaits = []time.Duration{time.Second, 2 * time.Second, 4 * time.Second}
+
+// NoticeRetryWaits son las esperas de los avisos por mail: unos 2 minutos en total,
+// lo que recomienda el proveedor, que tarda en despertarse cuando está dormido (27.5).
+var NoticeRetryWaits = []time.Duration{
+	2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second, 32 * time.Second, 64 * time.Second,
+}
 
 // reconnectWait es cuánto se espera para volver a conectarse si se cae RabbitMQ.
 const reconnectWait = 5 * time.Second
@@ -29,17 +46,22 @@ const reconnectWait = 5 * time.Second
 // se confirma igual; cualquier otro error se reintenta.
 type Handler func(ctx context.Context, m commands.Message) error
 
-// Consumer lee la cola de Vuelos. La cola tiene un solo consumidor activo (4.23):
-// si corren dos instancias, una procesa y la otra espera de reserva, así los
-// eventos de un mismo vuelo se aplican en orden.
+// Consumer lee una cola de Vuelos.
 type Consumer struct {
 	url        string
+	queue      string
 	handler    Handler
 	retryWaits []time.Duration
 }
 
-func NewConsumer(url string, handler Handler) *Consumer {
-	return &Consumer{url: url, handler: handler, retryWaits: DefaultRetryWaits}
+func NewConsumer(url, queue string, handler Handler) *Consumer {
+	return &Consumer{url: url, queue: queue, handler: handler, retryWaits: DefaultRetryWaits}
+}
+
+// WithRetryWaits cambia las esperas entre reintentos de esta cola.
+func (c *Consumer) WithRetryWaits(waits []time.Duration) *Consumer {
+	c.retryWaits = waits
+	return c
 }
 
 // Run consume hasta que se cancele ctx. Si la conexión se cae, se vuelve a conectar.
@@ -49,7 +71,7 @@ func (c *Consumer) Run(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		slog.ErrorContext(ctx, "se cortó el consumo de eventos; se vuelve a conectar", "queue", QueueName, "error", err)
+		slog.ErrorContext(ctx, "se cortó el consumo de eventos; se vuelve a conectar", "queue", c.queue, "error", err)
 		select {
 		case <-ctx.Done():
 			return
@@ -72,11 +94,11 @@ func (c *Consumer) consume(ctx context.Context) error {
 	if err := ch.Qos(1, 0, false); err != nil {
 		return fmt.Errorf("configurar el canal: %w", err)
 	}
-	deliveries, err := ch.ConsumeWithContext(ctx, QueueName, "vuelos", false, false, false, false, nil)
+	deliveries, err := ch.ConsumeWithContext(ctx, c.queue, "vuelos", false, false, false, false, nil)
 	if err != nil {
-		return fmt.Errorf("consumir %s: %w", QueueName, err)
+		return fmt.Errorf("consumir %s: %w", c.queue, err)
 	}
-	slog.InfoContext(ctx, "consumiendo eventos", "queue", QueueName)
+	slog.InfoContext(ctx, "consumiendo eventos", "queue", c.queue)
 	for {
 		select {
 		case <-ctx.Done():
@@ -114,9 +136,9 @@ func (c *Consumer) process(ctx context.Context, d amqp.Delivery) {
 			"correlation_id", correlationID, "error", err)
 		_ = d.Ack(false)
 	default:
-		// Sin volver a encolar: RabbitMQ lo pasa solo a vuelos.eventos.fallidos (4.20).
+		// Sin volver a encolar: RabbitMQ lo pasa solo a la cola de fallidos (4.20).
 		// Este log es el que dispara la alerta de mensajes fallidos (11.4).
-		slog.ErrorContext(ctx, "evento enviado a fallidos", "event", d.RoutingKey, "event_id", eventID,
+		slog.ErrorContext(ctx, "evento enviado a fallidos", "queue", c.queue, "event", d.RoutingKey, "event_id", eventID,
 			"correlation_id", correlationID, "error", err)
 		_ = d.Nack(false, false)
 	}

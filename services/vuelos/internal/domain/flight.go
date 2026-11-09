@@ -36,6 +36,10 @@ func ValidateSlot(s Slot) error {
 	if strings.TrimSpace(s.RunwayID) == "" {
 		return fmt.Errorf("%w: falta la pista", ErrInvalidFlight)
 	}
+	// Sin block_start en el JSON, llega el instante cero: falta el bloque (contrato, Slot).
+	if s.BlockStart.IsZero() {
+		return fmt.Errorf("%w: falta el bloque (block_start)", ErrInvalidFlight)
+	}
 	start := s.BlockStart.UTC()
 	if !start.Truncate(BlockDuration).Equal(start) {
 		return fmt.Errorf("%w: el bloque tiene que empezar en un múltiplo de 15 minutos", ErrInvalidFlight)

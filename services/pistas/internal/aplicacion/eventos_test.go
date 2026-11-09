@@ -67,15 +67,13 @@ func TestVueloCanceladoSinDatosEsInaplicable(t *testing.T) {
 	}
 }
 
-// Los eventos de clima y los desconocidos se confirman sin cambiar nada (8.1, 4.22).
-func TestEventosSinEfecto(t *testing.T) {
+// Un evento desconocido se confirma sin cambiar nada (4.22).
+func TestEventoDesconocidoSinEfecto(t *testing.T) {
 	repo := nuevoRepo()
 	p := NuevoPistas(repo)
 	_, _ = p.Asignar(context.Background(), pedido("LA2000", domain.Despegue, "05-23", catorce))
-	for _, tipo := range []string{"clima.aptitud.cambio", "clima.sin_datos", "otro.evento"} {
-		if err := p.ProcesarEvento(context.Background(), Mensaje{ID: tipo, Type: tipo}); err != nil {
-			t.Errorf("%s: no se esperaba error: %v", tipo, err)
-		}
+	if err := p.ProcesarEvento(context.Background(), Mensaje{ID: "m1", Type: "otro.evento"}); err != nil {
+		t.Errorf("no se esperaba error: %v", err)
 	}
 	if len(repo.slots) != 1 {
 		t.Fatalf("no tenían que cambiar los slots: %+v", repo.slots)
