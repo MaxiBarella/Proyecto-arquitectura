@@ -2,6 +2,23 @@
 # Uso: copiar .env.example como .env y correr `docker compose up --build`.
 
 services:
+  # Gateway y balanceador (15.1, 15.3): la entrada al sistema. Verifica el token, manda cada
+  # pedido a su servicio con la identidad en encabezados y limita el tráfico (nginx/README.md).
+  nginx:
+    build: ./nginx
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?falta en .env}
+      # Límite por IP (15.8). Para las pruebas de carga se sube en el .env.
+      GATEWAY_RATE_LIMIT: ${GATEWAY_RATE_LIMIT:-20}
+      GATEWAY_RATE_BURST: ${GATEWAY_RATE_BURST:-40}
+    ports:
+      - "8080:80"
+    depends_on:
+      - vuelos
+      - pistas
+      - usuarios
+      - clima
+
   vuelos:
     build: ./services/vuelos
     environment:

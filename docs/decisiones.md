@@ -347,6 +347,15 @@ Las decisiones 15.10 a 15.17 las tomó Male el 7/11/2026, al escribir el contrat
 | 15.17 | Clave de firma del token | **La variable `JWT_SECRET` del `.env`** | La leen Usuarios para firmar y NGINX para verificar (15.5). |
 | 15.22 | Nombres de las cuentas de prueba | **`operador`, `aerolineas` (AR) y `latam` (LA)** (Male, 9/11/2026) | Fáciles de recordar y de tipear en la presentación. Sus contraseñas son `USUARIOS_OPERADOR_PASSWORD`, `USUARIOS_AEROLINEAS_PASSWORD` y `USUARIOS_LATAM_PASSWORD` (15.15). Las opciones las preparó el agente; queda confirmada al mergearse el pull request de Usuarios. |
 
+Las decisiones 15.18 a 15.21 las tomó Salvador el 9/11/2026, al programar el gateway (`nginx/`). Las opciones y las recomendaciones las preparó el agente de IA. Siguen la numeración de las 15.10 a 15.17 del contrato de Usuarios (#45). Quedan confirmadas al mergearse el pull request que las registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 15.18 | Qué responde el gateway sin un token válido | **`401` con `INVALID_TOKEN`, en formato Problem Details** | Vale igual si falta el token, si no es válido o si venció: el cliente no necesita saber cuál, y el motivo queda en el log de NGINX. Lleva `WWW-Authenticate: Bearer`. Es el mismo formato de error que los servicios, así el frontend los maneja igual. Se descartó un `401` sin cuerpo. |
+| 15.19 | La ruta interna de Pistas | **El gateway responde `404` a `/api/pistas/internal/`** | `POST /internal/slots` es la ruta con la que Vuelos le pide un slot a Pistas, y no controla quién pide. Si pasara por el gateway, cualquier aerolínea podría reservar un slot sin pasar por Vuelos. Por eso las rutas del operador en Pistas no van bajo `/internal`. El `/internal` de Clima sí pasa: ya pide el rol `operator`. Se descartó dejar pasar solo las rutas de los contratos, porque cada ruta nueva obligaría a tocar el gateway. |
+| 15.20 | Cuándo dejan de exponer puerto los servicios | **Cuando Usuarios emita tokens** | La 15.7 dice que solo NGINX expone un puerto. Hoy Usuarios no entrega tokens, y la pareja 1 prueba contra los puertos directos con los encabezados a mano. Los puertos `8081` a `8084` se sacan en otro pull request, cuando Usuarios ande. Mientras tanto, `nginx/token-de-prueba.sh` arma tokens de prueba para el gateway y para k6. |
+| 15.21 | Largo mínimo de `JWT_SECRET` | **32 bytes** | Es lo que pide HS256: una clave de al menos 256 bits (RFC 7518). Con una clave corta, cualquiera puede adivinarla probando y armar tokens válidos. Si es más corta, NGINX no arranca. Se genera con `openssl rand -base64 32`. |
+
 ## 16. Capacidad y costos (ADR D13)
 
 | # | Decisión | Elegido | Qué significa |
