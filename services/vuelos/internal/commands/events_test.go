@@ -16,6 +16,8 @@ type memMessages struct {
 	flights   map[string]*domain.Flight
 	processed map[string]bool
 	err       error
+	// outbox son los eventos que devolvieron los cambios aplicados.
+	outbox []domain.Event
 }
 
 func (m *memMessages) ApplyMessage(_ context.Context, messageID, flightID string, change domain.Change) (bool, error) {
@@ -30,9 +32,11 @@ func (m *memMessages) ApplyMessage(_ context.Context, messageID, flightID string
 		return false, domain.ErrNotFound
 	}
 	copied := *f
-	if _, err := change(&copied); err != nil {
+	events, err := change(&copied)
+	if err != nil {
 		return false, err
 	}
+	m.outbox = append(m.outbox, events...)
 	m.flights[flightID] = &copied
 	m.processed[messageID] = true
 	return true, nil

@@ -142,6 +142,17 @@ func TestRequestLogger(t *testing.T) {
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, se esperaba 500", rec.Code)
 		}
+		// El 500 de la 21.1, sin el detalle del pánico.
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/problem+json") {
+			t.Errorf("Content-Type = %q", ct)
+		}
+		var body map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || body["code"] != "INTERNAL_ERROR" {
+			t.Errorf("cuerpo: %s", rec.Body.String())
+		}
+		if strings.Contains(rec.Body.String(), "algo salió mal") {
+			t.Errorf("el cuerpo no tiene que traer el detalle del pánico: %s", rec.Body.String())
+		}
 		lines := decodeLines(t, &buf)
 		if len(lines) != 2 {
 			t.Fatalf("se esperaban 2 líneas (el pánico y el pedido), hubo %d", len(lines))

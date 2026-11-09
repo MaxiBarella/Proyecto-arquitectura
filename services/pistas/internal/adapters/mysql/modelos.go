@@ -8,15 +8,49 @@ import (
 
 // pistaModelo es la tabla de pistas.
 type pistaModelo struct {
-	ID      string `gorm:"primaryKey;size:10"`
-	Abierta bool   `gorm:"not null;default:true"`
+	ID         string  `gorm:"primaryKey;size:10"`
+	Abierta    bool    `gorm:"not null;default:true"`
+	CerradaPor *string `gorm:"size:10"`
 }
 
 func (pistaModelo) TableName() string { return "pistas" }
 
 func (p pistaModelo) aDominio() domain.Pista {
-	return domain.Pista{ID: p.ID, Abierta: p.Abierta}
+	d := domain.Pista{ID: p.ID, Abierta: p.Abierta}
+	if p.CerradaPor != nil {
+		d.CerradaPor = domain.MotivoCierre(*p.CerradaPor)
+	}
+	return d
 }
+
+func pistaDesdeDominio(p domain.Pista) pistaModelo {
+	m := pistaModelo{ID: p.ID, Abierta: p.Abierta}
+	if !p.Abierta {
+		motivo := string(p.CerradaPor)
+		m.CerradaPor = &motivo
+	}
+	return m
+}
+
+// climaModelo es la tabla clima: lo último que Pistas sabe del clima (4.2). Tiene una sola fila.
+type climaModelo struct {
+	Aeropuerto    string `gorm:"primaryKey;size:4"`
+	Operable      *bool
+	ConDatos      bool `gorm:"not null"`
+	ActualizadoEn *time.Time
+}
+
+func (climaModelo) TableName() string { return "clima" }
+
+// alternativoModelo es la tabla de aeropuertos alternativos (RN-25).
+type alternativoModelo struct {
+	ICAO       string `gorm:"column:icao;primaryKey;size:4"`
+	Nombre     string `gorm:"size:40;not null"`
+	Orden      int    `gorm:"not null"`
+	Disponible bool   `gorm:"not null"`
+}
+
+func (alternativoModelo) TableName() string { return "aeropuertos_alternativos" }
 
 // slotModelo es la tabla de slots ocupados. Un bloque libre no tiene fila.
 //

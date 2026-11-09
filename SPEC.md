@@ -2,8 +2,8 @@
 
 Alcance, reglas de negocio y criterios de aceptación del sistema.
 
-- **Versión:** 0.5, para la presentación grupal (11/11/2026).
-- **De dónde sale:** de las decisiones del equipo registradas en [docs/decisiones.md](docs/decisiones.md), puntos 1, 2.1 a 2.9, 6.7, 6.18, 6.19, 14.1, 14.2, 14.4, 14.8, 14.9, 17.1, 18 y 27.1. Este documento las desarrolla; no agrega decisiones nuevas.
+- **Versión:** 0.6, para la presentación grupal (11/11/2026).
+- **De dónde sale:** de las decisiones del equipo registradas en [docs/decisiones.md](docs/decisiones.md), puntos 1, 2.1 a 2.9, 6.7, 6.18, 6.19, 14.1, 14.2, 14.4, 14.8, 14.9, 17.1, 18, 23.4 y 27.1. Este documento las desarrolla; no agrega decisiones nuevas.
 - **Qué no cubre:** cómo se construye. Los servicios, las bases de datos y la comunicación están en `docs/ARCHITECTURE.md` y en los ADR de `docs/adr/`.
 - **Bonus:** no se toma ninguno de los bonus del enunciado (decisión 17.1).
 
@@ -133,11 +133,12 @@ Las cuentas no se registran desde el sistema: se cargan al arrancar. Hay un oper
 |---|---|
 | RN-15 | Cuando el clima informa que no se puede operar, se cierran solas todas las pistas, para arribos y para despegues. La aptitud es una sola para todo el aeropuerto. |
 | RN-16 | El operador también puede cerrar una pista a mano, por cualquier motivo. Una pista cerrada a mano no se reabre sola cuando el clima lo permite: la reabre el operador. |
-| RN-17 | Cuando se cierra una pista, los **despegues** que tienen slot en ella de ahí en adelante pierden su slot y pasan a demorado. |
-| RN-18 | Cuando se cierra una pista, los **arribos** que tienen slot en ella de ahí en adelante pasan a desviado: aterrizan en un aeropuerto alternativo (RN-25) y dejan de ser una operación del nuestro. |
+| RN-17 | Cuando se cierra una pista, los **despegues** que tienen slot en ella de ahí en adelante pierden su slot y pasan a demorado. "De ahí en adelante" son los bloques que todavía no empezaron: el vuelo cuyo bloque ya empezó conserva su slot. |
+| RN-18 | Cuando se cierra una pista, los **arribos** que tienen slot en ella de ahí en adelante, como en RN-17, pasan a desviado: aterrizan en un aeropuerto alternativo (RN-25) y dejan de ser una operación del nuestro. |
 | RN-19 | Un vuelo demorado vuelve a quedar programado cuando la aerolínea le consigue un slot nuevo, con las mismas reglas de asignación. |
 | RN-24 | Si el servicio de clima no puede obtener los datos, las pistas no se cierran ni se reabren solas: el operador ve un aviso y decide a mano. |
 | RN-29 | Una condición climática forzada por el operador dura hasta que el operador la quita. Mientras dura, manda sobre el dato real. |
+| RN-42 | Una pista cerrada por el clima solo la reabre a mano el operador cuando el servicio de clima no tiene datos (RN-24). Mientras haya datos, la reabre el clima. Una condición forzada cuenta como dato: mientras esté puesta, tampoco se reabre a mano. Para abrir o cerrar las pistas en contra del dato real, el operador fuerza una condición (RN-29). |
 
 ### Desvíos
 
@@ -254,6 +255,8 @@ Cada criterio indica la regla que comprueba.
 | CA-22 | RN-26 | Dado que el operador marcó como no disponible el alternativo más cercano, cuando un arribo pasa a "Desviado", entonces se le asigna el siguiente de la lista. |
 | CA-24 | RN-16 | Dada una pista cerrada a mano, cuando el clima permite operar, entonces la pista sigue cerrada hasta que el operador la reabre. |
 | CA-25 | RN-29 | Dada una condición forzada por el operador que no permite operar, cuando el dato real sí lo permite, entonces las pistas siguen cerradas hasta que el operador quita la condición. |
+| CA-40 | RN-42 | Dada una pista cerrada por el clima y el servicio de clima con datos, cuando el operador intenta reabrirla, entonces se rechaza y la pista sigue cerrada. |
+| CA-41 | RN-17 | Dado un despegue cuyo bloque ya empezó, cuando se cierra su pista, entonces conserva su slot y sigue "Programado". |
 
 ### Estados y roles
 
@@ -336,3 +339,4 @@ Cuando una regla cambia, no se borra: se agrega una fila acá que dice qué camb
 | 0.3 | 19/10/2026 | Incorpora las decisiones 14.1, 14.2, 14.4, 17.1 y 18. Bloques de 15 minutos (RN-03). Se informan los 3 libres más cercanos (RN-09, F-04, CA-03). El cierre alcanza a los vuelos de ahí en adelante (RN-17, RN-18). Nuevas reglas: no se pide slot en pista cerrada (RN-27), no se cambia el slot (RN-28), duración de la condición forzada (RN-29), cada aerolínea opera solo sus vuelos (RN-30, RN-31), finalizado automático (RN-32, F-22) las del tablero (RN-33 a RN-37) el horario que vale cuando el vuelo tiene slot (RN-38, RN-39) y dos validaciones al publicar (RN-40, RN-41). El atraso del tablero queda en 2 minutos: 60 segundos del índice más 60 de la caché (RN-37, 10.3). Se suman los datos del vuelo, la lista de alternativos (RN-25), las cuentas cargadas al arrancar y los criterios CA-23 a CA-35. Se anuncia que no se toma ningún bonus. Se cierran todos los pendientes salvo el 14. |
 | 0.4 | 22/10/2026 | Incorpora las decisiones 14.8 y 14.9. La búsqueda por texto encuentra por el comienzo y no distingue mayúsculas ni tildes (RN-34). La fecha del tablero es el día en hora de Argentina (RN-33). Se suman los criterios CA-36 y CA-37, y se abre el pendiente 21. |
 | 0.5 | 30/10/2026 | Incorpora el pendiente 21 de la decisión 18. Sin filtro de fecha, el tablero muestra los vuelos de hoy en adelante (RN-33). Los empates se ordenan por horario y después por número de vuelo (RN-35). Se suman los criterios CA-38 y CA-39 y se cierra el pendiente 21. Incorpora también la 27.1: F-19 pasa a ser el aviso por email a la aerolínea cuando el clima le demora o le desvía un vuelo, y se cierra el pendiente 14. |
+| 0.6 | 9/11/2026 | Incorpora la 23.4: una pista cerrada por el clima solo se reabre a mano cuando Clima no tiene datos (RN-42, CA-40). Lo pidió Male en la revisión del #53. Aclara que el cierre alcanza a los bloques que todavía no empezaron, como dice la decisión 18 (pendiente 3), en RN-17, RN-18 y CA-41. |

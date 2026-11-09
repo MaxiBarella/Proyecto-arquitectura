@@ -29,8 +29,23 @@ type Lectura interface {
 // Transaccion son las operaciones que se hacen juntas al asignar un slot.
 type Transaccion interface {
 	Lectura
-	// Pista devuelve domain.ErrPistaInexistente si no existe.
+	// Pista devuelve domain.ErrPistaInexistente si no existe. La lee con un bloqueo compartido:
+	// varios pedidos de slot la pueden leer a la vez, pero un cierre espera a que terminen, y un
+	// pedido espera a que termine un cierre (ADR-004).
 	Pista(ctx context.Context, id string) (domain.Pista, error)
+	// PistasConBloqueo devuelve todas las pistas y las bloquea hasta el final de la transacción,
+	// para cerrarlas o reabrirlas sin que se cruce un pedido de slot.
+	PistasConBloqueo(ctx context.Context) ([]domain.Pista, error)
+	// GuardarPista guarda si está abierta y quién la cerró.
+	GuardarPista(ctx context.Context, p domain.Pista) error
+	// SlotsDePista devuelve los slots de la pista, ordenados por bloque.
+	SlotsDePista(ctx context.Context, pistaID string) ([]domain.Slot, error)
+	// Alternativos devuelve los aeropuertos alternativos ordenados por distancia (RN-25).
+	Alternativos(ctx context.Context) ([]domain.Alternativo, error)
+	// Clima devuelve lo último que Pistas sabe del clima, y lo bloquea hasta el final de la
+	// transacción, así dos eventos de clima se aplican de a uno.
+	Clima(ctx context.Context) (domain.EstadoClima, error)
+	GuardarClima(ctx context.Context, c domain.EstadoClima) error
 	// SlotDelVuelo devuelve nil si el vuelo no tiene slot.
 	SlotDelVuelo(ctx context.Context, vueloID string) (*domain.Slot, error)
 	// OcupanteConBloqueo devuelve quién ocupa el slot, o nil, y lo bloquea hasta el final de la

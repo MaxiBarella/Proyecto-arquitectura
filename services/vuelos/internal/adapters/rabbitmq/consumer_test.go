@@ -36,7 +36,7 @@ func delivery(t *testing.T, a *acks, body any) amqp.Delivery {
 var validMessage = map[string]any{"id": "m1", "type": "pistas.slot.asignado", "version": 1, "data": map[string]any{}}
 
 func newConsumer(handler Handler) *Consumer {
-	c := NewConsumer("amqp://no-se-usa", handler)
+	c := NewConsumer("amqp://no-se-usa", QueueName, handler)
 	c.retryWaits = []time.Duration{time.Millisecond, time.Millisecond, time.Millisecond}
 	return c
 }
