@@ -14,10 +14,11 @@ type FlightReader interface {
 }
 
 // Service es el lado de lectura de Vuelos (CQRS, 7.3). Los vuelos propios de una
-// aerolínea se leen de MySQL, al instante. El tablero público va a leer del
-// índice de búsqueda (14), en noviembre.
+// aerolínea se leen de MySQL, al instante. El tablero público lee del índice de
+// búsqueda (14).
 type Service struct {
 	flights FlightReader
+	board   BoardIndex
 }
 
 func New(flights FlightReader) *Service {

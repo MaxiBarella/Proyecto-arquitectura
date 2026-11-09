@@ -88,7 +88,18 @@ func (s *Service) HandleEvent(ctx context.Context, store MessageStore, m Message
 		return fmt.Errorf("%w: %s sin flight_id", ErrUnprocessable, m.Type)
 	}
 	applied, err := store.ApplyMessage(ctx, m.ID, d.FlightID, func(f *domain.Flight) ([]domain.Event, error) {
-		return nil, change(f)
+		if err := change(f); err != nil {
+			return nil, err
+		}
+		// El cambio de estado llega al tablero con "vuelo actualizado" (14.5).
+		events := []domain.Event{s.updated(ctx, f)}
+		if m.Type == EventSlotReleased {
+			// La aerolínea se entera por mail de que el cierre le demoró o le desvió
+			// el vuelo (27.1). Va en la misma transacción: si el cambio se guarda, el
+			// aviso sale (27.5).
+			events = append(events, s.closureHit(ctx, f, d))
+		}
+		return events, nil
 	})
 	switch {
 	case errors.Is(err, domain.ErrNotFound), errors.Is(err, domain.ErrInvalidTransition), errors.Is(err, domain.ErrInvalidFlight):

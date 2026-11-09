@@ -6,7 +6,7 @@ Este documento alcanza para integrarse sin hablar con nosotros. El contrato form
 
 | | |
 |---|---|
-| **Versión vigente** | `2.0.1` |
+| **Versión vigente** | `2.1.0` |
 | **Dirección** | `https://clima-aeropuerto.onrender.com` |
 | **Estado** | Publicado. Para probar sin conectarse, el mock corre local (ver abajo). |
 | **Formato** | JSON. Errores en `application/problem+json`. |
@@ -110,6 +110,7 @@ Todos los errores usan el formato Problem Details ([RFC 9457](https://www.rfc-ed
 | 401 | `INVALID_API_KEY` | La clave no corresponde a ningún consumidor. | **No.** Revisá la clave. |
 | 404 | `AIRPORT_NOT_SUPPORTED` | El código es válido pero no es un aeropuerto atendido. | **No.** |
 | 429 | `RATE_LIMIT_EXCEEDED` | Pasaste los 60 pedidos por minuto. | **Sí**, después de los segundos que indica `Retry-After`. |
+| 500 | `INTERNAL_ERROR` | Falló algo que no esperábamos. La respuesta no trae el detalle. | **Sí**, con espera creciente. |
 | 503 | `WEATHER_SOURCE_UNAVAILABLE` | No pudimos renovar el dato desde la fuente y el último que tenemos tiene más de 30 minutos. | **Sí**, después de los segundos que indica `Retry-After`. |
 
 Cualquier otro `5xx` se puede reintentar con espera creciente.
@@ -186,3 +187,4 @@ curl -i -H "X-API-Key: demo" -H "Prefer: code=503" http://localhost:4010/airport
 | 1.0.0 | 9/10/2026 | Primera versión del contrato, con mock. |
 | 2.0.0 | 18/10/2026 | **Rompe:** la ruta pasa de `/v1/airports/{icao}/conditions` a `/airports/{icao}/conditions`, y la versión pasa a ser solo la del contrato. Además, aclara cuándo se responde `503` (dato de más de 30 minutos) y avisa que el servicio publicado se duerme sin uso. |
 | 2.0.1 | 19/10/2026 | Aclara que `precipitation_mm` es la de los últimos 15 minutos, que es lo que informa la fuente. Sin cambios en la API. |
+| 2.1.0 | 6/11/2026 | Suma el `500` con el código `INTERNAL_ERROR`, que el servicio ya respondía ante un error inesperado. Es compatible: un cliente que trata los códigos desconocidos como genéricos no tiene que cambiar nada. |

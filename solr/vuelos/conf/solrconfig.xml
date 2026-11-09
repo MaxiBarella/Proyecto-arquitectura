@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Core "vuelos" de Solr: el índice del tablero (ADR-006, 20.5).
+  Vuelos escribe con POST /update y busca con /select.
+-->
+<config>
+  <luceneMatchVersion>9.0</luceneMatchVersion>
+
+  <dataDir>${solr.data.dir:}</dataDir>
+  <directoryFactory name="DirectoryFactory" class="${solr.directoryFactory:solr.NRTCachingDirectoryFactory}"/>
+
+  <!-- El esquema está en schema.xml y no se cambia por la API: lo que vale es el del repo. -->
+  <schemaFactory class="ClassicIndexSchemaFactory"/>
+
+  <updateHandler class="solr.DirectUpdateHandler2">
+    <!-- El registro de cambios lo necesita el descarte de versiones viejas de abajo. -->
+    <updateLog>
+      <str name="dir">${solr.ulog.dir:}</str>
+    </updateLog>
+    <!-- Guarda en disco cada 15 segundos, sin abrir un buscador nuevo: lo que se ve lo
+         decide commitWithin=5000 de cada escritura (14.7). -->
+    <autoCommit>
+      <maxTime>15000</maxTime>
+      <openSearcher>false</openSearcher>
+    </autoCommit>
+  </updateHandler>
+
+  <!--
+    Un cambio viejo no pisa uno nuevo (14.6): Solr descarta toda escritura con un
+    data_version menor o igual al que ya tiene ese vuelo. ignoreOldUpdates hace que la
+    descarte sin error: si respondiera 409, Vuelos reintentaría y la mandaría a fallidos
+    por algo que no es una falla (revisión de Male en el #49).
+  -->
+  <updateRequestProcessorChain name="versiones" default="true">
+    <processor class="solr.LogUpdateProcessorFactory"/>
+    <!-- Tiene que ir antes del DistributedUpdateProcessor: si no, Solr rechaza toda escritura. -->
+    <processor class="solr.DocBasedVersionConstraintsProcessorFactory">
+      <str name="versionField">data_version</str>
+      <bool name="ignoreOldUpdates">true</bool>
+    </processor>
+    <processor class="solr.DistributedUpdateProcessorFactory"/>
+    <processor class="solr.RunUpdateProcessorFactory"/>
+  </updateRequestProcessorChain>
+
+  <requestHandler name="/select" class="solr.SearchHandler">
+    <lst name="defaults">
+      <str name="echoParams">none</str>
+      <!-- 20 vuelos por página (14.4, RN-36). -->
+      <int name="rows">20</int>
+    </lst>
+  </requestHandler>
+</config>

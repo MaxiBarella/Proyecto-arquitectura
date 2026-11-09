@@ -1,0 +1,278 @@
+openapi: 3.1.0
+info:
+  title: Recién hecho - Notificaciones
+  version: 1.0.1
+  description: |
+    Capacidad publicada por Recién hecho para que otros sistemas envíen notificaciones
+    por email a sus usuarios. El envío es asíncrono: el POST acepta la notificación
+    (202) y el resultado se consulta con el GET.
+
+    Documentación de uso, errores y versionado en docs/contracts/notificaciones/README.md.
+    La versión vigente es la de `info.version` (versionado semántico).
+servers:
+  - url: https://recienhecho-api-gateway.onrender.com
+    description: Implementación real (Render, plan gratis; se duerme a los 15 minutos sin uso)
+  - url: https://recienhecho-notificaciones-mock.onrender.com
+    description: Mock público (Prism), sin estado
+  - url: http://localhost:8080
+    description: API Gateway local (desarrollo del equipo de Recién hecho)
+  - url: http://localhost:4010
+    description: Mock local (desarrollo del equipo de Recién hecho)
+
+security:
+  - claveApi: []
+
+paths:
+  /notificaciones:
+    post:
+      operationId: crearNotificacion
+      summary: Solicita el envío de una notificación
+      description: |
+        La notificación queda en estado `pendiente` y se envía en segundo plano.
+        Repetir el pedido con la misma `Idempotency-Key` y el mismo cuerpo responde 202
+        con la notificación ya creada (en su estado actual), sin enviar otra. Con la
+        misma clave y otro cuerpo responde 409.
+      parameters:
+        - $ref: '#/components/parameters/ClaveIdempotencia'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevaNotificacion'
+            examples:
+              pedidoListo:
+                summary: Aviso de pedido listo para retirar
+                value:
+                  canal: email
+                  destinatario: cliente@ejemplo.com
+                  asunto: Tu pedido está listo
+                  cuerpo: Tu torta de chocolate ya se puede retirar desde las 17 h.
+      responses:
+        '202':
+          description: Notificación aceptada; se envía en segundo plano.
+          headers:
+            Location:
+              description: URL para consultar el estado.
+              schema:
+                type: string
+              example: /notificaciones/9f1c2a7e-3b4d-4e8a-9c21-5d6f7a8b9c0d
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notificacion'
+              examples:
+                aceptada:
+                  value:
+                    id: 9f1c2a7e-3b4d-4e8a-9c21-5d6f7a8b9c0d
+                    canal: email
+                    destinatario: cliente@ejemplo.com
+                    asunto: Tu pedido está listo
+                    estado: pendiente
+                    creadaEn: '2026-10-09T14:30:00Z'
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '409':
+          $ref: '#/components/responses/ConflictoIdempotencia'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  /notificaciones/{id}:
+    get:
+      operationId: obtenerNotificacion
+      summary: Consulta el estado de una notificación
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 9f1c2a7e-3b4d-4e8a-9c21-5d6f7a8b9c0d
+      responses:
+        '200':
+          description: Notificación encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notificacion'
+              examples:
+                enviada:
+                  value:
+                    id: 9f1c2a7e-3b4d-4e8a-9c21-5d6f7a8b9c0d
+                    canal: email
+                    destinatario: cliente@ejemplo.com
+                    asunto: Tu pedido está listo
+                    estado: enviada
+                    creadaEn: '2026-10-09T14:30:00Z'
+                    enviadaEn: '2026-10-09T14:30:04Z'
+                fallida:
+                  value:
+                    id: 9f1c2a7e-3b4d-4e8a-9c21-5d6f7a8b9c0d
+                    canal: email
+                    destinatario: no-existe@ejemplo.com
+                    asunto: Tu pedido está listo
+                    estado: fallida
+                    motivo: El servidor de correo rechazó el destinatario.
+                    creadaEn: '2026-10-09T14:30:00Z'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          $ref: '#/components/responses/NoEncontrada'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+components:
+  securitySchemes:
+    claveApi:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clave entregada a cada grupo consumidor. No se comparte entre grupos.
+
+  parameters:
+    ClaveIdempotencia:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Identificador único del pedido de envío, generado por el consumidor (se recomienda un UUID). Se recuerda durante 24 horas.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+      example: 2b0e8f4a-7c1d-4f3e-8a9b-1c2d3e4f5a6b
+
+  schemas:
+    NuevaNotificacion:
+      type: object
+      required: [canal, destinatario, asunto, cuerpo]
+      additionalProperties: false
+      properties:
+        canal:
+          type: string
+          enum: [email]
+          description: Medio de envío. Por ahora solo `email`; se pueden sumar otros sin romper compatibilidad.
+        destinatario:
+          type: string
+          format: email
+          maxLength: 254
+        asunto:
+          type: string
+          minLength: 1
+          maxLength: 150
+        cuerpo:
+          type: string
+          minLength: 1
+          maxLength: 5000
+          description: Texto plano.
+
+    Notificacion:
+      type: object
+      required: [id, canal, destinatario, asunto, estado, creadaEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        canal:
+          type: string
+          enum: [email]
+        destinatario:
+          type: string
+          format: email
+        asunto:
+          type: string
+        estado:
+          type: string
+          enum: [pendiente, enviada, fallida]
+          description: |
+            `pendiente`: aceptada, todavía no se envió (se reintenta si falla el servidor de correo).
+            `enviada`: el servidor de correo la aceptó.
+            `fallida`: se agotaron los reintentos o el destinatario fue rechazado; ver `motivo`.
+        motivo:
+          type: string
+          description: Solo presente cuando `estado` es `fallida`.
+        creadaEn:
+          type: string
+          format: date-time
+        enviadaEn:
+          type: string
+          format: date-time
+          description: Solo presente cuando `estado` es `enviada`.
+
+    Error:
+      type: object
+      required: [codigo, mensaje]
+      properties:
+        codigo:
+          type: string
+          description: Código estable, pensado para que lo interprete el programa consumidor.
+        mensaje:
+          type: string
+          description: Descripción para personas; puede cambiar sin aviso.
+
+  responses:
+    SolicitudInvalida:
+      description: El cuerpo o los headers no respetan el contrato. No reintentar sin corregir.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: solicitud_invalida
+            mensaje: 'El pedido no respeta el contrato: falta un campo o un header obligatorio, o un valor es inválido.'
+    NoAutenticado:
+      description: Falta `X-API-Key` o no es válida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: no_autenticado
+            mensaje: Clave de API ausente o inválida.
+    NoEncontrada:
+      description: No existe una notificación con ese id para esta clave de API.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: no_encontrada
+            mensaje: Notificación inexistente.
+    ConflictoIdempotencia:
+      description: La `Idempotency-Key` ya se usó con un cuerpo distinto. Generar una clave nueva.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: conflicto_idempotencia
+            mensaje: La clave de idempotencia ya se usó con otro contenido.
+    DemasiadasSolicitudes:
+      description: Se superó el límite de solicitudes. Reintentar después de los segundos indicados en `Retry-After`.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          example: 30
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: limite_superado
+            mensaje: Límite de 60 solicitudes por minuto superado.
+    NoDisponible:
+      description: El servicio no está disponible, o está arrancando después de estar dormido. Reintentar con espera exponencial usando la misma `Idempotency-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: no_disponible
+            mensaje: Servicio temporalmente no disponible.

@@ -1,0 +1,10 @@
+# Le dice a Grafana que cargue al arrancar los tableros de esta carpeta (20.4).
+apiVersion: 1
+
+providers:
+  - name: Aeropuerto
+    folder: Aeropuerto
+    type: file
+    disableDeletion: true
+    options:
+      path: /otel-lgtm/aeropuerto-dashboards

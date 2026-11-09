@@ -14,8 +14,10 @@ import (
 
 	httpadapter "github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/http"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/mysql"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/notificaciones"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/pistas"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/rabbitmq"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/solr"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/commands"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/domain"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/observability"
@@ -109,7 +111,18 @@ func run(logger *slog.Logger) (err error) {
 	})
 	slots := pistas.NewClient(pistas.DefaultConfig(pistasURL))
 	cmds := commands.New(flights, slots)
-	httpadapter.Register(router, cmds, queries.New(flights))
+	// El índice del tablero en Solr (14, ADR-006). Sin SOLR_URL, el tablero responde 503
+	// y nadie escribe en el índice.
+	solrURL := os.Getenv("SOLR_URL")
+	var index *solr.Client
+	qs := queries.New(flights)
+	if solrURL != "" {
+		index = solr.NewClient(solrURL, solr.DefaultTimeout)
+		qs.WithBoard(index)
+	} else {
+		logger.Warn("falta la variable SOLR_URL: el tablero no responde y el índice no se actualiza")
+	}
+	httpadapter.Register(router, cmds, qs)
 
 	// Relay: publica el outbox cada segundo (4.4, 4.5). Corre en las dos instancias;
 	// SKIP LOCKED evita que publiquen el mismo evento (4.21).
@@ -127,10 +140,31 @@ func run(logger *slog.Logger) (err error) {
 	})
 
 	// Consumidor de los eventos de Pistas (4.1, 4.3).
-	consumer := rabbitmq.NewConsumer(rabbitURL, func(ctx context.Context, m commands.Message) error {
+	consumer := rabbitmq.NewConsumer(rabbitURL, rabbitmq.QueueName, func(ctx context.Context, m commands.Message) error {
 		return cmds.HandleEvent(ctx, flights, m)
 	})
 	go consumer.Run(ctx)
+
+	// Consumidor del índice del tablero: escribe cada "vuelo actualizado" en Solr
+	// (14.5). Sin SOLR_URL no arranca, y los eventos esperan en vuelos.indice.
+	if index != nil {
+		go rabbitmq.NewConsumer(rabbitURL, rabbitmq.IndexQueueName, queries.NewIndexer(index).HandleEvent).Run(ctx)
+	}
+
+	// Consumidor de los avisos por mail a las aerolíneas, con el proveedor (27.1).
+	// Sin NOTIFICACIONES_URL no arranca, y los avisos esperan en vuelos.avisos.
+	if notifURL := os.Getenv("NOTIFICACIONES_URL"); notifURL != "" {
+		emails, err := parseAirlineEmails(os.Getenv("AEROLINEAS_EMAILS"))
+		if err != nil {
+			return err
+		}
+		mailer := notificaciones.NewClient(notifURL, os.Getenv("NOTIFICACIONES_API_KEY"), notificaciones.DefaultTimeout)
+		notifier := commands.NewNotifier(mailer, emails)
+		go rabbitmq.NewConsumer(rabbitURL, rabbitmq.NoticeQueueName, notifier.HandleEvent).
+			WithRetryWaits(rabbitmq.NoticeRetryWaits).Run(ctx)
+	} else {
+		logger.Warn("falta la variable NOTIFICACIONES_URL: no se avisa por mail a las aerolíneas")
+	}
 
 	server := &http.Server{
 		Addr:              ":" + port,
