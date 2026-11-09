@@ -19,7 +19,7 @@ Un script mandó un pedido de slot cada 2 o 3 segundos durante todo el ensayo: p
 Lo que pasaba se miró en Grafana (Explore), con tres consultas:
 
 - **Prometheus:** respuestas de `POST /flights/:id/slot-request` en Vuelos, por código.
-- **Prometheus:** el tiempo de respuesta del mismo pedido (percentil 95).
+- **Prometheus:** el tiempo de respuesta del mismo pedido (percentil 95). Las dos con una ventana de 2 minutos (`[2m]`).
 - **Loki:** los logs de Vuelos con "circuit breaker".
 
 ## Línea temporal
@@ -52,7 +52,7 @@ Lo que pasaba se miró en Grafana (Explore), con tres consultas:
 ## Detección
 
 - **El circuit breaker quedó en los logs de Vuelos** como WARN, con el estado anterior y el nuevo (`closed` → `open`, `open` → `half-open`, `half-open` → `closed`). En Loki se ve cada cambio con su hora.
-- **En las métricas** se ve el pedido de slot pasar de `202` a `503`, y el tiempo de respuesta subir a unos 6,5 segundos y después bajar casi a cero cuando se abre el circuit breaker.
+- **En las métricas** se ve el pedido de slot pasar de `202` a `503`, y el percentil 95 del tiempo de respuesta subir a unos 7 segundos y después volver a unos 20 ms. Las métricas aparecen en Grafana con alrededor de un minuto de atraso, porque los servicios las mandan cada un minuto: hay que mirarlas con una ventana de 2 minutos o más. Los logs llegan enseguida.
 - **RabbitMQ caído** se ve en los logs: Pistas registró 28 veces "no se pudo publicar el evento; se reintenta en la próxima vuelta", y los consumidores, 22 veces "se cortó el consumo de eventos; se vuelve a conectar".
 - **No saltó ninguna alerta.** Las dos que hay (mensajes en fallidos, y el p95 del pedido de slot arriba de 500 ms durante 5 minutos) no aplican a una caída de menos de 2 minutos sin mensajes fallidos. La caída se detectó mirando.
 
