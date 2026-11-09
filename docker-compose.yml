@@ -71,10 +71,22 @@ services:
     build: ./services/usuarios
     environment:
       PORT: "8080"
+      MYSQL_DSN: ${MYSQL_USUARIOS_USER:?falta en .env}:${MYSQL_USUARIOS_PASSWORD:?falta en .env}@tcp(mysql-usuarios:3306)/usuarios?parseTime=true&loc=UTC
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
+      # La misma clave la usa NGINX para verificar los tokens (15.17).
+      JWT_SECRET: ${JWT_SECRET:?falta en .env}
+      # Contraseñas de las cuentas de prueba (15.15).
+      USUARIOS_OPERADOR_PASSWORD: ${USUARIOS_OPERADOR_PASSWORD:?falta en .env}
+      USUARIOS_AEROLINEAS_PASSWORD: ${USUARIOS_AEROLINEAS_PASSWORD:?falta en .env}
+      USUARIOS_LATAM_PASSWORD: ${USUARIOS_LATAM_PASSWORD:?falta en .env}
     ports:
       - "8084:8080"
     depends_on:
-      - mysql-usuarios
+      # Usuarios arranca recién cuando MySQL acepta conexiones.
+      mysql-usuarios:
+        condition: service_healthy
+      grafana:
+        condition: service_started
 
   mysql-vuelos:
     image: mysql:8.4
@@ -117,8 +129,18 @@ services:
     environment:
       MYSQL_DATABASE: usuarios
       MYSQL_ROOT_PASSWORD: ${MYSQL_USUARIOS_ROOT_PASSWORD:?falta en .env}
+      # Usuario propio de Usuarios, con acceso solo a la base usuarios (15.16).
+      MYSQL_USER: ${MYSQL_USUARIOS_USER:?falta en .env}
+      MYSQL_PASSWORD: ${MYSQL_USUARIOS_PASSWORD:?falta en .env}
     volumes:
       - mysql-usuarios-data:/var/lib/mysql
+      # La tabla se crea la primera vez que arranca la base.
+      - ./services/usuarios/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   mongo-clima:
     image: mongo:7

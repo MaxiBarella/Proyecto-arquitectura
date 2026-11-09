@@ -345,6 +345,7 @@ Las decisiones 15.10 a 15.17 las tomó Male el 7/11/2026, al escribir el contrat
 | 15.15 | Cuentas de prueba | **Un operador y las aerolíneas `AR` y `LA`, con contraseñas del `.env`** | `AR` y `LA` son los códigos que ya usan los tests de Vuelos. Las contraseñas no quedan en el repo, que es público. |
 | 15.16 | Cómo se conecta Usuarios a MySQL | **Usuario propio y la variable `MYSQL_DSN`, como Vuelos (5.9)** | Se suman `MYSQL_USUARIOS_USER` y `MYSQL_USUARIOS_PASSWORD` al `.env`. Usuarios no usa root. |
 | 15.17 | Clave de firma del token | **La variable `JWT_SECRET` del `.env`** | La leen Usuarios para firmar y NGINX para verificar (15.5). |
+| 15.22 | Nombres de las cuentas de prueba | **`operador`, `aerolineas` (AR) y `latam` (LA)** (Male, 9/11/2026) | Fáciles de recordar y de tipear en la presentación. Sus contraseñas son `USUARIOS_OPERADOR_PASSWORD`, `USUARIOS_AEROLINEAS_PASSWORD` y `USUARIOS_LATAM_PASSWORD` (15.15). Las opciones las preparó el agente; queda confirmada al mergearse el pull request de Usuarios. |
 
 ## 16. Capacidad y costos (ADR D13)
 
