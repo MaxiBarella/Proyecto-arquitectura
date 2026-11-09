@@ -214,7 +214,7 @@ paths:
       summary: Reabrir una pista (F-11)
       description: |
         Reabre una pista cerrada por el operador. Una pista cerrada por el clima solo se
-        reabre a mano cuando Clima no tiene datos (RN-24, CA-20): mientras haya datos, la
+        reabre a mano cuando Clima no tiene datos (RN-42, CA-40): mientras haya datos, la
         reabre el clima, y se responde `409` con `RUNWAY_CLOSED_BY_WEATHER`. Para probar
         el cierre y la reapertura se usa el clima forzado (F-12). Pistas publica
         `pistas.pista.reabierta`.
