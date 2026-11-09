@@ -5,10 +5,10 @@ Organización interna: **hexagonal** (decisión 7.3 de [docs/decisiones.md](../.
 Asigna slots de pista sin que se pisen: un slot por vuelo, prioridad de los arribos sobre los despegues y pedidos simultáneos.
 
 - **Endpoint:** `POST /internal/slots`, el pedido de slot de Vuelos. El contrato es `services/pistas/openapi.yaml`, que entra con el pull request #27 (decisión 4.15).
-- **Tablas:** las crea [db/001_schema.sql](db/001_schema.sql) la primera vez que arranca MySQL, junto con las pistas `05-23` y `18-36` (RN-02, 4.11, 5.6). Si el script cambia, hay que borrar solo el volumen de la base de Pistas: `docker compose rm -sf mysql-pistas` y después `docker volume rm proyecto-arquitectura_mysql-pistas-data`. `docker compose down -v` también sirve, pero borra las bases de todos los servicios.
-- **Consume** la cola `pistas.eventos` (4.18, 4.19). `vuelos.vuelo.cancelado` libera el slot del vuelo (RN-23). Los eventos de clima se confirman sin efecto hasta noviembre, cuando se programe el cierre de pistas (8.1). Cada mensaje se aplica una sola vez (4.9); una falla pasajera se reintenta 3 veces, a 1, 2 y 4 segundos, y después el mensaje va a `pistas.eventos.fallidos` (4.20, 4.24).
+- **Tablas:** las crea [db/001_schema.sql](db/001_schema.sql) la primera vez que arranca MySQL, junto con las pistas `05-23` y `18-36` (RN-02, 4.11, 5.6), el estado del clima y la lista de aeropuertos alternativos (RN-25). Si el script cambia, hay que borrar solo el volumen de la base de Pistas: `docker compose rm -sf mysql-pistas` y después `docker volume rm proyecto-arquitectura_mysql-pistas-data`. `docker compose down -v` también sirve, pero borra las bases de todos los servicios.
+- **Consume** la cola `pistas.eventos` (4.18, 4.19). `vuelos.vuelo.cancelado` libera el slot del vuelo (RN-23). `clima.aptitud.cambio` cierra o reabre las pistas, y `clima.sin_datos` deja de cambiarlas solas (ver abajo). Cada mensaje se aplica una sola vez (4.9); una falla pasajera se reintenta 3 veces, a 1, 2 y 4 segundos, y después el mensaje va a `pistas.eventos.fallidos` (4.20, 4.24).
 - **Observabilidad:** logs en JSON, métricas y trazas con OpenTelemetry hacia Grafana, con la carpeta `internal/observability` copiada de Vuelos (11.1). La traza que llega de Vuelos sigue en el evento: se guarda en el outbox y viaja en el encabezado `traceparent` del mensaje (11.6).
-- **Eventos:** publica `pistas.slot.asignado` y `pistas.slot.cedido` en el exchange `aeropuerto.eventos` (4.10, 4.12, 4.14). Si ninguna cola recibe un evento, queda en el outbox hasta que exista una (4.13).
+- **Eventos:** publica `pistas.slot.asignado`, `pistas.slot.cedido`, `pistas.slot.liberado_por_cierre`, `pistas.pista.cerrada` y `pistas.pista.reabierta` en el exchange `aeropuerto.eventos` (4.10, 4.12, 4.14). Si ninguna cola recibe un evento, queda en el outbox hasta que exista una (4.13).
 
 | Carpeta | Para qué es |
 |---|---|
@@ -51,3 +51,16 @@ go test -tags integration ./internal/adapters/mysql/   # pedidos simultáneos co
 Puerto en el arranque local: `8082`.
 
 El contrato del pedido de slot que hace Vuelos está en [openapi.yaml](openapi.yaml) (4.15).
+4. El pedido lee la pista con `SELECT ... FOR SHARE`. Varios pedidos pueden leerla a la vez, pero un cierre, que la bloquea con `FOR UPDATE`, espera a que terminen, y un pedido que llega durante un cierre espera a que termine y ve la pista cerrada (RN-27, ADR-004).
+
+## Qué hace con el clima
+
+Pistas guarda lo último que dijo Clima y no le consulta nada al asignar (4.2).
+
+| Evento | Qué hace |
+|---|---|
+| `clima.aptitud.cambio` con `operable: false` | Cierra todas las pistas abiertas por el clima (RN-15). De cada una libera los slots cuyo bloque todavía no empezó (pendiente 3): el despegue queda demorado (RN-17) y el arribo se desvía al primer alternativo disponible (RN-18, RN-25). Publica `pista.cerrada` por pista y `slot.liberado_por_cierre` por vuelo. |
+| `clima.aptitud.cambio` con `operable: true` | Reabre solo las pistas que cerró el clima; las que cerró el operador siguen cerradas (RN-16). Publica `pista.reabierta`. |
+| `clima.sin_datos` | Guarda que Clima no tiene datos. Las pistas no se cierran ni se reabren solas hasta que vuelva un "aptitud cambió" (RN-24). |
+
+Todo eso pasa en una sola transacción, con los eventos en el outbox: si algo falla, no se cierra nada y el mensaje se reintenta.
