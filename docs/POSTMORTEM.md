@@ -91,6 +91,13 @@ Son propuestas del ensayo. Ninguna está decidida: se llevan al grupo.
 
 ## Evidencia
 
-- Registro de los 100 pedidos, con hora, código y duración: en la máquina donde se hizo el ensayo.
+- [postmortem/pedidos.log](postmortem/pedidos.log): los 100 pedidos de slot, con su hora en UTC (3 horas más que la de Argentina), el código de respuesta y lo que tardaron.
 - Logs de Vuelos y de Pistas en Loki, entre las 15:50 y las 15:57 del 9/11/2026.
-- Capturas de Grafana: *(pendiente: sumarlas al pull request)*.
+
+**Métricas del pedido de slot en Vuelos.** En verde, los `202`; en naranja, los `503`; en rojo, el percentil 95 del tiempo de respuesta, en segundos. El pico de 7 segundos es Pistas caída, antes de que se abra el circuit breaker. Las métricas aparecen con alrededor de un minuto de atraso respecto de la línea temporal.
+
+![Métricas del pedido de slot durante el ensayo](postmortem/metricas-pedido-de-slot.png)
+
+**Logs del circuit breaker en Loki.** Los 5 cambios de estado: se abre, prueba, se vuelve a abrir, prueba y se cierra.
+
+![Cambios de estado del circuit breaker durante el ensayo](postmortem/logs-circuit-breaker.png)
