@@ -24,11 +24,20 @@ const (
 	// IndexQueueName es la de "vuelo actualizado", para el índice del tablero
 	// (14.5). La pueden leer las dos instancias a la vez: Solr descarta lo viejo (14.6).
 	IndexQueueName = "vuelos.indice"
+	// NoticeQueueName es la de los avisos a las aerolíneas por mail (27.4). La
+	// pueden leer las dos instancias a la vez: cada aviso es independiente.
+	NoticeQueueName = "vuelos.avisos"
 )
 
 // DefaultRetryWaits son las esperas entre intentos ante una falla pasajera: hasta
 // 3 reintentos (4.5), con 1, 2 y 4 segundos (4.24).
 var DefaultRetryWaits = []time.Duration{time.Second, 2 * time.Second, 4 * time.Second}
+
+// NoticeRetryWaits son las esperas de los avisos por mail: unos 2 minutos en total,
+// lo que recomienda el proveedor, que tarda en despertarse cuando está dormido (27.5).
+var NoticeRetryWaits = []time.Duration{
+	2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second, 32 * time.Second, 64 * time.Second,
+}
 
 // reconnectWait es cuánto se espera para volver a conectarse si se cae RabbitMQ.
 const reconnectWait = 5 * time.Second
@@ -47,6 +56,12 @@ type Consumer struct {
 
 func NewConsumer(url, queue string, handler Handler) *Consumer {
 	return &Consumer{url: url, queue: queue, handler: handler, retryWaits: DefaultRetryWaits}
+}
+
+// WithRetryWaits cambia las esperas entre reintentos de esta cola.
+func (c *Consumer) WithRetryWaits(waits []time.Duration) *Consumer {
+	c.retryWaits = waits
+	return c
 }
 
 // Run consume hasta que se cancele ctx. Si la conexión se cae, se vuelve a conectar.

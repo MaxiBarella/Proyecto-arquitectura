@@ -14,6 +14,7 @@ import (
 
 	httpadapter "github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/http"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/mysql"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/notificaciones"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/pistas"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/rabbitmq"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/solr"
@@ -148,6 +149,21 @@ func run(logger *slog.Logger) (err error) {
 	// (14.5). Sin SOLR_URL no arranca, y los eventos esperan en vuelos.indice.
 	if index != nil {
 		go rabbitmq.NewConsumer(rabbitURL, rabbitmq.IndexQueueName, queries.NewIndexer(index).HandleEvent).Run(ctx)
+	}
+
+	// Consumidor de los avisos por mail a las aerolíneas, con el proveedor (27.1).
+	// Sin NOTIFICACIONES_URL no arranca, y los avisos esperan en vuelos.avisos.
+	if notifURL := os.Getenv("NOTIFICACIONES_URL"); notifURL != "" {
+		emails, err := parseAirlineEmails(os.Getenv("AEROLINEAS_EMAILS"))
+		if err != nil {
+			return err
+		}
+		mailer := notificaciones.NewClient(notifURL, os.Getenv("NOTIFICACIONES_API_KEY"), notificaciones.DefaultTimeout)
+		notifier := commands.NewNotifier(mailer, emails)
+		go rabbitmq.NewConsumer(rabbitURL, rabbitmq.NoticeQueueName, notifier.HandleEvent).
+			WithRetryWaits(rabbitmq.NoticeRetryWaits).Run(ctx)
+	} else {
+		logger.Warn("falta la variable NOTIFICACIONES_URL: no se avisa por mail a las aerolíneas")
 	}
 
 	server := &http.Server{

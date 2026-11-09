@@ -19,7 +19,12 @@
       "name": "vuelos.indice", "vhost": "/", "durable": true, "auto_delete": false,
       "arguments": { "x-dead-letter-exchange": "aeropuerto.fallidos", "x-dead-letter-routing-key": "vuelos.indice.fallidos" }
     },
-    { "name": "vuelos.indice.fallidos", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+    { "name": "vuelos.indice.fallidos", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    {
+      "name": "vuelos.avisos", "vhost": "/", "durable": true, "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "aeropuerto.fallidos", "x-dead-letter-routing-key": "vuelos.avisos.fallidos" }
+    },
+    { "name": "vuelos.avisos.fallidos", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
   ],
   "bindings": [
     { "source": "aeropuerto.eventos", "vhost": "/", "destination": "pistas.eventos", "destination_type": "queue", "routing_key": "clima.#", "arguments": {} },
@@ -28,6 +33,8 @@
     { "source": "aeropuerto.fallidos", "vhost": "/", "destination": "pistas.eventos.fallidos", "destination_type": "queue", "routing_key": "pistas.eventos.fallidos", "arguments": {} },
     { "source": "aeropuerto.eventos", "vhost": "/", "destination": "vuelos.indice", "destination_type": "queue", "routing_key": "vuelos.vuelo.actualizado", "arguments": {} },
     { "source": "aeropuerto.fallidos", "vhost": "/", "destination": "vuelos.eventos.fallidos", "destination_type": "queue", "routing_key": "vuelos.eventos.fallidos", "arguments": {} },
-    { "source": "aeropuerto.fallidos", "vhost": "/", "destination": "vuelos.indice.fallidos", "destination_type": "queue", "routing_key": "vuelos.indice.fallidos", "arguments": {} }
+    { "source": "aeropuerto.fallidos", "vhost": "/", "destination": "vuelos.indice.fallidos", "destination_type": "queue", "routing_key": "vuelos.indice.fallidos", "arguments": {} },
+    { "source": "aeropuerto.eventos", "vhost": "/", "destination": "vuelos.avisos", "destination_type": "queue", "routing_key": "vuelos.vuelo.afectado_por_cierre", "arguments": {} },
+    { "source": "aeropuerto.fallidos", "vhost": "/", "destination": "vuelos.avisos.fallidos", "destination_type": "queue", "routing_key": "vuelos.avisos.fallidos", "arguments": {} }
   ]
 }
