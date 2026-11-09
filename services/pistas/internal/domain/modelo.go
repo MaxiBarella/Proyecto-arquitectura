@@ -19,11 +19,39 @@ func (t TipoOperacion) Valido() bool {
 	return t == Arribo || t == Despegue
 }
 
+// MotivoCierre dice quién cerró una pista. Los valores son los del evento de pista cerrada (4.12).
+type MotivoCierre string
+
+const (
+	CerradaPorClima    MotivoCierre = "weather"
+	CerradaPorOperador MotivoCierre = "operator"
+)
+
 // Pista es el recurso físico donde se aterriza y se despega. Su ID es el nombre, sin barra, como
 // "05-23" (4.11).
 type Pista struct {
 	ID      string
 	Abierta bool
+	// CerradaPor está vacío si la pista está abierta.
+	CerradaPor MotivoCierre
+}
+
+// NuestroAeropuerto es el único que maneja el sistema (2.8). Los eventos de clima de otro se ignoran.
+const NuestroAeropuerto = "SACO"
+
+// EstadoClima es lo último que Pistas sabe del clima, por los eventos de Clima (4.2).
+type EstadoClima struct {
+	// Operable es nil si todavía no llegó ningún dato.
+	Operable *bool
+	// ConDatos es falso después de "Clima sin datos": las pistas no cambian solas (RN-24).
+	ConDatos bool
+}
+
+// Alternativo es un aeropuerto al que se puede desviar un arribo (RN-25).
+type Alternativo struct {
+	ICAO       string
+	Nombre     string
+	Disponible bool
 }
 
 // Slot es una pista más un bloque, ocupado por un vuelo. Un bloque sin vuelo no se guarda: está libre.
@@ -65,8 +93,11 @@ type Resultado struct {
 
 // Claves de ruteo de los eventos que publica Pistas (4.14).
 const (
-	EventoSlotAsignado = "pistas.slot.asignado"
-	EventoSlotCedido   = "pistas.slot.cedido"
+	EventoSlotAsignado   = "pistas.slot.asignado"
+	EventoSlotCedido     = "pistas.slot.cedido"
+	EventoSlotLiberado   = "pistas.slot.liberado_por_cierre"
+	EventoPistaCerrada   = "pistas.pista.cerrada"
+	EventoPistaReabierta = "pistas.pista.reabierta"
 )
 
 // Evento es un evento de dominio que se guarda en el outbox y se publica después (4.4).
@@ -94,4 +125,19 @@ type DatosSlotCedido struct {
 	PistaID        string    `json:"runway_id"`
 	InicioBloque   time.Time `json:"block_start"`
 	CedidoAVueloID string    `json:"taken_by_flight_id"`
+}
+
+// DatosSlotLiberado son los datos de "slot liberado por cierre" (4.12). DesviadoA es el alternativo
+// de un arribo (RN-25), o nil si es un despegue, que queda demorado (RN-17).
+type DatosSlotLiberado struct {
+	VueloID      string    `json:"flight_id"`
+	PistaID      string    `json:"runway_id"`
+	InicioBloque time.Time `json:"block_start"`
+	DesviadoA    *string   `json:"diverted_to"`
+}
+
+// DatosPista son los datos de "pista cerrada" y "pista reabierta" (4.12): la pista y quién la cerró.
+type DatosPista struct {
+	PistaID string       `json:"runway_id"`
+	Motivo  MotivoCierre `json:"reason"`
 }
