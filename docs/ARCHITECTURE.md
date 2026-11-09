@@ -159,6 +159,8 @@ Son consecuencias de lo que se eligió. El equipo las aceptó a sabiendas, y cad
 | Si se vence una entrada muy pedida de la caché, varios pedidos a la vez van a Solr (cache stampede), y al arrancar la caché está vacía. | Con 60 segundos de vigencia y un solo tablero, la carga extra es chica. | ADR-007 |
 | Si no hay ningún aeropuerto alternativo disponible, el arribo se desvía igual al primero de la lista. | El SPEC asume que siempre hay uno disponible. | 18 (pendiente 16) |
 | La copia de Clima en Render se duerme sin uso: el primer pedido tarda cerca de un minuto y puede traer un `503`. | Es el plan gratuito. Está avisado en la guía del contrato. | 9.4, ADR-015 |
+| NGINX se entera de que una instancia de Vuelos cayó cuando le falla un pedido. Si está colgada, ese pedido espera 10 segundos. | La verificación activa es de la versión paga de NGINX. | 12.2, 12.4, 12.5, ADR-012 |
+| Si una instancia no responde un `POST`, NGINX no lo reintenta en la otra: la aerolínea recibe un error. Publicar el vuelo de nuevo puede dejarlo duplicado. | NGINX no sabe si el pedido se aplicó. Pedir un slot es idempotente; publicar no. | ADR-012 (pendiente) |
 
 **Seguridad**
 
@@ -166,6 +168,9 @@ Son consecuencias de lo que se eligió. El equipo las aceptó a sabiendas, y cad
 |---|---|---|
 | Un token no se puede revocar: vale hasta que vence, 1 hora después. | Así el gateway lo verifica sin preguntarle a Usuarios, y la caída de Usuarios no corta las sesiones abiertas. | 15.2 |
 | Los servicios confían en los encabezados de identidad que pone el gateway. | Mientras los servicios expongan su puerto directo, cualquiera que llegue a él puede mandar esos encabezados. Se cierra cuando se saquen los puertos (15.20). | 15.6, 15.20 |
+| Quien tenga `JWT_SECRET` puede firmar tokens válidos: la clave es la misma en Usuarios y en NGINX (HS256), y está en el `.env` de cada uno. | Es la forma más simple de verificar el token en el gateway sin llamar a Usuarios. NGINX no arranca con una clave de menos de 32 bytes. | 15.5, 15.21 |
+| El token se guarda en `sessionStorage`: un script inyectado en la página lo podría leer. | Sobrevive a una recarga y se borra al cerrar la pestaña; dura 1 hora. | 22.7 |
+| El límite de tráfico es por IP: los usuarios que salen por la misma IP comparten los 20 pedidos por segundo. | Con un solo NGINX no hay que coordinar el límite. Para las pruebas de carga se sube. | 15.8 |
 | Grafana entra sin usuario ni contraseña. | Corre solo en la computadora de cada uno. | ADR-011 |
 | La base de Clima en Atlas acepta conexiones desde cualquier IP, protegida solo por usuario y contraseña. | Render gratis no tiene una IP fija. | ADR-015 |
 
