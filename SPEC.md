@@ -138,7 +138,7 @@ Las cuentas no se registran desde el sistema: se cargan al arrancar. Hay un oper
 | RN-19 | Un vuelo demorado vuelve a quedar programado cuando la aerolínea le consigue un slot nuevo, con las mismas reglas de asignación. |
 | RN-24 | Si el servicio de clima no puede obtener los datos, las pistas no se cierran ni se reabren solas: el operador ve un aviso y decide a mano. |
 | RN-29 | Una condición climática forzada por el operador dura hasta que el operador la quita. Mientras dura, manda sobre el dato real. |
-| RN-42 | Una pista cerrada por el clima solo la reabre a mano el operador cuando el servicio de clima no tiene datos (RN-24). Mientras haya datos, la reabre el clima. Para abrir o cerrar las pistas en contra del dato real, el operador fuerza una condición (RN-29). |
+| RN-42 | Una pista cerrada por el clima solo la reabre a mano el operador cuando el servicio de clima no tiene datos (RN-24). Mientras haya datos, la reabre el clima. Una condición forzada cuenta como dato: mientras esté puesta, tampoco se reabre a mano. Para abrir o cerrar las pistas en contra del dato real, el operador fuerza una condición (RN-29). |
 
 ### Desvíos
 

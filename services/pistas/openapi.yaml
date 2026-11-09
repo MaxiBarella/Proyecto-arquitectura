@@ -215,8 +215,9 @@ paths:
       description: |
         Reabre una pista cerrada por el operador. Una pista cerrada por el clima solo se
         reabre a mano cuando Clima no tiene datos (RN-42, CA-40): mientras haya datos, la
-        reabre el clima, y se responde `409` con `RUNWAY_CLOSED_BY_WEATHER`. Para probar
-        el cierre y la reapertura se usa el clima forzado (F-12). Pistas publica
+        reabre el clima, y se responde `409` con `RUNWAY_CLOSED_BY_WEATHER`. Una condición
+        forzada cuenta como dato: mientras esté puesta, manda sobre todo (RN-29) y tampoco
+        se reabre a mano. Para probar el cierre y la reapertura se usa el clima forzado (F-12). Pistas publica
         `pistas.pista.reabierta`.
 
         Los vuelos que perdieron su slot al cerrarse no lo recuperan: un despegue
