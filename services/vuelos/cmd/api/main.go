@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	httpadapter "github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/http"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/memcached"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/mysql"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/pistas"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/rabbitmq"
@@ -117,7 +118,7 @@ func run(logger *slog.Logger) (err error) {
 	qs := queries.New(flights)
 	if solrURL != "" {
 		index = solr.NewClient(solrURL, solr.DefaultTimeout)
-		qs.WithBoard(index)
+		qs.WithBoard(boardIndex(index, logger))
 	} else {
 		logger.Warn("falta la variable SOLR_URL: el tablero no responde y el índice no se actualiza")
 	}
@@ -176,4 +177,19 @@ func run(logger *slog.Logger) (err error) {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	return server.Shutdown(shutdownCtx)
+}
+
+// boardIndex pone la caché de Memcached delante de Solr (10, ADR-007), salvo que esté
+// apagada con CACHE_ENABLED=false para medir el "antes" (10.7) o que falte MEMCACHED_ADDR.
+func boardIndex(index *solr.Client, logger *slog.Logger) queries.BoardIndex {
+	addr := os.Getenv("MEMCACHED_ADDR")
+	switch {
+	case os.Getenv("CACHE_ENABLED") == "false":
+		logger.Info("caché del tablero apagada (CACHE_ENABLED=false)")
+		return index
+	case addr == "":
+		logger.Warn("falta la variable MEMCACHED_ADDR: el tablero va siempre a Solr")
+		return index
+	}
+	return memcached.NewBoardCache(index, addr)
 }

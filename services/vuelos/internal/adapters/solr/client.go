@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/queries"
 )
@@ -27,14 +29,20 @@ type Client struct {
 	// coreURL es la dirección del core, por ejemplo http://solr:8983/solr/vuelos.
 	coreURL string
 	http    *http.Client
+	// searches cuenta las consultas del tablero que llegan a Solr, para comparar con
+	// y sin caché (ADR-007).
+	searches metric.Int64Counter
 }
 
 // NewClient arma el cliente para el core de coreURL.
 func NewClient(coreURL string, timeout time.Duration) *Client {
+	searches, _ := otel.Meter("vuelos").Int64Counter("vuelos.solr.consultas",
+		metric.WithDescription("Consultas del tablero que llegan a Solr (ADR-007)."))
 	return &Client{
 		coreURL: strings.TrimRight(coreURL, "/"),
 		// otelhttp suma el pedido a Solr a la traza en curso (11.1).
-		http: &http.Client{Timeout: timeout, Transport: otelhttp.NewTransport(http.DefaultTransport)},
+		http:     &http.Client{Timeout: timeout, Transport: otelhttp.NewTransport(http.DefaultTransport)},
+		searches: searches,
 	}
 }
 
