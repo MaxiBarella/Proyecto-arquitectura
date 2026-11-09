@@ -1,0 +1,46 @@
+# Alerta de mensajes fallidos (decisión 11.4, ADR-011). Grafana la carga al arrancar.
+# Se dispara cuando un consumidor de Vuelos o de Pistas manda un evento a su cola de
+# fallidos, después de los 3 reintentos (4.20). Los mensajes se revisan a mano desde el
+# panel de RabbitMQ.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: mensajes
+    folder: Aeropuerto
+    interval: 1m
+    rules:
+      - uid: mensajes-fallidos
+        title: Evento enviado a fallidos
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              refId: A
+              queryType: instant
+              expr: 'sum(count_over_time({service_name=~"vuelos|pistas"} |= "evento enviado a fallidos" [5m]))'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        # Sin líneas en los últimos 5 minutos, Loki no devuelve nada: no hay fallidos.
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: Un consumidor mandó un evento a su cola de fallidos.
+          description: |
+            Buscar en Loki la línea "evento enviado a fallidos" para ver el tipo de evento y
+            la traza, y revisar el mensaje en el panel de RabbitMQ (http://localhost:15672).

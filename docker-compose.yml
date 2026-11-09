@@ -172,6 +172,9 @@ services:
     ports:
       - "3001:3000"
       - "4318:4318"
+    volumes:
+      # Las alertas guardadas en el repo se cargan al arrancar (20.4).
+      - ./grafana/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
 
 volumes:
   mysql-vuelos-data:
