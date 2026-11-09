@@ -16,6 +16,7 @@ import (
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/mysql"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/pistas"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/rabbitmq"
+	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/adapters/solr"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/commands"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/domain"
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/vuelos/internal/observability"
@@ -127,10 +128,19 @@ func run(logger *slog.Logger) (err error) {
 	})
 
 	// Consumidor de los eventos de Pistas (4.1, 4.3).
-	consumer := rabbitmq.NewConsumer(rabbitURL, func(ctx context.Context, m commands.Message) error {
+	consumer := rabbitmq.NewConsumer(rabbitURL, rabbitmq.QueueName, func(ctx context.Context, m commands.Message) error {
 		return cmds.HandleEvent(ctx, flights, m)
 	})
 	go consumer.Run(ctx)
+
+	// Consumidor del índice del tablero: escribe cada "vuelo actualizado" en Solr
+	// (14.5). Sin SOLR_URL no arranca, y los eventos esperan en vuelos.indice.
+	if solrURL := os.Getenv("SOLR_URL"); solrURL != "" {
+		indexer := queries.NewIndexer(solr.NewClient(solrURL, solr.DefaultTimeout))
+		go rabbitmq.NewConsumer(rabbitURL, rabbitmq.IndexQueueName, indexer.HandleEvent).Run(ctx)
+	} else {
+		logger.Warn("falta la variable SOLR_URL: el índice del tablero no se actualiza")
+	}
 
 	server := &http.Server{
 		Addr:              ":" + port,
