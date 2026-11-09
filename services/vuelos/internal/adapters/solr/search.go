@@ -60,6 +60,7 @@ func (c *Client) Search(ctx context.Context, s queries.BoardSearch) ([]queries.I
 		return nil, 0, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	c.searches.Add(ctx, 1)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("buscar en Solr: %w", err)

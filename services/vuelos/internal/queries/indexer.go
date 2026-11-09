@@ -50,9 +50,5 @@ func (ix *Indexer) HandleEvent(ctx context.Context, m commands.Message) error {
 	if d.ID == "" || m.DataVersion < 1 {
 		return fmt.Errorf("%w: falta el id del vuelo o la versión del dato", commands.ErrUnprocessable)
 	}
-	boardAt := d.ScheduledAt
-	if d.Slot != nil {
-		boardAt = d.Slot.BlockStart
-	}
-	return ix.index.Upsert(ctx, IndexedFlight{FlightUpdatedData: d, BoardAt: boardAt.UTC(), DataVersion: m.DataVersion})
+	return ix.index.Upsert(ctx, indexed(d, m.DataVersion))
 }
