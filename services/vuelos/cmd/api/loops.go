@@ -9,6 +9,9 @@ import (
 // relayInterval es cada cuánto el relay revisa el outbox (4.5).
 const relayInterval = time.Second
 
+// completeInterval es cada cuánto se buscan vuelos para dar por finalizados (28.1).
+const completeInterval = time.Minute
+
 // taskTimeout es el plazo de cada ejecución. Si la base o RabbitMQ se cuelgan, la
 // tarea se corta y la próxima vuelve a intentar, en vez de quedar trabada. Es el
 // mismo valor que en Clima (9.20); este archivo es una copia del de Clima.

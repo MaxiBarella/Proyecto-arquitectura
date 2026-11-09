@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -96,6 +97,12 @@ func run(logger *slog.Logger) (err error) {
 	}()
 	flights := mysql.NewRepository(db)
 
+	// docker compose run vuelos-1 reindex: reconstruye el índice del tablero desde MySQL
+	// y termina, sin levantar el servicio (14.3, 14.11).
+	if len(os.Args) > 1 && os.Args[1] == "reindex" {
+		return reindex(ctx, logger, flights)
+	}
+
 	// Sin GIN_MODE, Gin escribe avisos en texto que se mezclarían con los logs JSON.
 	if os.Getenv(gin.EnvGinMode) == "" {
 		gin.SetMode(gin.ReleaseMode)
@@ -136,6 +143,14 @@ func run(logger *slog.Logger) (err error) {
 			observability.EndSpan(span, err)
 			return err
 		})
+		return err
+	})
+
+	// Finalizado automático: cada minuto pasa a finalizado los vuelos programados cuyo
+	// bloque terminó (RN-32, F-22, 28.1). Corre en las dos instancias; cada vuelo se
+	// cambia con la fila bloqueada, así que no se finaliza dos veces.
+	go runEvery(ctx, completeInterval, completeInterval, "finalizado de vuelos", func(ctx context.Context) error {
+		_, err := cmds.CompleteDue(ctx, flights)
 		return err
 	})
 
@@ -192,4 +207,19 @@ func boardIndex(index *solr.Client, logger *slog.Logger) queries.BoardIndex {
 		return index
 	}
 	return memcached.NewBoardCache(index, addr)
+}
+
+// reindex vuelve a cargar en Solr todos los vuelos de MySQL (14.3, 14.11).
+func reindex(ctx context.Context, logger *slog.Logger, flights *mysql.Repository) error {
+	solrURL := os.Getenv("SOLR_URL")
+	if solrURL == "" {
+		return errors.New("falta la variable SOLR_URL")
+	}
+	logger.Info("reconstruyendo el índice del tablero")
+	n, err := queries.Reindex(ctx, flights, solr.NewClient(solrURL, solr.DefaultTimeout))
+	if err != nil {
+		return fmt.Errorf("reconstruir el índice: %w (se escribieron %d vuelos)", err, n)
+	}
+	logger.Info("índice del tablero reconstruido", "flights", n)
+	return nil
 }
