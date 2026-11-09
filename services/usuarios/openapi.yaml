@@ -1,0 +1,193 @@
+openapi: 3.1.0
+
+info:
+  title: Usuarios API
+  version: 0.1.0
+  summary: Inicio de sesión de aerolíneas y operadores.
+  description: |
+    API interna del servicio Usuarios. La usa el frontend, a través del gateway, para
+    iniciar sesión. No la consume ningún otro grupo.
+
+    - **Cuentas:** no hay registro. Al arrancar se cargan un operador y dos aerolíneas
+      de prueba, `AR` y `LA` (decisión 15.15).
+    - **Token:** un JWT firmado con HS256 que dura 1 hora (15.2, 15.5). El gateway lo
+      verifica sin llamar a Usuarios y pasa la identidad a los servicios en los
+      encabezados `X-User-*` (15.6).
+    - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio, igual
+      que Clima (6.14). Un error inesperado responde `500` con `INTERNAL_ERROR`, sin
+      el detalle: lo que pasó queda en el log de Usuarios.
+    - **Versionado:** la versión es la de este contrato (`info.version`), como en Clima
+      (9.10). La ruta no lleva versión.
+
+servers:
+  - url: http://localhost:8084
+    description: Usuarios en el arranque local, sin gateway. Por el gateway, la ruta va con `/api/usuarios` adelante (15.7).
+
+# El inicio de sesión es lo único que pasa por el gateway sin token (15.7).
+security: []
+
+tags:
+  - name: Sesión
+    description: Inicio de sesión.
+
+paths:
+  /login:
+    post:
+      operationId: login
+      tags: [Sesión]
+      summary: Iniciar sesión (F-01)
+      description: |
+        Verifica el usuario y la contraseña y entrega un token para los demás pedidos.
+        La respuesta trae también el rol y la aerolínea, para que el frontend sepa qué
+        pantalla mostrar sin leer el token (15.11).
+
+        Si el usuario no existe o la contraseña no coincide, la respuesta es la misma:
+        así no se puede averiguar qué usuarios existen (15.12).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+            example:
+              username: operador
+              password: una-contraseña
+      responses:
+        '200':
+          description: Sesión iniciada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+              examples:
+                airline:
+                  summary: Aerolínea
+                  value:
+                    access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI...
+                    token_type: Bearer
+                    expires_in: 3600
+                    role: airline
+                    airline: AR
+                operator:
+                  summary: Operador
+                  value:
+                    access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI...
+                    token_type: Bearer
+                    expires_in: 3600
+                    role: operator
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    Credentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+          format: password
+
+    Session:
+      type: object
+      required: [access_token, token_type, expires_in, role]
+      properties:
+        access_token:
+          type: string
+          description: |
+            JWT firmado con HS256 (15.5). Se manda en los pedidos siguientes como
+            `Authorization: Bearer <token>`. Lleva estos datos (15.13):
+
+            - `sub`: identificador del usuario.
+            - `role`: `airline` u `operator` (15.9).
+            - `airline`: código de la aerolínea. Solo si el rol es `airline`.
+            - `iat` y `exp`: cuándo se emitió y cuándo vence, en segundos desde 1970.
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          description: Segundos que dura el token. Hoy, 3600 (15.2).
+          example: 3600
+        role:
+          type: string
+          enum: [airline, operator]
+        airline:
+          type: string
+          description: Código de la aerolínea. Solo si el rol es `airline`.
+          example: AR
+
+    Problem:
+      type: object
+      description: Error en formato Problem Details (RFC 9457).
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+          description: Código propio del error.
+          enum:
+            - INVALID_REQUEST
+            - INVALID_CREDENTIALS
+            - INTERNAL_ERROR
+
+  responses:
+    InvalidRequest:
+      description: Falta el usuario o la contraseña, o el cuerpo no es JSON. **No reintentar** sin corregirlo.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/invalid-request
+            title: Pedido inválido
+            status: 400
+            detail: Falta la contraseña.
+            instance: /login
+            code: INVALID_REQUEST
+
+    InvalidCredentials:
+      description: El usuario no existe o la contraseña no coincide. No dice cuál de las dos (15.12).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/invalid-credentials
+            title: Usuario o contraseña incorrectos
+            status: 401
+            instance: /login
+            code: INVALID_CREDENTIALS
+
+    InternalError:
+      description: |
+        Falló algo que Usuarios no esperaba. La respuesta no trae el detalle: queda en el
+        log de Usuarios.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/internal-error
+            title: Error interno
+            status: 500
+            instance: /login
+            code: INTERNAL_ERROR
