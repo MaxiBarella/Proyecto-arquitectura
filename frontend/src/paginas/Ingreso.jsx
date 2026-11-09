@@ -18,8 +18,12 @@ export default function Ingreso() {
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
 
+  // Vuelve a la pantalla que se quería abrir, salvo que sea la de otro rol: por ejemplo, si
+  // alguien abrió /operador e ingresó como aerolínea, va a /aerolinea.
   function entrar(rol) {
-    navegar(ubicacion.state?.volverA || INICIO[rol] || '/', { replace: true });
+    const volverA = ubicacion.state?.volverA;
+    const deOtroRol = Object.entries(INICIO).some(([r, ruta]) => r !== rol && volverA?.startsWith(ruta));
+    navegar(volverA && !deOtroRol ? volverA : INICIO[rol] || '/', { replace: true });
   }
 
   async function ingresar(evento) {
