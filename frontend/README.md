@@ -19,7 +19,7 @@ Cada uno tiene su archivo en `src/paginas/` (22.1):
 
 Para ver el resultado final, como lo sirve NGINX: `docker compose up --build nginx` y `http://localhost:8080`.
 
-**Para entrar como aerolínea u operador** mientras no ande el ingreso: generá un token con `nginx/token-de-prueba.sh airline AR` (o `operator`) desde la raíz, y pegalo en la pantalla de ingreso.
+**Para entrar como aerolínea u operador:** en la pantalla de ingreso, con las cuentas de Usuarios: `aerolineas` (AR), `latam` (LA) u `operador`, con las contraseñas de tu `.env` (15.15, 15.22). Con `npm run dev` hay además un desplegable para entrar con un token de `nginx/token-de-prueba.sh airline AR` (o `operator`), sin pasar por Usuarios; no aparece en lo que sirve NGINX.
 
 ## Lo que da la base (22.3)
 
