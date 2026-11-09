@@ -268,6 +268,15 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 | 11.5 | Formato de los logs | **JSON con `log/slog`** (agente) | Es la librería de logs que trae Go. Cada línea lleva el identificador de la traza. |
 | 11.6 | Cómo sigue la traza en los eventos | **El encabezado `traceparent` en el mensaje, guardado en el outbox** (Male, 22/10/2026) | Detalla la 11.2. Con solo el `correlation_id`, Grafana muestra trazas separadas. Por eso, al guardar un evento en el outbox se guarda también el `traceparent` de la traza en curso; el relay lo pone como encabezado del mensaje de RabbitMQ, y el consumidor lo lee para seguir la misma traza. Las funciones para escribirlo y leerlo van en la carpeta de observabilidad (11.1), que cada servicio copia: la escribe Male en Clima, y la pareja 1 la usa en los relays y consumidores de Vuelos y Pistas. Queda confirmada al mergearse el pull request de la rama `feat/rabbitmq-definiciones`. |
 
+Las decisiones 11.7 a 11.10 son los pendientes del ADR-011. Las propuso Male al grupo el 7/11/2026, con las opciones del agente, y las confirmó Maxi en la revisión del pull request #46 el 9/11/2026.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 11.7 | Qué muestra el tablero | **Pedidos y errores por servicio, el p95 del pedido de slot contra el objetivo, el reparto entre las instancias de Vuelos y los eventos enviados a fallidos** | Es el tablero "Aeropuerto: estado general", en `grafana/dashboards/`, que Grafana carga al arrancar (20.4). |
+| 11.8 | La alerta de fallidos se apaga sola | **Se acepta, como limitación** | La alerta de la 11.4 mira los últimos 5 minutos de logs: si nadie revisa el mensaje, deja de sonar aunque siga en la cola. Alertar por la cantidad de mensajes en las colas `.fallidos` necesita sacar métricas de RabbitMQ, y no entraba antes de la presentación. |
+| 11.9 | Alerta por el objetivo de servicio | **Si el p95 del pedido de slot pasa los 500 ms durante 5 minutos seguidos** | Está en `grafana/alerting/objetivo.yaml`. Usa la misma consulta que la 11.3. |
+| 11.10 | Si en 5 minutos no hubo pedidos de slot | **El tablero muestra "Sin datos", en gris, y la alerta no se dispara** | Sin pedidos no hay un p95 que medir: mostrar 0 diría que se cumple el objetivo, y disparar la alerta avisaría de un problema que no existe. |
+
 ## 12. Balanceo de carga (ADR D12)
 
 | # | Decisión | Elegido | Qué significa |
