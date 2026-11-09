@@ -214,6 +214,24 @@ services:
       - "3001:3000"
       - "4318:4318"
 
+  # Pruebas de carga (ADR-013). No arranca con el resto: se corre a mano, por ejemplo
+  #   docker compose --profile carga run --rm k6 run /carga/tablero.js
+  # Le pega a NGINX por la red interna y manda sus métricas a Grafana (16.5).
+  k6:
+    image: grafana/k6:2.3.0
+    profiles: [carga]
+    environment:
+      BASE_URL: http://nginx
+      JWT_SECRET: ${JWT_SECRET:?falta en .env}
+      K6_OUT: opentelemetry
+      K6_OTEL_EXPORTER_PROTOCOL: http/protobuf
+      K6_OTEL_HTTP_EXPORTER_ENDPOINT: grafana:4318
+      K6_OTEL_HTTP_EXPORTER_INSECURE: "true"
+      K6_OTEL_SERVICE_NAME: k6
+    volumes:
+      - ./tests/carga:/carga:ro
+      - ./tests/carga/resultados:/resultados
+
 volumes:
   mysql-vuelos-data:
   mysql-pistas-data:

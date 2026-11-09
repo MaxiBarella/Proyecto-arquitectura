@@ -342,6 +342,15 @@ Las decisiones 15.18 a 15.21 las tomó Salvador el 9/11/2026, al programar el ga
 |---|---|---|---|
 | 16.1 | Con qué se hacen las pruebas de carga | **A. k6** | Escenarios en JavaScript guardados en el repo, como la rampa de 10 a 1000 pedidos por segundo. Por qué: se integra con Grafana, que ya se usa (11.1). |
 
+Las decisiones 16.2 a 16.5 las tomó Salvador el 9/11/2026, al escribir los escenarios de k6 (`tests/carga/`). Eran pendientes del [ADR-013](adr/ADR-013.md). Las opciones y las recomendaciones las preparó el agente de IA. Quedan confirmadas al mergearse el pull request que las registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 16.2 | Escalones de la rampa del tablero | **10, 100, 500 y 1000 pedidos por segundo, un minuto cada uno, con un minuto de calentamiento** | Es la rampa que pidió el profe, y muestra en qué escalón se rompe. Cada corrida dura unos 5 minutos. Se descartaron más escalones de 30 segundos: ubican mejor el límite, pero los números salen más ruidosos. |
+| 16.3 | Rampa del pedido de slot | **5, 20 y 50 pedidos por segundo, un minuto cada uno** | Las aerolíneas piden slots mucho menos que lo que se consulta el tablero, y cada pedido ocupa un slot real. Se descartó llegar a 200: llenaba bloques y los rechazos ensuciaban la medición. |
+| 16.4 | Cómo se corre k6 | **Con Docker, desde el compose** | Un servicio `k6` con la imagen oficial que solo arranca si se lo pide (`--profile carga`). Nadie instala nada y le pega a NGINX por la red interna, igual en todas las computadoras. Se descartó instalar k6 en cada una. |
+| 16.5 | Si los resultados de k6 van a Grafana | **Sí, por OpenTelemetry** | k6 manda sus métricas al mismo `grafana:4318` que los servicios, con `service_name="k6"`. Se ven los pedidos de k6 al lado del reparto entre instancias y la latencia de cada servicio. Además queda el resumen de k6 en un archivo. |
+
 ## 17. Bonus
 
 | # | Decisión | Elegido | Qué significa |
