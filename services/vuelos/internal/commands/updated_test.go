@@ -64,7 +64,7 @@ func TestFlightUpdatedDataJSON(t *testing.T) {
 	}
 	var got map[string]any
 	_ = json.Unmarshal(raw, &got)
-	for _, k := range []string{"id", "flight_number", "airline", "type", "scope", "origin", "destination", "scheduled_at", "status", "slot", "diverted_to", "updated_at"} {
+	for _, k := range []string{"id", "flight_number", "airline", "type", "scope", "origin", "destination", "scheduled_at", "status", "slot", "diverted_to", "created_at", "updated_at"} {
 		if _, ok := got[k]; !ok {
 			t.Errorf("falta %q en %s", k, raw)
 		}

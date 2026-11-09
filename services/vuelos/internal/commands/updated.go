@@ -27,6 +27,7 @@ type FlightUpdatedData struct {
 	Status       string          `json:"status"`
 	Slot         *FlightSlotData `json:"slot"`
 	DivertedTo   *string         `json:"diverted_to"`
+	CreatedAt    time.Time       `json:"created_at"`
 	UpdatedAt    time.Time       `json:"updated_at"`
 }
 
@@ -48,6 +49,7 @@ func NewFlightUpdatedData(f *domain.Flight) FlightUpdatedData {
 		Destination:  f.Destination,
 		ScheduledAt:  f.ScheduledAt.UTC(),
 		Status:       string(f.Status),
+		CreatedAt:    f.CreatedAt.UTC(),
 		UpdatedAt:    f.UpdatedAt.UTC(),
 	}
 	if f.Slot != nil {
