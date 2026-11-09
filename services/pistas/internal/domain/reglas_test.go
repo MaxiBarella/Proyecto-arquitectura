@@ -138,3 +138,40 @@ func compararLibres(t *testing.T, got, esperado []SlotLibre) {
 		}
 	}
 }
+
+// Pendiente 3: pierde el slot el vuelo cuyo bloque todavía no empezó.
+func TestAfectadoPorCierre(t *testing.T) {
+	ahora := time.Date(2026, 11, 11, 14, 5, 0, 0, time.UTC)
+	casos := []struct {
+		inicio time.Time
+		quiere bool
+	}{
+		{time.Date(2026, 11, 11, 14, 0, 0, 0, time.UTC), false},  // ya empezó
+		{time.Date(2026, 11, 11, 13, 45, 0, 0, time.UTC), false}, // ya terminó
+		{time.Date(2026, 11, 11, 14, 15, 0, 0, time.UTC), true},  // el próximo
+	}
+	for _, c := range casos {
+		if got := AfectadoPorCierre(Slot{InicioBloque: c.inicio}, ahora); got != c.quiere {
+			t.Errorf("bloque %s: %v, se esperaba %v", c.inicio.Format("15:04"), got, c.quiere)
+		}
+	}
+}
+
+// RN-25, RN-26, CA-21 y CA-22: el primer alternativo disponible de la lista.
+func TestDestinoDelDesvio(t *testing.T) {
+	lista := []Alternativo{
+		{ICAO: "SAOU", Disponible: true},
+		{ICAO: "SAAR", Disponible: true},
+	}
+	if got := DestinoDelDesvio(lista); got != "SAOU" {
+		t.Errorf("con todos disponibles: %s, se esperaba SAOU", got)
+	}
+	lista[0].Disponible = false
+	if got := DestinoDelDesvio(lista); got != "SAAR" {
+		t.Errorf("con SAOU no disponible: %s, se esperaba SAAR", got)
+	}
+	lista[1].Disponible = false
+	if got := DestinoDelDesvio(lista); got != "SAOU" {
+		t.Errorf("sin ninguno disponible: %s, se esperaba el primero de la lista", got)
+	}
+}

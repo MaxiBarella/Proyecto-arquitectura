@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Pistas API
-  version: 0.2.0
+  version: 0.3.0
   summary: Asignación de slots de pista.
   description: |
     API interna del servicio Pistas. Por ahora tiene solo el pedido de slot que hace
@@ -15,7 +15,8 @@ info:
     - **Pista y bloque:** la pista se identifica con un nombre sin barra, como `05-23`,
       y el bloque con su hora de inicio en UTC, en múltiplos de 15 minutos (4.11).
     - **Errores:** formato Problem Details (RFC 9457) con un campo `code` propio, igual
-      que Clima y Vuelos (6.14).
+      que Clima y Vuelos (6.14). Un error inesperado responde `500` con `INTERNAL_ERROR`,
+      sin el detalle: lo que pasó queda en el log de Pistas (21.1).
     - **Versionado:** la versión es la de este contrato (`info.version`), como en Clima
       (9.10).
 
@@ -75,6 +76,8 @@ paths:
           $ref: '#/components/responses/RunwayNotFound'
         '409':
           $ref: '#/components/responses/Rejected'
+        '500':
+          $ref: '#/components/responses/InternalError'
         '503':
           $ref: '#/components/responses/Unavailable'
 
@@ -153,6 +156,7 @@ components:
             - RUNWAY_CLOSED
             - FLIGHT_ALREADY_HAS_SLOT
             - UNAVAILABLE
+            - INTERNAL_ERROR
         nearest_free_slots:
           type: array
           description: Solo en `SLOT_TAKEN`. Los 3 slots libres más cercanos al pedido, antes o después y en cualquier pista (RN-09).
@@ -232,3 +236,20 @@ components:
                 status: 409
                 detail: El vuelo ya tiene la pista 05-23 a las 14:30.
                 code: FLIGHT_ALREADY_HAS_SLOT
+
+    InternalError:
+      description: |
+        Falló algo que Pistas no esperaba, como un error de programación. La respuesta no
+        trae el detalle: queda en el log de Pistas. Vuelos no lo reintenta, porque
+        reintentar no lo arregla (21.1), pero cuenta como falla para el circuit breaker
+        (13.2).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/internal-error
+            title: Error interno
+            status: 500
+            instance: /internal/slots
+            code: INTERNAL_ERROR
