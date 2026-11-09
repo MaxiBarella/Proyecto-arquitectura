@@ -46,7 +46,8 @@ func (s *Service) Publish(ctx context.Context, who Identity, d domain.NewFlightD
 	if err != nil {
 		return nil, err
 	}
-	if err := s.flights.Create(ctx, f); err != nil {
+	// "Vuelo actualizado" lleva el vuelo nuevo al índice del tablero (14.5).
+	if err := s.flights.Create(ctx, f, s.updated(ctx, f)); err != nil {
 		return nil, err
 	}
 	return f, nil
@@ -59,8 +60,11 @@ func (s *Service) Cancel(ctx context.Context, who Identity, id string) (*domain.
 		if err := f.Cancel(who.Airline, s.now()); err != nil {
 			return nil, err
 		}
-		// Datos del evento: 4.12.
-		return []domain.Event{s.event(ctx, EventFlightCancelled, map[string]string{"flight_id": f.ID})}, nil
+		// Datos del evento: 4.12. "Vuelo actualizado" lleva el cambio al tablero (14.5).
+		return []domain.Event{
+			s.event(ctx, EventFlightCancelled, map[string]string{"flight_id": f.ID}),
+			s.updated(ctx, f),
+		}, nil
 	})
 }
 
