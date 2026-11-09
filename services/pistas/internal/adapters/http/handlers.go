@@ -143,8 +143,9 @@ func (h *handlers) responderError(c *gin.Context, err error) {
 		responder(c, problema{Type: "/problems/runway-already-exists", Title: "La pista ya existe",
 			Status: http.StatusConflict, Code: "RUNWAY_ALREADY_EXISTS"})
 	case errors.Is(err, domain.ErrCerradaPorClima):
-		responder(c, problema{Type: "/problems/runway-closed-by-weather", Title: "La pista la cerró el clima",
-			Status: http.StatusConflict, Detail: "Se reabre sola cuando el clima lo permita.", Code: "RUNWAY_CLOSED_BY_WEATHER"})
+		responder(c, problema{Type: "/problems/runway-closed-by-weather", Title: "El clima no permite reabrir la pista",
+			Status: http.StatusConflict, Detail: "Mientras Clima tenga datos y no permita operar, la pista no se reabre a mano.",
+			Code: "RUNWAY_CLOSED_BY_WEATHER"})
 	case errors.Is(err, domain.ErrAlternativoInexistente):
 		responder(c, problema{Type: "/problems/alternate-not-found", Title: "Aeropuerto alternativo no encontrado",
 			Status: http.StatusNotFound, Code: "ALTERNATE_NOT_FOUND"})

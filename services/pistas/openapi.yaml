@@ -217,7 +217,8 @@ paths:
         reabre a mano cuando Clima no tiene datos (RN-42, CA-40): mientras haya datos, la
         reabre el clima, y se responde `409` con `RUNWAY_CLOSED_BY_WEATHER`. Una condición
         forzada cuenta como dato: mientras esté puesta, manda sobre todo (RN-29) y tampoco
-        se reabre a mano. Para probar el cierre y la reapertura se usa el clima forzado (F-12). Pistas publica
+        se reabre a mano. Mientras Clima tenga datos que no permiten operar, tampoco se
+        reabre una pista cerrada por el operador, y se responde el mismo `409` (23.6, CA-42). Para probar el cierre y la reapertura se usa el clima forzado (F-12). Pistas publica
         `pistas.pista.reabierta`.
 
         Los vuelos que perdieron su slot al cerrarse no lo recuperan: un despegue
@@ -637,17 +638,18 @@ components:
 
     ClosedByWeather:
       description: |
-        La pista la cerró el clima y Clima tiene datos: la reabre el clima cuando vuelva a
-        permitir la operación (23.4). Para probar, se fuerza el clima (F-12).
+        Clima tiene datos y la pista la cerró el clima (23.4) o el clima no permite operar
+        (23.6): no se reabre a mano. Una cerrada por el clima la reabre el clima cuando vuelva
+        a permitir la operación. Para probar, se fuerza el clima (F-12).
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
           example:
             type: /problems/runway-closed-by-weather
-            title: La pista la cerró el clima
+            title: El clima no permite reabrir la pista
             status: 409
-            detail: La pista 05-23 se reabre sola cuando el clima lo permita.
+            detail: Mientras Clima tenga datos y no permita operar, la pista no se reabre a mano.
             instance: /runways/05-23/reopen
             code: RUNWAY_CLOSED_BY_WEATHER
 
