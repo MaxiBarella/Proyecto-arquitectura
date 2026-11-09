@@ -63,6 +63,12 @@ func (r *repoEnMemoria) EnTransaccion(ctx context.Context, fn func(context.Conte
 
 func (r *repoEnMemoria) Pistas(context.Context) ([]domain.Pista, error) { return r.pistas, nil }
 
+func (r *repoEnMemoria) Alternativos(context.Context) ([]domain.Alternativo, error) {
+	return r.alternativos, nil
+}
+
+func (r *repoEnMemoria) ClimaActual(context.Context) (domain.EstadoClima, error) { return r.clima, nil }
+
 func (r *repoEnMemoria) SlotsOcupados(_ context.Context, desde, hasta time.Time) ([]domain.Slot, error) {
 	return filtrar(r.slots, desde, hasta), nil
 }
@@ -112,6 +118,30 @@ func (t *txEnMemoria) SlotsDePista(_ context.Context, pistaID string) ([]domain.
 
 func (t *txEnMemoria) Alternativos(context.Context) ([]domain.Alternativo, error) {
 	return t.repo.alternativos, nil
+}
+
+func (t *txEnMemoria) ClimaActual(context.Context) (domain.EstadoClima, error) { return t.clima, nil }
+
+func (t *txEnMemoria) CrearPista(_ context.Context, p domain.Pista) error {
+	for _, o := range t.pistas {
+		if o.ID == p.ID {
+			return domain.ErrPistaYaExiste
+		}
+	}
+	t.pistas = append(t.pistas, p)
+	return nil
+}
+
+// GuardarAlternativo cambia la lista del repositorio directo: alcanza para los tests, que no
+// deshacen estos cambios.
+func (t *txEnMemoria) GuardarAlternativo(_ context.Context, icao string, disponible bool) (domain.Alternativo, error) {
+	for i, a := range t.repo.alternativos {
+		if a.ICAO == icao {
+			t.repo.alternativos[i].Disponible = disponible
+			return t.repo.alternativos[i], nil
+		}
+	}
+	return domain.Alternativo{}, domain.ErrAlternativoInexistente
 }
 
 func (t *txEnMemoria) Clima(context.Context) (domain.EstadoClima, error) { return t.clima, nil }

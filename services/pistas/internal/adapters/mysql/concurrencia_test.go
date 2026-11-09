@@ -318,3 +318,66 @@ func TestCierreConPedidosSimultaneos(t *testing.T) {
 		t.Fatalf("%d vuelos consiguieron slot pero se liberaron %d", conSlot, liberados)
 	}
 }
+
+// F-09, F-10, F-11, F-20 y RN-42 contra MySQL: las operaciones del operador (23.2).
+func TestOperadorContraMySQL(t *testing.T) {
+	repo := levantarBase(t)
+	pistas := aplicacion.NuevoPistas(repo)
+	ctx := context.Background()
+
+	if _, err := pistas.AltaDePista(ctx, "09-27"); err != nil {
+		t.Fatalf("alta: %v", err)
+	}
+	if _, err := pistas.AltaDePista(ctx, "09-27"); !errors.Is(err, domain.ErrPistaYaExiste) {
+		t.Fatalf("alta repetida: se esperaba ErrPistaYaExiste, vino %v", err)
+	}
+
+	// SAOU no disponible: el arribo que pierde el slot va a SAAR (RN-26).
+	alt, err := pistas.CambiarDisponibilidad(ctx, "SAOU", false)
+	if err != nil || alt.Disponible || alt.Nombre != "San Luis" {
+		t.Fatalf("disable: %+v %v", alt, err)
+	}
+	if _, err := pistas.CambiarDisponibilidad(ctx, "SAOU", false); err != nil {
+		t.Fatalf("disable repetido: %v", err)
+	}
+	if _, err := pistas.CambiarDisponibilidad(ctx, "SACO", false); !errors.Is(err, domain.ErrAlternativoInexistente) {
+		t.Fatalf("SACO: se esperaba ErrAlternativoInexistente, vino %v", err)
+	}
+
+	if _, err := pistas.Asignar(ctx, domain.PedidoDeSlot{
+		VueloID: "A01", TipoOperacion: domain.Arribo, PistaID: "09-27", InicioBloque: manana,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cerrada, err := pistas.CerrarPista(ctx, "09-27")
+	if err != nil || cerrada.CerradaPor != domain.CerradaPorOperador {
+		t.Fatalf("cerrar: %+v %v", cerrada, err)
+	}
+	if ocupados, _ := repo.SlotsOcupados(ctx, manana, manana.Add(domain.DuracionBloque)); len(ocupados) != 0 {
+		t.Errorf("el slot tenía que quedar libre: %+v", ocupados)
+	}
+	for _, e := range pendientesPorTipo(t, repo)[domain.EventoSlotLiberado] {
+		var d struct {
+			DivertedTo *string `json:"diverted_to"`
+		}
+		_ = json.Unmarshal(e.DatosJSON, &d)
+		if d.DivertedTo == nil || *d.DivertedTo != "SAAR" {
+			t.Errorf("el arribo tenía que ir a SAAR: %s", e.DatosJSON)
+		}
+	}
+	if _, err := pistas.ReabrirPista(ctx, "09-27"); err != nil {
+		t.Fatalf("reabrir: %v", err)
+	}
+
+	// Cerrada por el clima y con datos: no se reabre a mano (RN-42).
+	if err := pistas.ProcesarEvento(ctx, eventoDeClima("6b0f1c2e-4444-4c1b-9d2e-5f4a3b2c1d0e", false)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pistas.ReabrirPista(ctx, "05-23"); !errors.Is(err, domain.ErrCerradaPorClima) {
+		t.Fatalf("se esperaba ErrCerradaPorClima, vino %v", err)
+	}
+	lista, clima, err := pistas.ListarPistas(ctx)
+	if err != nil || len(lista) != 3 || clima.Operable == nil || *clima.Operable || !clima.ConDatos {
+		t.Fatalf("listar: %+v %+v %v", lista, clima, err)
+	}
+}

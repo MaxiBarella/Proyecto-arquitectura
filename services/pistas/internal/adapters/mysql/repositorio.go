@@ -67,6 +67,16 @@ func (r *Repositorio) Pistas(ctx context.Context) ([]domain.Pista, error) {
 	return pistas(r.db.WithContext(ctx))
 }
 
+// Alternativos implementa ports.Lectura.
+func (r *Repositorio) Alternativos(ctx context.Context) ([]domain.Alternativo, error) {
+	return alternativos(r.db.WithContext(ctx))
+}
+
+// ClimaActual implementa ports.Lectura.
+func (r *Repositorio) ClimaActual(ctx context.Context) (domain.EstadoClima, error) {
+	return climaActual(r.db.WithContext(ctx))
+}
+
 // SlotsOcupados implementa ports.Lectura.
 func (r *Repositorio) SlotsOcupados(ctx context.Context, desde, hasta time.Time) ([]domain.Slot, error) {
 	return slotsOcupados(r.db.WithContext(ctx), desde, hasta)
@@ -158,15 +168,43 @@ func (t *transaccion) SlotsDePista(ctx context.Context, pistaID string) ([]domai
 }
 
 func (t *transaccion) Alternativos(ctx context.Context) ([]domain.Alternativo, error) {
-	var filas []alternativoModelo
-	if err := t.db.WithContext(ctx).Order("orden").Find(&filas).Error; err != nil {
-		return nil, err
+	return alternativos(t.db.WithContext(ctx))
+}
+
+func (t *transaccion) ClimaActual(ctx context.Context) (domain.EstadoClima, error) {
+	return climaActual(t.db.WithContext(ctx))
+}
+
+// CrearPista inserta la pista. Un nombre repetido no es un choque entre transacciones que se
+// arregle reintentando: es domain.ErrPistaYaExiste.
+func (t *transaccion) CrearPista(ctx context.Context, p domain.Pista) error {
+	m := pistaDesdeDominio(p)
+	err := t.db.WithContext(ctx).Create(&m).Error
+	var e *driver.MySQLError
+	if errors.As(err, &e) && e.Number == errEntradaDuplicada {
+		return domain.ErrPistaYaExiste
 	}
-	res := make([]domain.Alternativo, len(filas))
-	for i, f := range filas {
-		res[i] = domain.Alternativo{ICAO: f.ICAO, Nombre: f.Nombre, Disponible: f.Disponible}
+	return traducir(err)
+}
+
+// GuardarAlternativo lee el alternativo con bloqueo, así se sabe si existe aunque el valor no
+// cambie (MySQL no cuenta como afectada una fila que queda igual).
+func (t *transaccion) GuardarAlternativo(ctx context.Context, icao string, disponible bool) (domain.Alternativo, error) {
+	var f alternativoModelo
+	err := t.db.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("icao = ?", icao).First(&f).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return domain.Alternativo{}, domain.ErrAlternativoInexistente
 	}
-	return res, nil
+	if err != nil {
+		return domain.Alternativo{}, err
+	}
+	if f.Disponible != disponible {
+		if err := t.db.WithContext(ctx).Model(&alternativoModelo{}).Where("icao = ?", icao).
+			Update("disponible", disponible).Error; err != nil {
+			return domain.Alternativo{}, err
+		}
+	}
+	return domain.Alternativo{ICAO: f.ICAO, Nombre: f.Nombre, Disponible: disponible}, nil
 }
 
 func (t *transaccion) Clima(ctx context.Context) (domain.EstadoClima, error) {
@@ -291,4 +329,24 @@ func traducir(err error) error {
 		}
 	}
 	return err
+}
+
+func alternativos(db *gorm.DB) ([]domain.Alternativo, error) {
+	var filas []alternativoModelo
+	if err := db.Order("orden").Find(&filas).Error; err != nil {
+		return nil, err
+	}
+	res := make([]domain.Alternativo, len(filas))
+	for i, f := range filas {
+		res[i] = domain.Alternativo{ICAO: f.ICAO, Nombre: f.Nombre, Disponible: f.Disponible}
+	}
+	return res, nil
+}
+
+func climaActual(db *gorm.DB) (domain.EstadoClima, error) {
+	var c climaModelo
+	if err := db.Where("aeropuerto = ?", domain.NuestroAeropuerto).First(&c).Error; err != nil {
+		return domain.EstadoClima{}, err
+	}
+	return domain.EstadoClima{Operable: c.Operable, ConDatos: c.ConDatos}, nil
 }

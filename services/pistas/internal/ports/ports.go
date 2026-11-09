@@ -24,6 +24,10 @@ type Lectura interface {
 	Pistas(ctx context.Context) ([]domain.Pista, error)
 	// SlotsOcupados devuelve los slots con inicio en [desde, hasta).
 	SlotsOcupados(ctx context.Context, desde, hasta time.Time) ([]domain.Slot, error)
+	// Alternativos devuelve los aeropuertos alternativos ordenados por distancia (RN-25).
+	Alternativos(ctx context.Context) ([]domain.Alternativo, error)
+	// ClimaActual devuelve lo último que Pistas sabe del clima, sin bloquearlo: es para mostrarlo.
+	ClimaActual(ctx context.Context) (domain.EstadoClima, error)
 }
 
 // Transaccion son las operaciones que se hacen juntas al asignar un slot.
@@ -40,8 +44,11 @@ type Transaccion interface {
 	GuardarPista(ctx context.Context, p domain.Pista) error
 	// SlotsDePista devuelve los slots de la pista, ordenados por bloque.
 	SlotsDePista(ctx context.Context, pistaID string) ([]domain.Slot, error)
-	// Alternativos devuelve los aeropuertos alternativos ordenados por distancia (RN-25).
-	Alternativos(ctx context.Context) ([]domain.Alternativo, error)
+	// CrearPista guarda una pista nueva. Devuelve domain.ErrPistaYaExiste si el nombre está tomado.
+	CrearPista(ctx context.Context, p domain.Pista) error
+	// GuardarAlternativo cambia si un alternativo está disponible y lo devuelve. Devuelve
+	// domain.ErrAlternativoInexistente si el código no está en la lista.
+	GuardarAlternativo(ctx context.Context, icao string, disponible bool) (domain.Alternativo, error)
 	// Clima devuelve lo último que Pistas sabe del clima, y lo bloquea hasta el final de la
 	// transacción, así dos eventos de clima se aplican de a uno.
 	Clima(ctx context.Context) (domain.EstadoClima, error)

@@ -17,6 +17,12 @@ import (
 // CasosDeUso es lo que el adaptador HTTP necesita del núcleo.
 type CasosDeUso interface {
 	Asignar(ctx context.Context, p domain.PedidoDeSlot) (domain.Resultado, error)
+	ListarPistas(ctx context.Context) ([]domain.Pista, domain.EstadoClima, error)
+	AltaDePista(ctx context.Context, id string) (domain.Pista, error)
+	CerrarPista(ctx context.Context, id string) (domain.Pista, error)
+	ReabrirPista(ctx context.Context, id string) (domain.Pista, error)
+	ListarAlternativos(ctx context.Context) ([]domain.Alternativo, error)
+	CambiarDisponibilidad(ctx context.Context, icao string, disponible bool) (domain.Alternativo, error)
 }
 
 // NuevoRouter arma las rutas de services/pistas/openapi.yaml, con la observabilidad de la 11.1:
@@ -36,6 +42,16 @@ func NuevoRouter(casos CasosDeUso, log *slog.Logger) *gin.Engine {
 	})
 	// Ruta interna: la llama Vuelos, el gateway no la expone (4.15, 15.7).
 	r.POST("/internal/slots", h.asignar)
+
+	// Rutas del operador: fuera de /internal, para que pasen por el gateway (15.19, 23.2).
+	operador := r.Group("", soloOperador())
+	operador.GET("/runways", h.listarPistas)
+	operador.POST("/runways", h.altaDePista)
+	operador.POST("/runways/:id/close", h.cerrarPista)
+	operador.POST("/runways/:id/reopen", h.reabrirPista)
+	operador.GET("/alternate-airports", h.listarAlternativos)
+	operador.POST("/alternate-airports/:icao/disable", h.cambiarDisponibilidad(false))
+	operador.POST("/alternate-airports/:icao/enable", h.cambiarDisponibilidad(true))
 	return r
 }
 
@@ -123,6 +139,15 @@ func (h *handlers) responderError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrPistaCerrada):
 		responder(c, problema{Type: "/problems/runway-closed", Title: "Pista cerrada",
 			Status: http.StatusConflict, Code: "RUNWAY_CLOSED"})
+	case errors.Is(err, domain.ErrPistaYaExiste):
+		responder(c, problema{Type: "/problems/runway-already-exists", Title: "La pista ya existe",
+			Status: http.StatusConflict, Code: "RUNWAY_ALREADY_EXISTS"})
+	case errors.Is(err, domain.ErrCerradaPorClima):
+		responder(c, problema{Type: "/problems/runway-closed-by-weather", Title: "La pista la cerró el clima",
+			Status: http.StatusConflict, Detail: "Se reabre sola cuando el clima lo permita.", Code: "RUNWAY_CLOSED_BY_WEATHER"})
+	case errors.Is(err, domain.ErrAlternativoInexistente):
+		responder(c, problema{Type: "/problems/alternate-not-found", Title: "Aeropuerto alternativo no encontrado",
+			Status: http.StatusNotFound, Code: "ALTERNATE_NOT_FOUND"})
 	case errors.Is(err, domain.ErrVueloConSlot):
 		responder(c, problema{Type: "/problems/flight-already-has-slot", Title: "El vuelo ya tiene un slot",
 			Status: http.StatusConflict, Code: "FLIGHT_ALREADY_HAS_SLOT"})
