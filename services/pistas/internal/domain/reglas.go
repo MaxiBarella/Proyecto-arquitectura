@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -117,4 +118,16 @@ func DestinoDelDesvio(alternativos []Alternativo) string {
 		return alternativos[0].ICAO
 	}
 	return ""
+}
+
+// nombreDePista es el formato del nombre de una pista: letras, números y guiones, sin barra,
+// hasta 10 caracteres, como "05-23" (4.11).
+var nombreDePista = regexp.MustCompile(`^[A-Za-z0-9-]{1,10}$`)
+
+// ValidarNombreDePista revisa el nombre de una pista nueva (F-09, 23.5).
+func ValidarNombreDePista(id string) error {
+	if !nombreDePista.MatchString(id) {
+		return ErrDatosInvalidos{Motivo: "el nombre de la pista lleva letras, números y guiones, sin barra, hasta 10 caracteres"}
+	}
+	return nil
 }

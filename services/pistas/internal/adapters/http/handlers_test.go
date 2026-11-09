@@ -30,6 +30,7 @@ func TestMain(m *testing.M) {
 }
 
 type casosDePrueba struct {
+	operadorDePrueba
 	res         domain.Resultado
 	err         error
 	pedido      domain.PedidoDeSlot
