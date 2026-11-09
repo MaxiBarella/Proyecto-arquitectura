@@ -139,13 +139,21 @@ func (s *WeatherService) SetForced(ctx context.Context, in ForcedInput) (models.
 	return c, EvaluateAptitude(c), nil
 }
 
-// ClearForced quita la condición forzada y vuelve al dato real.
+// ClearForced quita la condición forzada y vuelve al dato real. Antes consulta a
+// Open-Meteo: mientras duró el forzado, el último dato guardado pudo quedar viejo,
+// y con él Clima diría "sin datos" y las pistas no se reabrirían hasta la próxima
+// consulta. Si Open-Meteo no responde, sigue con el último dato que haya.
 func (s *WeatherService) ClearForced(ctx context.Context) error {
 	if err := s.aptitude.SetForced(ctx, s.airport.ICAO, nil); err != nil {
 		return err
 	}
 	slog.InfoContext(ctx, "condición forzada quitada", "airport", s.airport.ICAO)
-	return s.Refresh(ctx)
+	if err := s.Poll(ctx); err != nil {
+		slog.WarnContext(ctx, "no se pudo consultar Open-Meteo al quitar el forzado; se usa el último dato",
+			"airport", s.airport.ICAO, "error", err)
+		return s.Refresh(ctx)
+	}
+	return nil
 }
 
 // Refresh recalcula el estado que ve Pistas y, si cambió, encola el evento en el
