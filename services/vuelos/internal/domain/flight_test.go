@@ -157,6 +157,9 @@ func TestValidateSlot(t *testing.T) {
 	if err := ValidateSlot(Slot{BlockStart: block}); !errors.Is(err, ErrInvalidFlight) {
 		t.Errorf("sin pista: got %v", err)
 	}
+	if err := ValidateSlot(Slot{RunwayID: "05-23"}); !errors.Is(err, ErrInvalidFlight) {
+		t.Errorf("sin bloque: got %v", err)
+	}
 	// 11:30 en Córdoba (UTC-3) es 14:30 UTC: tiene que valer igual.
 	cordoba := time.FixedZone("ART", -3*60*60)
 	if err := ValidateSlot(Slot{RunwayID: "05-23", BlockStart: block.In(cordoba)}); err != nil {
