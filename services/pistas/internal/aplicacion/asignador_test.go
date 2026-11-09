@@ -13,27 +13,38 @@ import (
 // repoEnMemoria implementa ports.Repositorio sin base de datos. Cada transacción trabaja sobre una
 // copia y solo se aplica si termina sin error, como una transacción real.
 type repoEnMemoria struct {
-	pistas     []domain.Pista
-	slots      []domain.Slot
-	eventos    []domain.Evento
-	procesados map[string]bool
-	proximoID  int64
-	conflictos int // cuántas veces Ocupar va a fallar con ErrConflicto antes de funcionar
+	pistas       []domain.Pista
+	clima        domain.EstadoClima
+	alternativos []domain.Alternativo
+	slots        []domain.Slot
+	eventos      []domain.Evento
+	procesados   map[string]bool
+	proximoID    int64
+	conflictos   int // cuántas veces Ocupar va a fallar con ErrConflicto antes de funcionar
 	// fotoVieja hace que SlotDelVuelo no vea los slots, como una lectura sin bloqueo que todavía no
 	// ve lo que guardó un pedido simultáneo.
 	fotoVieja bool
 }
 
 func nuevoRepo() *repoEnMemoria {
-	return &repoEnMemoria{pistas: []domain.Pista{
-		{ID: "05-23", Abierta: true},
-		{ID: "18-36", Abierta: true},
-	}}
+	return &repoEnMemoria{
+		pistas: []domain.Pista{
+			{ID: "05-23", Abierta: true},
+			{ID: "18-36", Abierta: true},
+		},
+		clima: domain.EstadoClima{ConDatos: true},
+		alternativos: []domain.Alternativo{
+			{ICAO: "SAOU", Nombre: "San Luis", Disponible: true},
+			{ICAO: "SAAR", Nombre: "Rosario", Disponible: true},
+		},
+	}
 }
 
 func (r *repoEnMemoria) EnTransaccion(ctx context.Context, fn func(context.Context, ports.Transaccion) error) error {
 	tx := &txEnMemoria{
 		repo:       r,
+		pistas:     append([]domain.Pista(nil), r.pistas...),
+		clima:      r.clima,
 		slots:      append([]domain.Slot(nil), r.slots...),
 		eventos:    append([]domain.Evento(nil), r.eventos...),
 		procesados: map[string]bool{},
@@ -46,6 +57,7 @@ func (r *repoEnMemoria) EnTransaccion(ctx context.Context, fn func(context.Conte
 		return err
 	}
 	r.slots, r.eventos, r.procesados, r.proximoID = tx.slots, tx.eventos, tx.procesados, tx.id
+	r.pistas, r.clima = tx.pistas, tx.clima
 	return nil
 }
 
@@ -57,6 +69,8 @@ func (r *repoEnMemoria) SlotsOcupados(_ context.Context, desde, hasta time.Time)
 
 type txEnMemoria struct {
 	repo       *repoEnMemoria
+	pistas     []domain.Pista
+	clima      domain.EstadoClima
 	slots      []domain.Slot
 	eventos    []domain.Evento
 	procesados map[string]bool
@@ -71,14 +85,48 @@ func (t *txEnMemoria) MarcarProcesado(_ context.Context, mensajeID string) (bool
 	return true, nil
 }
 
-func (t *txEnMemoria) Pistas(context.Context) ([]domain.Pista, error) { return t.repo.pistas, nil }
+func (t *txEnMemoria) Pistas(context.Context) ([]domain.Pista, error) { return t.pistas, nil }
+
+func (t *txEnMemoria) PistasConBloqueo(context.Context) ([]domain.Pista, error) {
+	return append([]domain.Pista(nil), t.pistas...), nil
+}
+
+func (t *txEnMemoria) GuardarPista(_ context.Context, p domain.Pista) error {
+	for i := range t.pistas {
+		if t.pistas[i].ID == p.ID {
+			t.pistas[i] = p
+		}
+	}
+	return nil
+}
+
+func (t *txEnMemoria) SlotsDePista(_ context.Context, pistaID string) ([]domain.Slot, error) {
+	var res []domain.Slot
+	for _, s := range t.slots {
+		if s.PistaID == pistaID {
+			res = append(res, s)
+		}
+	}
+	return res, nil
+}
+
+func (t *txEnMemoria) Alternativos(context.Context) ([]domain.Alternativo, error) {
+	return t.repo.alternativos, nil
+}
+
+func (t *txEnMemoria) Clima(context.Context) (domain.EstadoClima, error) { return t.clima, nil }
+
+func (t *txEnMemoria) GuardarClima(_ context.Context, c domain.EstadoClima) error {
+	t.clima = c
+	return nil
+}
 
 func (t *txEnMemoria) SlotsOcupados(_ context.Context, desde, hasta time.Time) ([]domain.Slot, error) {
 	return filtrar(t.slots, desde, hasta), nil
 }
 
 func (t *txEnMemoria) Pista(_ context.Context, id string) (domain.Pista, error) {
-	for _, p := range t.repo.pistas {
+	for _, p := range t.pistas {
 		if p.ID == id {
 			return p, nil
 		}

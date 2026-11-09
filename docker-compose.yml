@@ -167,10 +167,14 @@ services:
 
   solr:
     image: solr:9
+    # Crea el core "vuelos" con la configuración de solr/ (20.5), solo si todavía no existe.
+    # Si cambia la configuración, hay que borrar el volumen: docker volume rm <proyecto>_solr-data.
+    command: ["solr-precreate", "vuelos", "/opt/solr/server/solr/configsets/vuelos"]
     ports:
       - "8983:8983"
     volumes:
       - solr-data:/var/solr
+      - ./solr/vuelos:/opt/solr/server/solr/configsets/vuelos:ro
 
   # Mock del proveedor de notificaciones (Recién hecho), hecho con Prism a partir de su
   # contrato (ADR-009). Valida cada pedido contra el contrato y no manda mails. Sirve
@@ -187,6 +191,9 @@ services:
     ports:
       - "3001:3000"
       - "4318:4318"
+    volumes:
+      # Las alertas guardadas en el repo se cargan al arrancar (20.4).
+      - ./grafana/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
 
 volumes:
   mysql-vuelos-data:

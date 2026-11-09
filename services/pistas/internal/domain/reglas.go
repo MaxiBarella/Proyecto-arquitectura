@@ -97,3 +97,24 @@ func SlotsLibresCercanos(pedido SlotLibre, pistas []Pista, ocupados []Slot, n in
 	}
 	return libres
 }
+
+// AfectadoPorCierre indica si un slot pierde su lugar cuando se cierra su pista: los vuelos de
+// ahí en adelante (RN-17, RN-18). El vuelo cuyo bloque ya empezó lo conserva (18, pendiente 3).
+func AfectadoPorCierre(s Slot, ahora time.Time) bool {
+	return s.InicioBloque.After(ahora)
+}
+
+// DestinoDelDesvio es el alternativo al que va un arribo desviado: el primero disponible de la
+// lista, que viene ordenada por distancia (RN-25, RN-26). Si ninguno está disponible, va al primero
+// de la lista: el sistema asume que siempre hay uno (18, pendiente 16).
+func DestinoDelDesvio(alternativos []Alternativo) string {
+	for _, a := range alternativos {
+		if a.Disponible {
+			return a.ICAO
+		}
+	}
+	if len(alternativos) > 0 {
+		return alternativos[0].ICAO
+	}
+	return ""
+}

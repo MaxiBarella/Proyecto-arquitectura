@@ -61,7 +61,16 @@ func Recovery(logger *slog.Logger) gin.HandlerFunc {
 			"error", fmt.Sprint(recovered),
 			"stack", string(debug.Stack()),
 		)
-		c.AbortWithStatus(http.StatusInternalServerError)
+		// El mismo 500 con INTERNAL_ERROR que el resto de los errores inesperados
+		// (21.1), sin el detalle del pánico, que queda en el log. Como en Pistas (#52).
+		c.Header("Content-Type", "application/problem+json")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"type":     "/problems/internal-error",
+			"title":    "Error interno",
+			"status":   http.StatusInternalServerError,
+			"instance": c.Request.URL.Path,
+			"code":     "INTERNAL_ERROR",
+		})
 	})
 }
 

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/pistas/internal/ports"
@@ -15,7 +14,6 @@ import (
 // Claves de ruteo de los eventos que recibe Pistas en su cola pistas.eventos (4.14, 4.19, 9.14).
 const (
 	EventoVueloCancelado = "vuelos.vuelo.cancelado"
-	prefijoClima         = "clima."
 )
 
 // ErrInaplicable es un evento que no se puede aplicar y que reintentar no arregla: le faltan datos o
@@ -39,11 +37,8 @@ func (a *Pistas) ProcesarEvento(ctx context.Context, m Mensaje) error {
 	switch {
 	case m.Type == EventoVueloCancelado:
 		return a.liberarSlotDeVueloCancelado(ctx, m)
-	case strings.HasPrefix(m.Type, prefijoClima):
-		// Cerrar y reabrir pistas por clima se programa en noviembre (8.1). Hasta entonces el evento
-		// se confirma para que no se acumule en la cola.
-		slog.InfoContext(ctx, "evento de clima sin efecto hasta noviembre", "event", m.Type, "event_id", m.ID)
-		return nil
+	case m.Type == EventoAptitudCambio, m.Type == EventoClimaSinDatos:
+		return a.aplicarClima(ctx, m)
 	default:
 		// Un evento que Pistas todavía no conoce: se confirma, así no termina en fallidos (4.22).
 		slog.WarnContext(ctx, "evento desconocido", "event", m.Type, "event_id", m.ID)

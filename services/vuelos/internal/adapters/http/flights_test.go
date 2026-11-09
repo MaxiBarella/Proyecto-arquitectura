@@ -372,6 +372,7 @@ func TestRequestSlotIsCheckedBeforeCallingPistas(t *testing.T) {
 	}{
 		{"bloque fuera de un múltiplo de 15 minutos", aerolineasArgentinas, slotBody("05-23", start.Add(7*time.Minute)), http.StatusBadRequest},
 		{"sin pista", aerolineasArgentinas, slotBody("", start), http.StatusBadRequest},
+		{"sin bloque", aerolineasArgentinas, map[string]any{"runway_id": "05-23"}, http.StatusBadRequest},
 		{"vuelo de otra aerolínea (CA-26)", latam, slotBody("05-23", start), http.StatusForbidden},
 	}
 	for _, c := range cases {
