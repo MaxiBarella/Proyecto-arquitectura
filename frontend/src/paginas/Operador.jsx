@@ -23,7 +23,7 @@ const REFRESCO_MS = 10000;
 // Mensajes para los códigos de error del contrato de Pistas.
 const MENSAJES = {
   RUNWAY_CLOSED_BY_WEATHER:
-    'La cerró el clima y Clima tiene datos: se reabre sola cuando mejore. Para probar, forzá buen tiempo.',
+    'Clima tiene datos y no deja reabrirla: la cerró el clima o no se puede operar. Para probar, forzá buen tiempo.',
   RUNWAY_ALREADY_EXISTS: 'Ya hay una pista con ese nombre.',
   RUNWAY_NOT_FOUND: 'Esa pista no existe.',
   ALTERNATE_NOT_FOUND: 'Ese aeropuerto no está en la lista de alternativos.',
@@ -85,7 +85,7 @@ export default function Operador() {
       {aviso && (aviso.tipo === 'ok' ? <Aviso tipo="ok">{aviso.texto}</Aviso> : <Aviso error={aviso.error} />)}
 
       {estado && <Clima clima={estado.weather} hacer={hacer} />}
-      {estado && <Pistas pistas={estado.runways} conDatos={estado.weather.data_available} hacer={hacer} />}
+      {estado && <Pistas pistas={estado.runways} clima={estado.weather} hacer={hacer} />}
       <AltaDePista hacer={hacer} />
       {alternativos && <Alternativos lista={alternativos} hacer={hacer} />}
     </section>
@@ -141,8 +141,17 @@ function Clima({ clima, hacer }) {
 
 const MOTIVOS = { weather: 'Cerrada por el clima', operator: 'Cerrada por el operador' };
 
-// Las pistas, con cerrar y reabrir (F-10, F-11).
-function Pistas({ pistas, conDatos, hacer }) {
+// Las pistas, con cerrar y reabrir (F-10, F-11). Con datos de Clima, no se reabre a mano una
+// cerrada por el clima (RN-42) ni ninguna mientras el clima no permita operar (23.6).
+function Pistas({ pistas, clima, hacer }) {
+  const conDatos = clima.data_available;
+  const malClima = conDatos && clima.operable === false;
+
+  function sePuedeReabrir(p) {
+    if (!conDatos) return true;
+    return p.closed_reason === 'operator' && !malClima;
+  }
+
   function cerrar(id) {
     const seguro = window.confirm(
       `¿Cerrar la pista ${id}? Los vuelos con slot en ella que todavía no empezaron lo pierden: los despegues quedan demorados y los arribos se desvían.`,
@@ -174,7 +183,7 @@ function Pistas({ pistas, conDatos, hacer }) {
                     Cerrar
                   </button>
                 )}
-                {p.status === 'closed' && (p.closed_reason === 'operator' || !conDatos) && (
+                {p.status === 'closed' && sePuedeReabrir(p) && (
                   <button
                     type="button"
                     className="boton"
@@ -183,8 +192,12 @@ function Pistas({ pistas, conDatos, hacer }) {
                     Reabrir
                   </button>
                 )}
-                {p.status === 'closed' && p.closed_reason === 'weather' && conDatos && (
-                  <span className="ayuda">Se reabre sola cuando mejore el clima.</span>
+                {p.status === 'closed' && !sePuedeReabrir(p) && (
+                  <span className="ayuda">
+                    {p.closed_reason === 'weather'
+                      ? 'Se reabre sola cuando mejore el clima.'
+                      : 'Se puede reabrir cuando el clima permita operar.'}
+                  </span>
                 )}
               </td>
             </tr>

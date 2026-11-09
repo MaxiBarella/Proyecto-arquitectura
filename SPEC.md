@@ -2,7 +2,7 @@
 
 Alcance, reglas de negocio y criterios de aceptación del sistema.
 
-- **Versión:** 0.6, para la presentación grupal (11/11/2026).
+- **Versión:** 0.7, para la presentación grupal (11/11/2026).
 - **De dónde sale:** de las decisiones del equipo registradas en [docs/decisiones.md](docs/decisiones.md), puntos 1, 2.1 a 2.9, 6.7, 6.18, 6.19, 14.1, 14.2, 14.4, 14.8, 14.9, 17.1, 18, 23.4 y 27.1. Este documento las desarrolla; no agrega decisiones nuevas.
 - **Qué no cubre:** cómo se construye. Los servicios, las bases de datos y la comunicación están en `docs/ARCHITECTURE.md` y en los ADR de `docs/adr/`.
 - **Bonus:** no se toma ninguno de los bonus del enunciado (decisión 17.1).
@@ -138,7 +138,7 @@ Las cuentas no se registran desde el sistema: se cargan al arrancar. Hay un oper
 | RN-19 | Un vuelo demorado vuelve a quedar programado cuando la aerolínea le consigue un slot nuevo, con las mismas reglas de asignación. |
 | RN-24 | Si el servicio de clima no puede obtener los datos, las pistas no se cierran ni se reabren solas: el operador ve un aviso y decide a mano. |
 | RN-29 | Una condición climática forzada por el operador dura hasta que el operador la quita. Mientras dura, manda sobre el dato real. |
-| RN-42 | Una pista cerrada por el clima solo la reabre a mano el operador cuando el servicio de clima no tiene datos (RN-24). Mientras haya datos, la reabre el clima. Una condición forzada cuenta como dato: mientras esté puesta, tampoco se reabre a mano. Para abrir o cerrar las pistas en contra del dato real, el operador fuerza una condición (RN-29). |
+| RN-42 | Una pista cerrada por el clima solo la reabre a mano el operador cuando el servicio de clima no tiene datos (RN-24). Mientras haya datos, la reabre el clima. Una condición forzada cuenta como dato: mientras esté puesta, tampoco se reabre a mano. Para abrir o cerrar las pistas en contra del dato real, el operador fuerza una condición (RN-29). Mientras haya datos y el clima no permita operar, tampoco se reabre a mano una pista cerrada por el operador. |
 
 ### Desvíos
 
@@ -257,6 +257,7 @@ Cada criterio indica la regla que comprueba.
 | CA-25 | RN-29 | Dada una condición forzada por el operador que no permite operar, cuando el dato real sí lo permite, entonces las pistas siguen cerradas hasta que el operador quita la condición. |
 | CA-40 | RN-42 | Dada una pista cerrada por el clima y el servicio de clima con datos, cuando el operador intenta reabrirla, entonces se rechaza y la pista sigue cerrada. |
 | CA-41 | RN-17 | Dado un despegue cuyo bloque ya empezó, cuando se cierra su pista, entonces conserva su slot y sigue "Programado". |
+| CA-42 | RN-42 | Dada una pista cerrada por el operador y el servicio de clima con datos que no permiten operar, cuando el operador intenta reabrirla, entonces se rechaza y la pista sigue cerrada. |
 
 ### Estados y roles
 
@@ -340,3 +341,4 @@ Cuando una regla cambia, no se borra: se agrega una fila acá que dice qué camb
 | 0.4 | 22/10/2026 | Incorpora las decisiones 14.8 y 14.9. La búsqueda por texto encuentra por el comienzo y no distingue mayúsculas ni tildes (RN-34). La fecha del tablero es el día en hora de Argentina (RN-33). Se suman los criterios CA-36 y CA-37, y se abre el pendiente 21. |
 | 0.5 | 30/10/2026 | Incorpora el pendiente 21 de la decisión 18. Sin filtro de fecha, el tablero muestra los vuelos de hoy en adelante (RN-33). Los empates se ordenan por horario y después por número de vuelo (RN-35). Se suman los criterios CA-38 y CA-39 y se cierra el pendiente 21. Incorpora también la 27.1: F-19 pasa a ser el aviso por email a la aerolínea cuando el clima le demora o le desvía un vuelo, y se cierra el pendiente 14. |
 | 0.6 | 9/11/2026 | Incorpora la 23.4: una pista cerrada por el clima solo se reabre a mano cuando Clima no tiene datos (RN-42, CA-40). Lo pidió Male en la revisión del #53. Aclara que el cierre alcanza a los bloques que todavía no empezaron, como dice la decisión 18 (pendiente 3), en RN-17, RN-18 y CA-41. |
+| 0.7 | 9/11/2026 | Incorpora la 23.6: mientras Clima tenga datos que no permiten operar, tampoco se reabre a mano una pista cerrada por el operador (RN-42, CA-42). Apareció en la revisión del #73: cerrar a mano una pista que cerró el clima y reabrirla dejaba una pista abierta con mal clima. |

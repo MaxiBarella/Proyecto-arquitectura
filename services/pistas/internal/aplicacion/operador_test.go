@@ -108,6 +108,31 @@ func TestNoSeReabreUnaCerradaPorElClimaConDatos(t *testing.T) {
 	}
 }
 
+// 23.6 y CA-42: con datos de Clima que no permiten operar, tampoco se reabre una pista cerrada
+// por el operador. Si no, cerrar a mano una que cerró el clima y reabrirla esquivaría la RN-42.
+func TestConMalClimaNoSeReabreUnaCerradaPorElOperador(t *testing.T) {
+	repo, p := pistasConVuelos(t)
+	_ = p.ProcesarEvento(context.Background(), aptitud("m1", false))
+	if _, err := p.CerrarPista(context.Background(), "05-23"); err != nil {
+		t.Fatal(err)
+	}
+	antes := len(repo.eventos)
+
+	_, err := p.ReabrirPista(context.Background(), "05-23")
+	if !errors.Is(err, domain.ErrCerradaPorClima) {
+		t.Fatalf("se esperaba ErrCerradaPorClima, vino %v", err)
+	}
+	if repo.pistas[0].Abierta || len(repo.eventos) != antes {
+		t.Errorf("la pista tenía que seguir cerrada y sin eventos nuevos: %+v", repo.pistas[0])
+	}
+
+	// Cuando el clima vuelve a permitir operar, el operador sí la reabre (RN-16).
+	_ = p.ProcesarEvento(context.Background(), aptitud("m2", true))
+	if pista, err := p.ReabrirPista(context.Background(), "05-23"); err != nil || !pista.Abierta {
+		t.Fatalf("con buen clima se tenía que poder reabrir: %+v %v", pista, err)
+	}
+}
+
 // RN-24, RN-42 y CA-20: sin datos de Clima, el operador sí la reabre a mano.
 func TestSinDatosSeReabreUnaCerradaPorElClima(t *testing.T) {
 	repo, p := pistasConVuelos(t)

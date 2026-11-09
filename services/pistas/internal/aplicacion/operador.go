@@ -83,7 +83,9 @@ func (a *Pistas) CerrarPista(ctx context.Context, id string) (domain.Pista, erro
 }
 
 // ReabrirPista reabre una pista (F-11). Una cerrada por el clima solo se reabre a mano cuando
-// Clima no tiene datos; una condición forzada cuenta como dato (RN-42, 23.4). Si ya estaba
+// Clima no tiene datos; una condición forzada cuenta como dato (RN-42, 23.4). Mientras Clima
+// tenga datos que no permiten operar, tampoco se reabre una cerrada por el operador: si no,
+// cerrarla a mano y reabrirla dejaría una pista abierta con mal clima (23.6). Si ya estaba
 // abierta, no cambia nada.
 func (a *Pistas) ReabrirPista(ctx context.Context, id string) (domain.Pista, error) {
 	var pista domain.Pista
@@ -96,14 +98,13 @@ func (a *Pistas) ReabrirPista(ctx context.Context, id string) (domain.Pista, err
 			pista = p
 			return nil
 		}
-		if p.CerradaPor == domain.CerradaPorClima {
-			clima, err := tx.Clima(ctx)
-			if err != nil {
-				return err
-			}
-			if clima.ConDatos {
-				return domain.ErrCerradaPorClima
-			}
+		clima, err := tx.Clima(ctx)
+		if err != nil {
+			return err
+		}
+		noSePuedeOperar := clima.Operable != nil && !*clima.Operable
+		if clima.ConDatos && (p.CerradaPor == domain.CerradaPorClima || noSePuedeOperar) {
+			return domain.ErrCerradaPorClima
 		}
 		motivo := p.CerradaPor
 		pista = domain.Pista{ID: p.ID, Abierta: true}
