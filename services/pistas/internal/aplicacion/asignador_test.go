@@ -16,11 +16,11 @@ type repoEnMemoria struct {
 	pistas       []domain.Pista
 	clima        domain.EstadoClima
 	alternativos []domain.Alternativo
-	slots      []domain.Slot
-	eventos    []domain.Evento
-	procesados map[string]bool
-	proximoID  int64
-	conflictos int // cuántas veces Ocupar va a fallar con ErrConflicto antes de funcionar
+	slots        []domain.Slot
+	eventos      []domain.Evento
+	procesados   map[string]bool
+	proximoID    int64
+	conflictos   int // cuántas veces Ocupar va a fallar con ErrConflicto antes de funcionar
 	// fotoVieja hace que SlotDelVuelo no vea los slots, como una lectura sin bloqueo que todavía no
 	// ve lo que guardó un pedido simultáneo.
 	fotoVieja bool
