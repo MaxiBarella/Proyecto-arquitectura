@@ -353,8 +353,9 @@ Son los puntos de la sección "Pendiente de definir" del [SPEC.md](../SPEC.md). 
 | 18 | Si el bloque pedido tiene que coincidir con el horario del vuelo | **No: se puede pedir cualquier bloque, y con slot vale el horario del bloque.** El tablero muestra, ordena y filtra por el horario del slot; sin slot, por el publicado. Así un vuelo demorado puede pedir un bloque más tarde. Apareció al escribir los endpoints de Vuelos; lo eligió Maxi el 19/10/2026 y queda confirmado al mergearse el pull request #17. |
 | 19 | Si un vuelo puede tener el mismo origen y destino | **No, se rechaza al publicar.** Lo propuso Male en la revisión del pull request #19 y lo aceptó Maxi el 20/10/2026. |
 | 20 | Si se puede publicar un vuelo con horario en el pasado | **No, se rechaza.** Se compara con el momento en que se publica; no afecta a los demorados, que ya están publicados. Lo propuso Male en la revisión del pull request #19 y lo aceptó Maxi el 20/10/2026. |
+| 21 | Qué muestra el tablero si no se filtra por fecha y cómo se desempata al ordenar | **Los vuelos de hoy en adelante, en hora de Argentina (14.9). Los empates, por horario y después por número de vuelo.** Así el orden siempre es el mismo y la paginación no repite ni saltea vuelos. Lo eligió Maxi en el documento de cierre del 30/10/2026. |
 
-El pendiente 11 se resolvió en la 14.1. El 14 depende de la capacidad que asigne la cátedra.
+El pendiente 11 se resolvió en la 14.1. El 14 se resolvió en la 27.1.
 
 ## 19. Reparto
 
@@ -384,6 +385,54 @@ Todo lo de esta sección lo eligió el agente, para que las dos parejas usen lo 
 | Firmar tokens en Usuarios | `github.com/golang-jwt/jwt/v5` |
 | Tests de integración | `testcontainers-go`, que levanta una base real desde el test |
 
+## Decisiones de la presentación
+
+Las secciones 21 a 26, la fila 21 de la sección 18 y el uso de BMAD de "Forma de trabajo" salen del documento de cierre del proyecto del 30/10/2026. Las opciones y las recomendaciones las preparó el agente de IA; las elecciones las completó Maxi en el documento. El 9/11/2026, con la revisión de Male del pull request #43, Maxi corrigió la 21.1, la 25.1 y la 26.1, y eligió la 27.1 a partir del contrato del proveedor. Quedan confirmadas cuando el equipo apruebe el pull request que las registra.
+
+## 21. Errores
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 21.1 | Qué responde un servicio ante un error inesperado | **`500` con `INTERNAL_ERROR` ante un error de programación, y `503` cuando una dependencia no responde** | `500` es para lo que no se arregla reintentando, como un pánico de un handler. `503` es para lo pasajero: en Pistas, que la base no responda o que un choque no se resuelva con los reintentos, como ya hace `responderError`; en Clima, la fuente sin datos. Así Vuelos sigue reintentando a Pistas ante `503` (4.5) y no reintenta un `500`, que igual cuenta como falla para el circuit breaker (13.2). Pistas ya responde así; falta anotar el `500` en su contrato (`services/pistas/openapi.yaml`). Lo marcó Male en la revisión del #43: la versión anterior pasaba todo a `500` y Vuelos dejaba de reintentar las caídas de la base. |
+
+## 22. Frontend
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 22.1 | Quién hace cada pantalla | **Cada uno, las de su parte** | Maxi: el tablero público y la pantalla de la aerolínea (publicar, pedir slot, cancelar y ver sus vuelos). Carola: la del operador (pistas, cerrar y reabrir, forzar clima y el aviso de Clima sin datos). Male: el ingreso. Salvador: arma el proyecto y lo sirve desde NGINX (15.7). Por qué: nadie carga con todo y cada uno conoce la API de su parte. |
+| 22.2 | Con qué se arma | **React con Vite** | React ya estaba elegido (7.2). Vite es la herramienta habitual hoy para arrancar un proyecto de React. |
+| 22.3 | Cómo se ven iguales las pantallas | **Una base común, mergeada primero** | El menú y los estilos entran antes que las pantallas, así las cuatro partes usan lo mismo. |
+
+## 23. Contratos nuevos
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 23.1 | Cómo se definen el login, el tablero y las rutas del operador | **Como en la Entrega 2** | Quien programa el servicio propone su `openapi.yaml` en un pull request y lo revisa la otra pareja antes de programar. El frontend puede arrancar contra el contrato. |
+
+## 24. Caída provocada
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 24.1 | Qué se tira abajo para el informe de `docs/POSTMORTEM.md` | **Pistas, y después RabbitMQ** | Con Pistas caída se ve el circuit breaker de Vuelos (13.1): los vuelos quedan "pendiente de slot", y se ve en el frontend y en Grafana. Con RabbitMQ caído se ve que el outbox guarda los eventos y los publica cuando vuelve. Las dos van en el informe. |
+
+## 25. Orden de los eventos
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 25.1 | Si los consumidores comparan `data_version` | **No** | En `vuelos.eventos` hay un solo consumidor activo (4.23), y Pistas corre en una sola instancia, así que lee `pistas.eventos` de a un consumidor: los eventos de un mismo relay llegan en orden. `pistas.eventos` no tiene `x-single-active-consumer`; importa porque ahí llegan también los avisos de aptitud de Clima, y un "no apto" viejo después de un "apto" nuevo dejaría la pista cerrada por error. Lo único que puede llegar desordenado son los eventos de las dos instancias de Vuelos (4.21), y hoy Pistas recibe de Vuelos solo "vuelo cancelado", una vez por vuelo y final: no hay dos eventos del mismo vuelo que se puedan pisar. Se revisa si Vuelos suma eventos hacia Pistas o si Pistas corre en más de una instancia. El índice de búsqueda sí compara (14.6). Cierra el pendiente del ADR-005. |
+
+## 26. Fecha de cierre
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 26.1 | Cuándo tiene que estar todo en `main` | **Miércoles 11/11/2026, antes de presentar** | En el sorteo del 6/11 salió el 11/11, así que la presentación y el cierre son el mismo día. Antes era el lunes 9/11; se corrió para tener dos días más de trabajo, a costa de no tener un día aparte para ensayar. |
+
+## 27. Proveedor
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 27.1 | Qué capacidad del proveedor se consume y en qué flujo | **Las notificaciones por email de Recién hecho, para avisarle a la aerolínea cuando el clima le demora o le desvía un vuelo** | El proveedor asignado es Recién hecho, un ecommerce de alimentos, y solo ofrece mandar emails (`POST /notificaciones`). Cuando se cierran las pistas por el clima y un vuelo queda demorado o desviado (RN-17, RN-18), se le manda un mail a la aerolínea dueña. Por qué: tiene consecuencias de negocio, sale de un evento que ya existe y, como el envío es asincrónico, si el proveedor está dormido o falla no frena el cierre de las pistas. Cada envío lleva una `Idempotency-Key` armada con el vuelo y el evento, así un reintento no manda el mail dos veces. La clave del proveedor no va al repo: va en `.env` y en Render (9.5). Qué servicio lo manda, el mail de cada aerolínea, el timeout y los reintentos se definen en el ADR-009. Cierra el pendiente 14 del SPEC. |
+
 ## Forma de trabajo
 
 | Decisión | Elegido | Qué significa |
@@ -391,7 +440,7 @@ Todo lo de esta sección lo eligió el agente, para que las dos parejas usen lo 
 | Formato de los ADR | **A** | Formato simple: título, fecha, estado, contexto, alternativas evaluadas, decisión, consecuencias aceptadas y a cuál reemplaza. |
 | Cómo se mergea | **A** | Con commit de merge, conservando los commits de la rama. |
 | Dónde vive el alcance | `SPEC.md` en la raíz | Un solo archivo con funcionalidades, reglas de negocio y criterios de aceptación. Es el documento que manda. Decidido el 8/10/2026. |
-| Uso de BMAD | Al empezar a programar | Para la Entrega 1 la documentación se escribe directo. Cuando arranque el desarrollo, se le pasa a BMAD todo lo producido (`SPEC.md`, decisiones, arquitectura y ADR) y su spec se genera a partir de eso. Si algo cambia, se cambia primero el documento original y se vuelve a generar el de BMAD; nunca al revés. Propuesto por Maxi el 8/10/2026; falta que lo confirme el resto del equipo. |
+| Uso de BMAD | **Sí, para las tareas de la presentación** | Para la Entrega 1 la documentación se escribe directo. Cuando arranque el desarrollo, se le pasa a BMAD todo lo producido (`SPEC.md`, decisiones, arquitectura y ADR) y su spec se genera a partir de eso. Si algo cambia, se cambia primero el documento original y se vuelve a generar el de BMAD; nunca al revés. Propuesto por Maxi el 8/10/2026; lo eligió Maxi en el documento de cierre del 30/10/2026. |
 
 ## Reparto de la Entrega 1
 
@@ -419,16 +468,31 @@ La Entrega 2 vence el viernes 23/10/2026. El trabajo de a dos lo decidió el equ
 
 El detalle está en [entrega-2.md](entrega-2.md).
 
+## Reparto de la presentación
+
+La presentación grupal es el miércoles 11/11/2026 (26.1). Se mantienen las parejas (19) y cada uno sigue con lo que hizo en la Entrega 2. Cada pull request lo revisa alguien de la otra pareja.
+
+| Quién | Qué produce |
+|---|---|
+| Carola | Pistas y el clima (cerrar y reabrir pistas, cierre manual, demoras y desvíos), el `500` en el contrato de Pistas (21.1), ADR-004, la caída provocada y `docs/POSTMORTEM.md` (24.1), `docs/ARCHITECTURE.md` con limitaciones y deuda técnica, y la pantalla del operador |
+| Maxi | La búsqueda con Solr, la caché con Memcached y su medición, `README.md` final, lo pendiente de Vuelos y de este documento, y las pantallas del tablero y de la aerolínea |
+| Male | Usuarios (inicio de sesión y tokens), la capacidad del proveedor (27.1) con su test de contrato y el ADR-009, la observabilidad completa (tablero, alerta y objetivo de servicio) con el ADR-011, el `500` del contrato de Clima y la pantalla de ingreso |
+| Salvador | El gateway con NGINX y el ADR-014, la segunda instancia de Vuelos con el balanceo, las pruebas de carga con k6 y el ADR-013, y el proyecto del frontend servido desde NGINX |
+| Todos | Los tests de su propio servicio, con la cobertura de la 20.3 |
+
+Lo primero, porque traba a otros: el gateway, Usuarios, la base del frontend (22.3) y los contratos nuevos (23.1).
+
 ## Lo que sigue abierto
 
 Los nueve puntos que había dejado abiertos la Entrega 1 se cerraron en la Entrega 2: caché (10.2), hosting y mock (9.4, 9.7 y 9.8), gateway (15), Clima sin datos y aeropuertos alternativos (18), valores (18, 10.3 y 14.2), límite de pedidos de Clima (9.6), mensajes fallidos (11.4) y los temas de la Entrega 2 (secciones 10 a 17).
 
 Queda abierto:
 
-1. **El proveedor y el consumidor:** qué capacidad de otro grupo consumimos y qué grupo consume nuestro Clima. Lo asigna la cátedra y frena el ADR D9 y el pendiente 14 del SPEC.
-2. **El ADR D4:** en qué entrega vence.
-3. **Los endpoints de Vuelos y Pistas:** cada pareja propone los suyos en su pull request y los revisa la otra.
-4. **El uso de BMAD:** la propuesta de Maxi de la sección "Forma de trabajo" sigue sin confirmar.
+1. **El ADR D4:** en qué entrega vence.
+
+Lo que se consume del proveedor quedó en la 27.1; el resto se define en el ADR-009.
+
+Los endpoints de Vuelos y Pistas quedaron en sus contratos (4.14 a 4.16 y `services/vuelos/openapi.yaml`), y los nuevos siguen la 23.1. El uso de BMAD se confirmó ("Forma de trabajo").
 
 ## Puntos a cuidar
 
@@ -461,7 +525,6 @@ Sin respuesta registrada:
 - Qué porcentaje de cobertura de tests unitarios esperan. Mientras tanto, se usa el de la 20.3.
 - Si la API pública de Clima puede no pasar por nuestro gateway (9.9).
 - Si el Clima de la nube puede ser una copia separada del que usa nuestro sistema (9.3).
-- Qué grupo consume nuestro Clima y qué capacidad nos toca consumir.
 - Cuándo es la clase de observabilidad.
 
 ## A qué ADR va cada decisión
@@ -471,13 +534,13 @@ Sin respuesta registrada:
 | D1 | Límites de los servicios | 3.1, 3.2, 3.3 | Entrega 1 |
 | D8 | Contrato propio | 6.1 a 6.19; se actualiza con 9.2, 9.4 y 9.6; la 9.10 lo reemplaza por el ADR-015 | Entrega 1; se actualiza en la 2 |
 | D3 | Persistencia | 5.1 a 5.5, 7.2 | Entrega 1, versión inicial; se valida en la 2 |
-| D5 | Comunicación entre servicios | 4.1 a 4.9 | Entrega 1, versión inicial; se valida en la 2 |
+| D5 | Comunicación entre servicios | 4.1 a 4.9, 25.1 | Entrega 1, versión inicial; se valida en la 2 |
 | D2 | Arquitectura interna | 7.3, 7.5, 7.6, 20 | Entrega 2 |
 | D4 | Consistencia y concurrencia | 2.3, 2.7, 4.4 | Sin entrega asignada |
 | D6 | Búsqueda | 3.2, 7.2, 10.4, 14.1 a 14.10 | Entrega 2 |
 | D7 | Caché | 10.1 a 10.4 | Entrega 2 |
-| D9 | Consumo del proveedor | Depende de la asignación de la cátedra | Entrega 2 |
-| D10 | Resiliencia | 4.5, 13.1 | Entrega 2 |
+| D9 | Consumo del proveedor | 27.1 | Entrega 2; se completa para la presentación |
+| D10 | Resiliencia | 4.5, 13.1, 21.1, 24.1 | Entrega 2 |
 | D11 | Observabilidad | 11.1 a 11.5 | Entrega 2, primera versión |
 | D12 | Balanceo de carga | 12.1 a 12.3, 15.3 | Entrega 2 |
 | D13 | Capacidad y costos | 11.3, 16.1 | Entrega 2 |
