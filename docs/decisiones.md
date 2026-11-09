@@ -338,7 +338,7 @@ Son los puntos de la sección "Pendiente de definir" del [SPEC.md](../SPEC.md). 
 |---|---|---|
 | 1 | Cuánto dura un bloque | **15 minutos.** |
 | 2 | Qué slots libres se informan al rechazar | **Los 3 más cercanos.** Antes o después del pedido, en cualquier pista y sin límite de distancia (agente). |
-| 3 | Qué vuelos alcanza el cierre de una pista | **Todos los que tienen slot en esa pista de ahí en adelante** (agente). No hay que definir un período. |
+| 3 | Qué vuelos alcanza el cierre de una pista | **Todos los que tienen slot en esa pista de ahí en adelante** (agente). No hay que definir un período. El vuelo cuyo bloque ya empezó conserva su slot: pierden el slot los bloques que todavía no empezaron. Lo eligió Carola el 9/11/2026, al programar el cierre por clima. |
 | 4 | Si se puede pedir un slot en una pista cerrada | **No.** |
 | 5 | Si una pista cerrada a mano se reabre sola | **No: la reabre el operador.** |
 | 6 | Cómo pasa un vuelo a "Finalizado" | **Automático, al pasar su bloque.** |
