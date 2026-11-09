@@ -1,0 +1,96 @@
+# Gateway (15, ADR-014): rutas, token y límite de tráfico.
+# Las instancias de Vuelos están en balanceo.conf (15.3).
+#
+# Es una plantilla: al arrancar, la imagen de NGINX reemplaza ${GATEWAY_RATE_LIMIT} y
+# ${GATEWAY_RATE_BURST} con las variables de entorno y deja el resultado en
+# /etc/nginx/conf.d/gateway.conf. Las variables de NGINX ($host, $uri...) no se tocan.
+
+# El script del token (15.4). Las variables se calculan solo cuando algo las usa.
+js_import jwt from /etc/nginx/njs/jwt.js;
+js_set $jwt_sub     jwt.sub;
+js_set $jwt_role    jwt.role;
+js_set $jwt_airline jwt.airline;
+js_set $jwt_motivo  jwt.motivo;
+
+# Límite de tráfico por IP (15.8): 20 pedidos por segundo con ráfagas de hasta 40.
+# Se cambia con GATEWAY_RATE_LIMIT y GATEWAY_RATE_BURST, por ejemplo para las pruebas de carga.
+limit_req_zone $binary_remote_addr zone=por_ip:10m rate=${GATEWAY_RATE_LIMIT}r/s;
+
+upstream pistas {
+    zone pistas 64k;
+    server pistas:8080 resolve;
+}
+
+upstream usuarios {
+    zone usuarios 64k;
+    server usuarios:8080 resolve;
+}
+
+upstream clima {
+    zone clima 64k;
+    server clima:8080 resolve;
+}
+
+server {
+    listen 80;
+
+    # Las respuestas que arma el gateway son errores en formato Problem Details (RFC 9457),
+    # como las de los servicios. Las de los servicios pasan tal cual.
+    default_type  application/problem+json;
+    charset       utf-8;
+    charset_types application/problem+json;
+
+    # "nodelay": hasta 40 pedidos de golpe pasan enseguida; del 41 en adelante, 429.
+    limit_req        zone=por_ip burst=${GATEWAY_RATE_BURST} nodelay;
+    limit_req_status 429;
+    error_page 429 @limite;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    # La identidad que leen los servicios (15.6). Se pisa siempre lo que mande el cliente con
+    # estos nombres: sin un token válido van vacías, y NGINX no manda un encabezado vacío.
+    # Un operador no lleva X-Airline.
+    proxy_set_header X-User-Id   $jwt_sub;
+    proxy_set_header X-User-Role $jwt_role;
+    proxy_set_header X-Airline   $jwt_airline;
+
+    # Sin token pasan solo el inicio de sesión y el tablero (15.7).
+    location = /api/usuarios/login {
+        rewrite ^ /login break;
+        proxy_pass http://usuarios;
+    }
+
+    location = /api/vuelos/board {
+        rewrite ^ /board break;
+        proxy_pass http://vuelos;
+    }
+
+    # La ruta con la que Vuelos le pide un slot a Pistas es solo entre servicios: no controla
+    # quién pide. Desde afuera no existe (15.19).
+    location ^~ /api/pistas/internal/ {
+        return 404 '{"type":"/problems/not-found","title":"Ruta inexistente","status":404,"code":"NOT_FOUND"}';
+    }
+
+    # El resto de /api/<servicio>/ pide un token válido y va al servicio sin el prefijo (15.7).
+    # /api/vuelos/flights llega a Vuelos como /flights.
+    location ~ ^/api/(vuelos|pistas|usuarios|clima)/ {
+        set $servicio $1;
+        if ($jwt_sub = "") {
+            add_header WWW-Authenticate 'Bearer' always;
+            return 401 '{"type":"/problems/invalid-token","title":"Token inválido","status":401,"detail":"Falta el token, no es válido o venció. Hay que iniciar sesión de nuevo.","code":"INVALID_TOKEN"}';
+        }
+        rewrite ^/api/[a-z]+(/.*)$ $1 break;
+        proxy_pass http://$servicio;
+    }
+
+    # Acá se va a servir el frontend (15.7, 22.1), en otro pull request.
+    location / {
+        return 404 '{"type":"/problems/not-found","title":"Ruta inexistente","status":404,"code":"NOT_FOUND"}';
+    }
+
+    location @limite {
+        return 429 '{"type":"/problems/rate-limit-exceeded","title":"Demasiados pedidos","status":429,"detail":"Se pasó el límite de pedidos por segundo. Probá de nuevo en un momento.","code":"RATE_LIMIT_EXCEEDED"}';
+    }
+}
