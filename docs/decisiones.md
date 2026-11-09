@@ -260,6 +260,8 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 | 10.6 | Memoria de Memcached | **128 MB** (Maxi, 9/11/2026; ver la 28) | Cada página del tablero pesa unos 8 KB, así que 64 MB, que es lo que trae, alcanzan para unas 8000 consultas distintas. 128 MB deja margen en la prueba de carga (16.2) y no cuesta nada. Se fija en el `docker-compose.yml`. |
 | 10.7 | Cómo se apaga la caché para medir el "antes" | **La variable `CACHE_ENABLED=false` en Vuelos** (Maxi, 9/11/2026; ver la 28) | Se descartó levantar sin el contenedor de Memcached: la medición se ensuciaría con los errores de conexión y el plazo de la 10.5. |
 | 10.8 | Qué consultas manda k6 para medir la caché | **80 % la portada y 20 % con filtros al azar** (Maxi, 9/11/2026; ver la 28) | La mezcla que propone el ADR-007, la misma en las dos corridas. Con todas iguales casi todo saldría de la caché; con todas al azar, casi nada. Es el valor por defecto de `PORCENTAJE_PORTADA` en `tests/carga/tablero.js`. |
+| 10.9 | Con qué datos se mide la caché | **Un script aparte, `tests/carga/sembrar-tablero.js`, que se corre una vez antes de las dos corridas** (Maxi, 9/11/2026; ver la 28) | Publica 700 vuelos en los próximos 7 días, unos 100 por día, del orden de los que opera Córdoba, de las dos aerolíneas, arribos y despegues, nacionales e internacionales, y a 3 de cada 4 les pide slot. Las dos corridas miden sobre los mismos datos. Se descartó cargarlos dentro de `tablero.js`: la segunda corrida tendría el doble de vuelos. Y se descartó medir con el índice casi vacío: Solr responde rápido igual y el "antes" sale optimista. |
+| 10.10 | Qué variedad tiene el 20 % con filtros (10.8) | **Miles de combinaciones: tipo, estado, aerolínea, fecha de los próximos 7 días, búsqueda, orden y páginas 1 a 5, de uno a tres filtros a la vez** (Maxi, 9/11/2026; ver la 28) | Con los filtros anteriores había unas 100 consultas distintas: con 60 segundos de vigencia, a 100 pedidos por segundo ya estaban todas en la caché y el ensayo dio 99,6 % de aciertos. Así el 20 % casi nunca acierta, que es lo que busca la 10.8, y el resultado depende sobre todo de la portada. Se descartó medir con las dos variedades: eran 4 corridas y más números para explicar. |
 
 ## 11. Observabilidad (ADR D11)
 
@@ -524,6 +526,8 @@ Las decisiones 27.2 a 27.9 las tomó Male el 9/11/2026, al escribir el ADR-009 y
 ## 28. Vuelos para la presentación
 
 Las decisiones 10.5 a 10.8, 14.11, 14.12, 20.5, 26.2 y 28.1 salen de lo que quedaba pendiente para programar la búsqueda, la caché y el finalizado automático (ADR-006 y ADR-007). Las opciones y las recomendaciones las preparó el agente de IA; Maxi eligió las recomendadas el 9/11/2026 y Salvador estuvo de acuerdo en el grupo. Quedan confirmadas cuando el equipo apruebe el pull request que las registra.
+
+Las 10.9 y 10.10 aparecieron al preparar la medición de la caché: hacían falta datos en el índice y el ensayo mostró que los filtros de k6 se repetían demasiado. Las opciones las preparó el agente de IA y Maxi eligió las recomendadas el 9/11/2026. Quedan confirmadas cuando el equipo apruebe el pull request que las registra.
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
