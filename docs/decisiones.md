@@ -318,6 +318,19 @@ El 16/10/2026 el profe respondió si NGINX puede ser balanceador y gateway a la 
 | 15.8 | Control de tráfico | **20 pedidos por segundo por IP** (agente) | Con ráfagas de hasta 40; al pasarlo responde `429`. El valor se configura: para las pruebas de carga del balanceo y la caché se sube, y una prueba aparte muestra el `429` con el valor normal. Con un solo NGINX no hay que coordinar el límite entre réplicas. |
 | 15.9 | Valores de `X-User-Role` | **`airline` y `operator`** (Maxi, 21/10/2026) | Son los que ya usan Clima (#20) y el contrato de Vuelos (#18), en inglés como el resto de la API. Usuarios los pone en el token y NGINX los pasa en el encabezado (15.5, 15.6). Queda confirmada al mergearse el pull request #26, que revisa la pareja 2 porque vale para todos los servicios. |
 
+Las decisiones 15.10 a 15.17 las tomó Male el 7/11/2026, al escribir el contrato de Usuarios (`services/usuarios/openapi.yaml`). Las opciones y las recomendaciones las preparó el agente de IA. Quedan confirmadas al mergearse el pull request que las registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 15.10 | Ruta del inicio de sesión | **`POST /login`** | Por el gateway, `/api/usuarios/login` (15.7). Por qué: es la más clara para el frontend. Se descartó `POST /sessions` porque no se guarda ninguna sesión: el JWT no se registra en ningún lado. |
+| 15.11 | Qué devuelve | **El token, y además `role`, `airline` y `expires_in`** | El frontend sabe qué pantalla mostrar sin abrir el token. `airline` va solo si el rol es `airline`. |
+| 15.12 | Errores del inicio de sesión | **`401 INVALID_CREDENTIALS`, igual si el usuario no existe o la contraseña está mal** | Así no se puede averiguar qué usuarios existen. Además, `400 INVALID_REQUEST` si falta un dato y `500 INTERNAL_ERROR` ante un error inesperado. |
+| 15.13 | Datos dentro del token | **`sub`, `role`, `airline`, `iat` y `exp`** | `sub`, `iat` y `exp` son los nombres estándar de JWT para el usuario, la emisión y el vencimiento. `airline` va solo para las aerolíneas. El script de NGINX (15.4) lee estos nombres. |
+| 15.14 | Cómo se guarda la contraseña | **Hasheada con bcrypt** | Viene en `golang.org/x/crypto`, que ya está entre las dependencias. Es el estándar más conocido y el costo se ajusta solo. Se descartó Argon2id: más moderno, pero con más parámetros para elegir. |
+| 15.15 | Cuentas de prueba | **Un operador y las aerolíneas `AR` y `LA`, con contraseñas del `.env`** | `AR` y `LA` son los códigos que ya usan los tests de Vuelos. Las contraseñas no quedan en el repo, que es público. |
+| 15.16 | Cómo se conecta Usuarios a MySQL | **Usuario propio y la variable `MYSQL_DSN`, como Vuelos (5.9)** | Se suman `MYSQL_USUARIOS_USER` y `MYSQL_USUARIOS_PASSWORD` al `.env`. Usuarios no usa root. |
+| 15.17 | Clave de firma del token | **La variable `JWT_SECRET` del `.env`** | La leen Usuarios para firmar y NGINX para verificar (15.5). |
+
 ## 16. Capacidad y costos (ADR D13)
 
 | # | Decisión | Elegido | Qué significa |
@@ -372,6 +385,7 @@ Todo lo de esta sección lo eligió el agente, para que las dos parejas usen lo 
 | 20.1 | Librerías comunes | Ver la tabla de abajo | Las mismas en todos los servicios. |
 | 20.2 | Carpetas nuevas | `nginx/` y `tests/carga/` | En la raíz. `nginx/` tiene los dos archivos de configuración y el script del token; `tests/carga/`, los escenarios de k6. |
 | 20.3 | Cobertura de tests unitarios | **60 % sobre las reglas de negocio** | Se mide sobre el código de reglas de Pistas y Vuelos, no sobre todo el repo. Se ajusta si el profe pide otro número. |
+| 20.4 | Configuración de Grafana | **Una carpeta `grafana/` en la raíz** (Male, 7/11/2026) | Como `rabbitmq/` y `nginx/`. El `docker-compose.yml` la monta en el contenedor de Grafana, que carga al arrancar lo que hay adentro: hoy, la alerta de mensajes fallidos (11.4) en `grafana/alerting/`; después, el tablero. Se descartó guardarla en `docs/`, que es documentación. Las opciones las preparó el agente; queda confirmada al mergearse el pull request que la registra. |
 
 | Para qué | Librería |
 |---|---|
