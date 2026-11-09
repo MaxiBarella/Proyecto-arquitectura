@@ -47,8 +47,13 @@ func Setup(ctx context.Context, service string) (func(context.Context) error, er
 		return func(context.Context) error { return nil }, nil
 	}
 
-	res, err := resource.Merge(resource.Default(),
-		resource.NewSchemaless(attribute.String("service.name", service)))
+	attrs := []attribute.KeyValue{attribute.String("service.name", service)}
+	// Cada instancia se identifica por el nombre de su máquina, que en Docker es el
+	// del contenedor. Sin esto, las métricas de dos instancias se pisan (ADR-011).
+	if host, err := os.Hostname(); err == nil {
+		attrs = append(attrs, attribute.String("service.instance.id", host))
+	}
+	res, err := resource.Merge(resource.Default(), resource.NewSchemaless(attrs...))
 	if err != nil {
 		return nil, err
 	}
