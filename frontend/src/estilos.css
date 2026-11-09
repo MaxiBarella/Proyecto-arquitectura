@@ -1,0 +1,304 @@
+/*
+ * Estilos comunes de todas las pantallas (22.3, 22.6). CSS propio, sin librerías.
+ *
+ * Los colores y medidas están en variables: si hay que cambiar uno, se cambia acá.
+ * Clases para usar en las pantallas:
+ *   .boton, .boton-secundario, .boton-peligro
+ *   .formulario, .campo (label con su input adentro), .ayuda
+ *   .tabla
+ *   .aviso con .aviso-error, .aviso-ok o .aviso-info (mejor con el componente <Aviso>)
+ *   .estado-<estado del vuelo> (mejor con el componente <EstadoVuelo>)
+ *   .tarjeta, .angosta, .fila
+ */
+
+:root {
+  --fondo: #f5f7fa;
+  --superficie: #ffffff;
+  --texto: #1d2733;
+  --texto-suave: #5b6878;
+  --borde: #d8dee6;
+  --primario: #1f5fa8;
+  --primario-oscuro: #174a84;
+  --peligro: #b3261e;
+  --ok: #1e7b3a;
+  --info: #1f5fa8;
+
+  --radio: 6px;
+  --espacio: 1rem;
+  --fuente: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: var(--fuente);
+  line-height: 1.5;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 0 0 var(--espacio);
+}
+
+h2 {
+  font-size: 1.2rem;
+  margin: 0 0 calc(var(--espacio) / 2);
+}
+
+a {
+  color: var(--primario);
+}
+
+code {
+  font-size: 0.9em;
+}
+
+/* Marco de la página */
+
+.contenedor {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 var(--espacio);
+}
+
+.contenido {
+  padding-top: calc(var(--espacio) * 1.5);
+  padding-bottom: calc(var(--espacio) * 3);
+}
+
+.encabezado {
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
+}
+
+.encabezado-fila {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--espacio) * 1.5);
+  min-height: 56px;
+  flex-wrap: wrap;
+}
+
+.marca {
+  font-weight: 700;
+}
+
+.menu {
+  display: flex;
+  gap: var(--espacio);
+  flex: 1;
+}
+
+.menu a {
+  color: var(--texto-suave);
+  text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+}
+
+.menu a.active {
+  color: var(--texto);
+  border-bottom-color: var(--primario);
+}
+
+.usuario {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--espacio) / 2);
+  color: var(--texto-suave);
+}
+
+/* Bloques */
+
+.tarjeta {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: calc(var(--espacio) * 1.5);
+}
+
+.angosta {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.fila {
+  display: flex;
+  gap: var(--espacio);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+/* Botones */
+
+.boton {
+  display: inline-block;
+  border: 1px solid var(--primario);
+  background: var(--primario);
+  color: #fff;
+  border-radius: var(--radio);
+  padding: 6px 14px;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.boton:hover {
+  background: var(--primario-oscuro);
+}
+
+.boton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.boton-secundario {
+  background: transparent;
+  color: var(--primario);
+}
+
+.boton-secundario:hover {
+  background: var(--fondo);
+}
+
+.boton-peligro {
+  background: var(--peligro);
+  border-color: var(--peligro);
+}
+
+.boton-peligro:hover {
+  background: #8c1d17;
+}
+
+/* Formularios */
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio);
+  margin-top: var(--espacio);
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.campo input,
+.campo select,
+.campo textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 6px 8px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--texto);
+}
+
+.ayuda {
+  color: var(--texto-suave);
+  margin: 0;
+}
+
+/* Tablas */
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.tabla th,
+.tabla td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.tabla th {
+  color: var(--texto-suave);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Avisos */
+
+.aviso {
+  border-radius: var(--radio);
+  padding: 8px 12px;
+  margin: 0 0 var(--espacio);
+  border: 1px solid;
+}
+
+.aviso-error {
+  color: var(--peligro);
+  background: #fdecea;
+}
+
+.aviso-ok {
+  color: var(--ok);
+  background: #e8f5ec;
+}
+
+.aviso-info {
+  color: var(--info);
+  background: #e8f0fa;
+}
+
+.aviso-codigo {
+  margin-left: 8px;
+  opacity: 0.8;
+}
+
+/* Estado de un vuelo */
+
+.estado {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #eef1f5;
+  color: var(--texto-suave);
+}
+
+.estado-pending_slot {
+  background: #fff4d6;
+  color: #7a5900;
+}
+
+.estado-scheduled {
+  background: #e8f0fa;
+  color: var(--primario);
+}
+
+.estado-delayed {
+  background: #ffe7d1;
+  color: #8a4300;
+}
+
+.estado-completed {
+  background: #e8f5ec;
+  color: var(--ok);
+}
+
+.estado-diverted {
+  background: #efe6fa;
+  color: #5b2a92;
+}
+
+.estado-cancelled {
+  background: #fdecea;
+  color: var(--peligro);
+}

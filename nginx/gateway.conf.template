@@ -85,9 +85,26 @@ server {
         proxy_pass http://$servicio;
     }
 
-    # Acá se va a servir el frontend (15.7, 22.1), en otro pull request.
-    location / {
+    # Cualquier otra ruta de la API no existe.
+    location /api/ {
         return 404 '{"type":"/problems/not-found","title":"Ruta inexistente","status":404,"code":"NOT_FOUND"}';
+    }
+
+    # El frontend (15.7, 22.1), compilado con Vite. Desde el mismo origen que la API, así no
+    # hace falta CORS. Las rutas de las pantallas (/aerolinea, /operador...) las resuelve
+    # React Router en el navegador: si no es un archivo, NGINX devuelve index.html.
+    root /usr/share/nginx/html;
+
+    location / {
+        try_files $uri /index.html;
+        # index.html se pide de nuevo cada vez, para que tome la última versión.
+        add_header Cache-Control "no-cache";
+    }
+
+    # Los archivos de Vite llevan un hash en el nombre: si cambian, cambia el nombre.
+    # Se pueden guardar en el navegador sin vencimiento.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
     location @limite {

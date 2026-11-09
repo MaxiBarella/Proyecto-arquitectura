@@ -4,7 +4,9 @@ name: gateway-prueba
 
 services:
   gateway:
-    build: ..
+    build:
+      context: ../..
+      dockerfile: nginx/Dockerfile
     environment:
       JWT_SECRET: clave-de-la-prueba-del-gateway-0123456789
     ports:

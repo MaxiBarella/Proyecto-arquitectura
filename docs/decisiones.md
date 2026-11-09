@@ -443,6 +443,15 @@ Las secciones 21 a 26, la fila 21 de la sección 18 y el uso de BMAD de "Forma d
 | 22.2 | Con qué se arma | **React con Vite** | React ya estaba elegido (7.2). Vite es la herramienta habitual hoy para arrancar un proyecto de React. |
 | 22.3 | Cómo se ven iguales las pantallas | **Una base común, mergeada primero** | El menú y los estilos entran antes que las pantallas, así las cuatro partes usan lo mismo. |
 
+Las decisiones 22.4 a 22.7 las tomó Salvador el 9/11/2026, al armar la base del frontend (`frontend/`). Las opciones y las recomendaciones las preparó el agente de IA. Quedan confirmadas al mergearse el pull request que las registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 22.4 | Dónde va y cómo se pasa de una pantalla a otra | **`frontend/` en la raíz, con React Router** | Cada pantalla tiene su dirección (`/`, `/ingreso`, `/aerolinea`, `/operador`), así se puede recargar y compartir el link, y cada uno trabaja en su archivo de `src/paginas/` sin pisarse. React Router es la librería de ruteo más usada con React. Se descartó elegir la pantalla con un estado de React: al recargar se volvía al inicio. |
+| 22.5 | Lenguaje | **JavaScript** | Quedan dos días y nadie del grupo programó el frontend todavía: sin tipos, cada uno arranca más rápido. Se descartó TypeScript, que ataja errores con los datos de la API pero suma tiempo. |
+| 22.6 | Estilos comunes | **CSS propio, sin librerías** | Un archivo, `src/estilos.css`, con los colores y medidas en variables y clases para botones, formularios, tablas, avisos y el estado de un vuelo. Sin dependencias y fácil de explicar. Se descartaron una librería de componentes (hay que aprenderla y pesa) y Tailwind (mete los estilos en cada elemento). |
+| 22.7 | Dónde guarda el frontend el token | **`sessionStorage`** | Sobrevive si se recarga la página y se borra al cerrar la pestaña; como el token dura 1 hora (15.2), queda poco tiempo expuesto. Un script malicioso en la página lo podría leer, igual que con `localStorage`, que además lo guardaría más tiempo. Se descartó tenerlo solo en memoria: al recargar había que volver a iniciar sesión. |
+
 ## 23. Contratos nuevos
 
 | # | Decisión | Elegido | Qué significa |

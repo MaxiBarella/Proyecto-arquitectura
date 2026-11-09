@@ -122,8 +122,22 @@ caso "bloqueada con letras codificadas" 404 NOT_FOUND -X POST \
     -H "Authorization: Bearer $OPERADOR" "$GATEWAY/api/pistas/%69nternal/slots"
 
 echo "== Otras rutas"
-caso "una ruta fuera de /api/ da 404" 404 NOT_FOUND "$GATEWAY/cualquier-cosa"
 caso "un servicio que no existe da 404" 404 NOT_FOUND -H "Authorization: Bearer $OPERADOR" "$GATEWAY/api/otro/x"
+caso "/api sin servicio da 404" 404 NOT_FOUND "$GATEWAY/api/"
+
+echo "== Frontend (15.7)"
+caso "la raíz sirve el frontend" 200 '<div id="root">' "$GATEWAY/"
+caso "una pantalla de React Router también" 200 '<div id="root">' "$GATEWAY/operador"
+caso "index.html no se guarda en el navegador" 200 'Cache-Control: no-cache' -i "$GATEWAY/aerolinea"
+casos=$((casos + 1))
+archivo=$(curl -s "$GATEWAY/" | grep -o '/assets/[^"]*\.js' | head -n 1)
+encabezados=$(curl -s -o /dev/null -D - "$GATEWAY$archivo")
+if [[ -n "$archivo" ]] && grep -qi 'cache-control: public, max-age=31536000, immutable' <<<"$encabezados"; then
+    echo "ok    los archivos de Vite se guardan en el navegador ($archivo)"
+else
+    fallas=$((fallas + 1))
+    echo "FALLA no encontré el JavaScript del frontend o no tiene Cache-Control: $archivo"
+fi
 
 echo "== Límite de tráfico (15.8)"
 casos=$((casos + 1))
