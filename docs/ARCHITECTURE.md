@@ -134,9 +134,65 @@ El grupo consumidor entra **directo a la copia pública**, sin pasar por nuestro
 
 **Balanceo.** NGINX reparte los pedidos por turnos entre dos instancias de Vuelos (12.1, 12.2). Se eligió Vuelos porque es el que más tráfico recibe y tiene el tablero cacheado, así que el balanceo y la caché se muestran sobre el mismo flujo. Por eso Vuelos no puede guardar nada importante en la memoria de una sola instancia, y la caché es un Memcached compartido (10.2).
 
+## Limitaciones conocidas
+
+Son consecuencias de lo que se eligió. El equipo las aceptó a sabiendas, y cada una tiene su motivo en el ADR o la decisión que se indica.
+
+**Datos que llegan con atraso**
+
+| Limitación | Por qué se acepta | Dónde |
+|---|---|---|
+| El tablero puede tardar hasta 2 minutos en mostrar un cambio: hasta 60 segundos del índice más hasta 60 de la caché. | Es informativo. La aerolínea ve sus propios vuelos al día, porque esa lista se lee de MySQL. | RN-37, ADR-006, ADR-007 |
+| Entre que Pistas asigna un slot y Vuelos recibe el evento, el vuelo figura "pendiente de slot". | Es el costo de no hacer una sola operación entre dos servicios. En las pruebas fueron unos 300 ms. | 4.1, ADR-004 |
+| Pistas trabaja con el último clima conocido: si un aviso se demora, puede asignar un slot en una pista que debería estar cerrada. | Así la caída de Clima no frena la asignación. El atraso aceptado es de hasta 30 segundos; en la prueba del 9/11/2026 fueron unos 2. | 4.2, 4.5, ADR-005 |
+| Las dos copias de Clima, la local y la de Render, pueden mostrar datos distintos durante unos minutos. | Cada una consulta a Open-Meteo por su cuenta, para no depender de la nube en el sistema local. | 9.3, ADR-015 |
+
+**Fallas que el sistema no cubre**
+
+| Limitación | Por qué se acepta | Dónde |
+|---|---|---|
+| NGINX es uno solo: si se cae, se cae la entrada a todo el sistema. | Alcance del práctico. | ADR-012 |
+| Con Pistas caída, la aerolínea espera unos 7 segundos hasta que se abre el circuit breaker, y el vuelo queda "pendiente de slot": tiene que volver a pedirlo a mano. | El pedido no se pierde y se puede repetir sin riesgo. Se vio en la caída provocada. | 4.16, 13.2, ADR-010, POSTMORTEM |
+| Durante los 30 segundos de circuit breaker abierto no se piden slots, aunque Pistas ya haya vuelto. | Es el precio de no cargar a Pistas apenas vuelve. | 13.2, ADR-010 |
+| Cada instancia de Vuelos tiene su propio circuit breaker: una puede estar abierta y la otra no. | No hace falta coordinarlos para el alcance del práctico. | 13.1, ADR-012 |
+| Si Solr estuvo caído, el índice queda desfasado hasta que alguien corre la reconstrucción. | Solo afecta al tablero; publicar vuelos y pedir slots siguen andando. | ADR-006 |
+| Si se vence una entrada muy pedida de la caché, varios pedidos a la vez van a Solr (cache stampede), y al arrancar la caché está vacía. | Con 60 segundos de vigencia y un solo tablero, la carga extra es chica. | ADR-007 |
+| Si no hay ningún aeropuerto alternativo disponible, el arribo se desvía igual al primero de la lista. | El SPEC asume que siempre hay uno disponible. | 18 (pendiente 16) |
+| La copia de Clima en Render se duerme sin uso: el primer pedido tarda cerca de un minuto y puede traer un `503`. | Es el plan gratuito. Está avisado en la guía del contrato. | 9.4, ADR-015 |
+
+**Seguridad**
+
+| Limitación | Por qué se acepta | Dónde |
+|---|---|---|
+| Un token no se puede revocar: vale hasta que vence, 1 hora después. | Así el gateway lo verifica sin preguntarle a Usuarios, y la caída de Usuarios no corta las sesiones abiertas. | 15.2 |
+| Los servicios confían en los encabezados de identidad que pone el gateway. | Mientras los servicios expongan su puerto directo, cualquiera que llegue a él puede mandar esos encabezados. Se cierra cuando se saquen los puertos (15.20). | 15.6, 15.20 |
+| Grafana entra sin usuario ni contraseña. | Corre solo en la computadora de cada uno. | ADR-011 |
+| La base de Clima en Atlas acepta conexiones desde cualquier IP, protegida solo por usuario y contraseña. | Render gratis no tiene una IP fija. | ADR-015 |
+
+**Capacidad y operación**
+
+| Limitación | Por qué se acepta | Dónde |
+|---|---|---|
+| Los resultados de las pruebas de carga dependen de la computadora donde se corren, y k6 le quita CPU al sistema. | No hay servidores para probar. Se documenta en qué máquina se corrió cada prueba. | ADR-013 |
+| El arranque local levanta muchos contenedores: cuatro bases, Solr, RabbitMQ, Memcached, Grafana y NGINX. | Es la consecuencia de que cada servicio tenga su base (5.2). | ADR-001, ADR-003 |
+| Si Grafana se recrea, se pierden los datos guardados: el contenedor no tiene volumen. | Alcanza para la presentación. | ADR-011 |
+| Después de cada merge, la copia de Clima en Render se despliega a mano. | El repositorio se conectó a Render como público. | ADR-015 |
+
+## Deuda técnica aceptada
+
+Cosas que se dejaron para después, sabiendo que habría que hacerlas si el sistema siguiera creciendo.
+
+| Deuda | Qué habría que hacer | Dónde |
+|---|---|---|
+| Los consumidores no comparan `data_version`, y no significa lo mismo en los tres servicios. | Compararlo si Vuelos publica más eventos hacia Pistas desde sus dos instancias, o si Pistas corre en más de una. | 25.1, ADR-005 |
+| La carpeta de observabilidad está copiada en cada servicio, y las copias pueden quedar distintas. | Llevar cada cambio a mano a todas las copias, o pasarla a un módulo compartido. | ADR-011 |
+| El límite de pedidos de Clima en la nube se cuenta en memoria: solo es correcto con una instancia. | Contarlo en un lugar compartido si Clima escalara. | ADR-015 |
+| Clima y Usuarios, en capas, dependen de sus repositorios concretos. | Revisar el estilo si crecieran sus reglas. | ADR-002 |
+| Los umbrales del clima no contemplan el viento cruzado según la orientación de cada pista. | Calcular la aptitud por pista, si el negocio lo pidiera. | ADR-008 |
+| Una caída de Pistas no dispara ninguna alerta: se detecta mirando el tablero o los logs. | Una alerta cuando se abre el circuit breaker. Es una propuesta del POSTMORTEM, sin decidir. | POSTMORTEM |
+| Con RabbitMQ caído, Pistas y los consumidores escriben un error por segundo. | Espaciar los reintentos mientras RabbitMQ no responde. Es una propuesta del POSTMORTEM, sin decidir. | POSTMORTEM |
+
 ## Pendiente
 
 - **Punto de entrada único:** confirmar con el profe que la API pública de Clima puede no pasar por el gateway (9.9, enunciado 2.1).
-- **Grupo proveedor:** qué capacidad consumimos, desde qué servicio y en qué flujo (F-19). Lo asigna la cátedra.
 - **Grupo consumidor:** qué grupo usa nuestro Clima. Lo asigna la cátedra.
-- **Limitaciones conocidas y deuda técnica aceptada:** sección que se agrega para la presentación.
