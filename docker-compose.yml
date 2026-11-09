@@ -162,10 +162,14 @@ services:
 
   solr:
     image: solr:9
+    # Crea el core "vuelos" con la configuración de solr/ (20.5), solo si todavía no existe.
+    # Si cambia la configuración, hay que borrar el volumen: docker volume rm <proyecto>_solr-data.
+    command: ["solr-precreate", "vuelos", "/opt/solr/server/solr/configsets/vuelos"]
     ports:
       - "8983:8983"
     volumes:
       - solr-data:/var/solr
+      - ./solr/vuelos:/opt/solr/server/solr/configsets/vuelos:ro
 
   grafana:
     image: grafana/otel-lgtm:0.37.0
