@@ -256,6 +256,10 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 | 10.2 | Herramienta | **Memcached** | Una sola, compartida por las dos instancias de Vuelos (12.1). Por qué: se usó en el práctico de la clase 3. |
 | 10.3 | Cómo se mantiene al día | **A. Solo vencimiento, 60 segundos** | Cada entrada dura 60 segundos y después se vuelve a calcular. No se borra cuando llega un evento. Por qué: con un vencimiento corto, borrar por evento casi no cambia nada. |
 | 10.4 | Si Memcached no responde | **Se consulta Solr directo** (agente) | El tablero sigue funcionando, más lento, y queda un log del error. La caché nunca es imprescindible para responder. |
+| 10.5 | Cuánto se espera a Memcached | **100 ms** (Maxi, 9/11/2026; ver la 28) | Pasado ese plazo se va directo a Solr (10.4). En la misma red, Memcached responde en menos de 1 ms: 100 ms da margen sin que el tablero se vuelva lento si se cae. |
+| 10.6 | Memoria de Memcached | **128 MB** (Maxi, 9/11/2026; ver la 28) | Cada página del tablero pesa unos 8 KB, así que 64 MB, que es lo que trae, alcanzan para unas 8000 consultas distintas. 128 MB deja margen en la prueba de carga (16.2) y no cuesta nada. Se fija en el `docker-compose.yml`. |
+| 10.7 | Cómo se apaga la caché para medir el "antes" | **La variable `CACHE_ENABLED=false` en Vuelos** (Maxi, 9/11/2026; ver la 28) | Se descartó levantar sin el contenedor de Memcached: la medición se ensuciaría con los errores de conexión y el plazo de la 10.5. |
+| 10.8 | Qué consultas manda k6 para medir la caché | **80 % la portada y 20 % con filtros al azar** (Maxi, 9/11/2026; ver la 28) | La mezcla que propone el ADR-007, la misma en las dos corridas. Con todas iguales casi todo saldría de la caché; con todas al azar, casi nada. Es el valor por defecto de `PORCENTAJE_PORTADA` en `tests/carga/tablero.js`. |
 
 ## 11. Observabilidad (ADR D11)
 
@@ -299,6 +303,8 @@ La 12.3 se actualizó el 23/10/2026 con la 4.21 y la 4.23, que cambiaron cómo s
 | 14.8 | Cómo encuentra la búsqueda por texto | **Por el comienzo, sin distinguir mayúsculas ni tildes** | "AR15" encuentra AR1550, "Bue" encuentra Buenos Aires y "cordoba" encuentra Córdoba. Se descartaron la palabra completa, porque obliga a escribir el número entero, y cualquier parte de la palabra, porque agranda el índice y trae resultados de más. |
 | 14.9 | Fecha del filtro del tablero | **El día en hora de Argentina (UTC−3)** | Un vuelo de las 23:30 en Córdoba es de ese día, aunque en UTC sean las 02:30 del siguiente. Es lo que espera quien mira el tablero. El resto de los horarios de la API siguen en UTC. |
 | 14.10 | Si Solr no responde al actualizar el índice | **Igual que los demás consumidores** | Se hacen 3 reintentos, a 1, 2 y 4 segundos (4.24), y el evento pasa a `vuelos.indice.fallidos`, con la alerta de la 11.4. Cuando Solr vuelve, se corre la reconstrucción (14.3). Se descartó reintentar sin límite, porque se comportaría distinto que el resto y los eventos se acumularían. |
+| 14.11 | Cómo se corre la reconstrucción del índice (14.3) | **Un subcomando del programa de Vuelos: `docker compose run vuelos reindex`** (Maxi, 9/11/2026; ver la 28) | No suma una ruta HTTP que habría que proteger en el gateway, y usa la misma configuración que el servicio. |
+| 14.12 | Plazo de cada escritura a Solr | **2 segundos** (Maxi, 9/11/2026; ver la 28) | El mismo que usa Vuelos con Pistas (4.16). Con los 3 reintentos (14.10), un Solr caído tarda unos 13 segundos en mandar el evento a fallidos. |
 
 Maxi eligió las decisiones 14.5 a 14.10 el 22/10/2026, al escribir el ADR-006, entre las opciones que propuso el agente. La 14.7 tiene la marca "(agente)" porque el valor de 5 segundos lo propuso el agente. Quedan confirmadas al mergearse el pull request #30.
 
@@ -386,6 +392,7 @@ Todo lo de esta sección lo eligió el agente, para que las dos parejas usen lo 
 | 20.2 | Carpetas nuevas | `nginx/` y `tests/carga/` | En la raíz. `nginx/` tiene los dos archivos de configuración y el script del token; `tests/carga/`, los escenarios de k6. |
 | 20.3 | Cobertura de tests unitarios | **60 % sobre las reglas de negocio** | Se mide sobre el código de reglas de Pistas y Vuelos, no sobre todo el repo. Se ajusta si el profe pide otro número. |
 | 20.4 | Configuración de Grafana | **Una carpeta `grafana/` en la raíz** (Male, 7/11/2026) | Como `rabbitmq/` y `nginx/`. El `docker-compose.yml` la monta en el contenedor de Grafana, que carga al arrancar lo que hay adentro: hoy, la alerta de mensajes fallidos (11.4) en `grafana/alerting/`; después, el tablero. Se descartó guardarla en `docs/`, que es documentación. Las opciones las preparó el agente; queda confirmada al mergearse el pull request que la registra. |
+| 20.5 | Configuración de Solr | **Una carpeta `solr/` en la raíz** (Maxi, 9/11/2026; ver la 28) | Como `rabbitmq/`, `nginx/` y `grafana/`: la monta el `docker-compose.yml`. Tiene el esquema del core y la cadena que descarta las versiones viejas (14.6). |
 
 | Para qué | Librería |
 |---|---|
@@ -440,12 +447,21 @@ Las secciones 21 a 26, la fila 21 de la sección 18 y el uso de BMAD de "Forma d
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 26.1 | Cuándo tiene que estar todo en `main` | **Miércoles 11/11/2026, antes de presentar** | En el sorteo del 6/11 salió el 11/11, así que la presentación y el cierre son el mismo día. Antes era el lunes 9/11; se corrió para tener dos días más de trabajo, a costa de no tener un día aparte para ensayar. |
+| 26.2 | Qué se asegura primero si no llega todo | **El tablero en el backend: Solr, `GET /board` y la caché con su medición** (Maxi, 9/11/2026; ver la 28) | El enunciado los pide con evidencia (2.6, 2.7). Las pantallas del tablero y de la aerolínea van después. |
 
 ## 27. Proveedor
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 27.1 | Qué capacidad del proveedor se consume y en qué flujo | **Las notificaciones por email de Recién hecho, para avisarle a la aerolínea cuando el clima le demora o le desvía un vuelo** | El proveedor asignado es Recién hecho, un ecommerce de alimentos, y solo ofrece mandar emails (`POST /notificaciones`). Cuando se cierran las pistas por el clima y un vuelo queda demorado o desviado (RN-17, RN-18), se le manda un mail a la aerolínea dueña. Por qué: tiene consecuencias de negocio, sale de un evento que ya existe y, como el envío es asincrónico, si el proveedor está dormido o falla no frena el cierre de las pistas. Cada envío lleva una `Idempotency-Key` armada con el vuelo y el evento, así un reintento no manda el mail dos veces. La clave del proveedor no va al repo: va en `.env` y en Render (9.5). Qué servicio lo manda, el mail de cada aerolínea, el timeout y los reintentos se definen en el ADR-009. Cierra el pendiente 14 del SPEC. |
+
+## 28. Vuelos para la presentación
+
+Las decisiones 10.5 a 10.8, 14.11, 14.12, 20.5, 26.2 y 28.1 salen de lo que quedaba pendiente para programar la búsqueda, la caché y el finalizado automático (ADR-006 y ADR-007). Las opciones y las recomendaciones las preparó el agente de IA; Maxi eligió las recomendadas el 9/11/2026 y Salvador estuvo de acuerdo en el grupo. Quedan confirmadas cuando el equipo apruebe el pull request que las registra.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 28.1 | Cada cuánto se dan por finalizados los vuelos (RN-32, F-22) | **Cada 1 minuto** | Vuelos busca los vuelos programados cuyo bloque ya terminó y los pasa a finalizado, cada uno con su "vuelo actualizado" para el tablero (14.5). Con bloques de 15 minutos (RN-03), un minuto de atraso casi no se nota, y la consulta es liviana. |
 
 ## Forma de trabajo
 
@@ -551,8 +567,8 @@ Sin respuesta registrada:
 | D5 | Comunicación entre servicios | 4.1 a 4.9, 25.1 | Entrega 1, versión inicial; se valida en la 2 |
 | D2 | Arquitectura interna | 7.3, 7.5, 7.6, 20 | Entrega 2 |
 | D4 | Consistencia y concurrencia | 2.3, 2.7, 4.4 | Sin entrega asignada |
-| D6 | Búsqueda | 3.2, 7.2, 10.4, 14.1 a 14.10 | Entrega 2 |
-| D7 | Caché | 10.1 a 10.4 | Entrega 2 |
+| D6 | Búsqueda | 3.2, 7.2, 10.4, 14.1 a 14.12, 20.5 | Entrega 2 |
+| D7 | Caché | 10.1 a 10.8 | Entrega 2 |
 | D9 | Consumo del proveedor | 27.1 | Entrega 2; se completa para la presentación |
 | D10 | Resiliencia | 4.5, 13.1, 21.1, 24.1 | Entrega 2 |
 | D11 | Observabilidad | 11.1 a 11.5 | Entrega 2, primera versión |
