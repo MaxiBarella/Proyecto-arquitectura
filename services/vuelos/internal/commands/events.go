@@ -88,7 +88,11 @@ func (s *Service) HandleEvent(ctx context.Context, store MessageStore, m Message
 		return fmt.Errorf("%w: %s sin flight_id", ErrUnprocessable, m.Type)
 	}
 	applied, err := store.ApplyMessage(ctx, m.ID, d.FlightID, func(f *domain.Flight) ([]domain.Event, error) {
-		return nil, change(f)
+		if err := change(f); err != nil {
+			return nil, err
+		}
+		// El cambio de estado llega al tablero con "vuelo actualizado" (14.5).
+		return []domain.Event{s.updated(ctx, f)}, nil
 	})
 	switch {
 	case errors.Is(err, domain.ErrNotFound), errors.Is(err, domain.ErrInvalidTransition), errors.Is(err, domain.ErrInvalidFlight):

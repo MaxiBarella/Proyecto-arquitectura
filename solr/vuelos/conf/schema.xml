@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Esquema del índice del tablero (ADR-006). Un documento por vuelo, con los nombres que
+  escribe Vuelos (services/vuelos/internal/adapters/solr/client.go).
+
+  Solo se indexa lo que se busca, se filtra o se ordena. El resto se guarda nada más
+  que para devolverlo, así el tablero responde sin consultar MySQL.
+-->
+<schema name="vuelos" version="1.6">
+  <uniqueKey>id</uniqueKey>
+
+  <fieldType name="string" class="solr.StrField" sortMissingLast="true" docValues="true"/>
+  <fieldType name="plong" class="solr.LongPointField" docValues="true"/>
+  <fieldType name="pdate" class="solr.DatePointField" docValues="true"/>
+
+  <!--
+    Búsqueda por texto (14.8, RN-34): encuentra por el comienzo y no distingue mayúsculas
+    ni tildes. Al guardar, el texto entero se pasa a minúsculas, se le sacan las tildes y se
+    guardan todos sus comienzos ("ar", "ar1", "ar15"...). Al buscar, lo escrito se pasa
+    igual a minúsculas y sin tildes, y se busca como un solo término. Así "ar15" encuentra
+    AR1550, "cordoba" encuentra Córdoba y "buenos ai" encuentra Buenos Aires.
+  -->
+  <fieldType name="comienzo" class="solr.TextField" positionIncrementGap="100">
+    <analyzer type="index">
+      <tokenizer class="solr.KeywordTokenizerFactory"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+      <filter class="solr.ASCIIFoldingFilterFactory"/>
+      <filter class="solr.EdgeNGramFilterFactory" minGramSize="1" maxGramSize="60"/>
+    </analyzer>
+    <analyzer type="query">
+      <tokenizer class="solr.KeywordTokenizerFactory"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+      <filter class="solr.ASCIIFoldingFilterFactory"/>
+    </analyzer>
+  </fieldType>
+
+  <field name="id" type="string" indexed="true" stored="true" required="true"/>
+  <field name="_version_" type="plong" indexed="false" stored="false"/>
+  <!-- La versión del vuelo, para descartar un cambio viejo (14.6). -->
+  <field name="data_version" type="plong" indexed="false" stored="true" required="true"/>
+
+  <!-- Filtros (14.1) y orden por aerolínea y por ámbito (RN-35). -->
+  <field name="airline" type="string" indexed="true" stored="true" required="true"/>
+  <field name="type" type="string" indexed="true" stored="true" required="true"/>
+  <field name="scope" type="string" indexed="true" stored="true" required="true"/>
+  <field name="status" type="string" indexed="true" stored="true" required="true"/>
+  <!-- El horario que vale (RN-39): filtro por fecha y orden. -->
+  <field name="board_at" type="pdate" indexed="true" stored="true" required="true"/>
+  <!-- Desempate del orden (RN-35): después del horario, el número de vuelo. -->
+  <field name="flight_number" type="string" indexed="true" stored="true" required="true"/>
+
+  <!-- Solo para devolver. -->
+  <field name="origin" type="string" indexed="false" stored="true" required="true"/>
+  <field name="destination" type="string" indexed="false" stored="true" required="true"/>
+  <field name="scheduled_at" type="pdate" indexed="false" stored="true" required="true"/>
+  <field name="slot_runway_id" type="string" indexed="false" stored="true"/>
+  <field name="slot_block_start" type="pdate" indexed="false" stored="true"/>
+  <field name="diverted_to" type="string" indexed="false" stored="true"/>
+  <field name="created_at" type="pdate" indexed="false" stored="true" required="true"/>
+  <field name="updated_at" type="pdate" indexed="false" stored="true" required="true"/>
+
+  <!-- Búsqueda por texto en el número de vuelo y las ciudades (RN-34). -->
+  <field name="busqueda" type="comienzo" indexed="true" stored="false" multiValued="true"/>
+  <copyField source="flight_number" dest="busqueda"/>
+  <copyField source="origin" dest="busqueda"/>
+  <copyField source="destination" dest="busqueda"/>
+</schema>

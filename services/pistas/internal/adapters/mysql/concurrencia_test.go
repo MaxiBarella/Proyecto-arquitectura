@@ -8,6 +8,7 @@ package mysql
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -177,5 +178,143 @@ func TestVueloCanceladoContraMySQL(t *testing.T) {
 	}
 	if len(ocupados) != 0 {
 		t.Fatalf("el slot tenía que quedar libre, tiene %d vuelos", len(ocupados))
+	}
+}
+
+// manana es un bloque que todavía no empezó, para que el cierre lo alcance (pendiente 3).
+var manana = time.Now().UTC().Add(24 * time.Hour).Truncate(domain.DuracionBloque)
+
+func eventoDeClima(id string, operable bool) aplicacion.Mensaje {
+	return aplicacion.Mensaje{ID: id, Type: aplicacion.EventoAptitudCambio,
+		Data: []byte(fmt.Sprintf(`{"airport":"SACO","operable":%t,"reasons":[]}`, operable))}
+}
+
+func pendientesPorTipo(t *testing.T, repo *Repositorio) map[string][]ports.EventoGuardado {
+	t.Helper()
+	pendientes, err := repo.Pendientes(context.Background(), 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := map[string][]ports.EventoGuardado{}
+	for _, e := range pendientes {
+		res[e.Tipo] = append(res[e.Tipo], e)
+	}
+	return res
+}
+
+// RN-15, RN-17, RN-18, RN-25 y RN-16 contra MySQL: el clima cierra las dos pistas, libera los
+// slots con sus eventos en el outbox, y al mejorar reabre solo las que cerró él.
+func TestCierrePorClimaContraMySQL(t *testing.T) {
+	repo := levantarBase(t)
+	pistas := aplicacion.NuevoPistas(repo)
+	ctx := context.Background()
+	for _, p := range []domain.PedidoDeSlot{
+		{VueloID: "D01", TipoOperacion: domain.Despegue, PistaID: "05-23", InicioBloque: manana},
+		{VueloID: "A01", TipoOperacion: domain.Arribo, PistaID: "18-36", InicioBloque: manana},
+	} {
+		if _, err := pistas.Asignar(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := pistas.ProcesarEvento(ctx, eventoDeClima("6b0f1c2e-1111-4c1b-9d2e-5f4a3b2c1d0e", false)); err != nil {
+		t.Fatalf("no se esperaba error: %v", err)
+	}
+
+	todas, _ := repo.Pistas(ctx)
+	for _, p := range todas {
+		if p.Abierta || p.CerradaPor != domain.CerradaPorClima {
+			t.Errorf("la pista %s tenía que quedar cerrada por el clima: %+v", p.ID, p)
+		}
+	}
+	if ocupados, _ := repo.SlotsOcupados(ctx, manana, manana.Add(domain.DuracionBloque)); len(ocupados) != 0 {
+		t.Errorf("los slots tenían que quedar libres: %+v", ocupados)
+	}
+	eventos := pendientesPorTipo(t, repo)
+	if len(eventos[domain.EventoPistaCerrada]) != 2 || len(eventos[domain.EventoSlotLiberado]) != 2 {
+		t.Fatalf("faltan eventos en el outbox: %d pista.cerrada y %d slot.liberado",
+			len(eventos[domain.EventoPistaCerrada]), len(eventos[domain.EventoSlotLiberado]))
+	}
+	for _, e := range eventos[domain.EventoSlotLiberado] {
+		var d struct {
+			FlightID   string  `json:"flight_id"`
+			DivertedTo *string `json:"diverted_to"`
+		}
+		_ = json.Unmarshal(e.DatosJSON, &d)
+		if d.FlightID == "A01" && (d.DivertedTo == nil || *d.DivertedTo != "SAOU") {
+			t.Errorf("el arribo tenía que ir a SAOU: %s", e.DatosJSON)
+		}
+		if d.FlightID == "D01" && d.DivertedTo != nil {
+			t.Errorf("el despegue no se desvía: %s", e.DatosJSON)
+		}
+	}
+
+	// El operador cierra 18-36 a mano: el clima no la reabre (RN-16).
+	if err := repo.EnTransaccion(ctx, func(ctx context.Context, tx ports.Transaccion) error {
+		return tx.GuardarPista(ctx, domain.Pista{ID: "18-36", Abierta: false, CerradaPor: domain.CerradaPorOperador})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := pistas.ProcesarEvento(ctx, eventoDeClima("6b0f1c2e-2222-4c1b-9d2e-5f4a3b2c1d0e", true)); err != nil {
+		t.Fatalf("no se esperaba error: %v", err)
+	}
+	todas, _ = repo.Pistas(ctx)
+	if !todas[0].Abierta || todas[1].Abierta || todas[1].CerradaPor != domain.CerradaPorOperador {
+		t.Errorf("se esperaba 05-23 abierta y 18-36 cerrada por el operador: %+v", todas)
+	}
+}
+
+// ADR-004: un cierre por clima que llega mientras se piden slots. Ningún slot queda ocupado en una
+// pista cerrada, y cada vuelo que lo había conseguido recibe su "slot liberado".
+func TestCierreConPedidosSimultaneos(t *testing.T) {
+	repo := levantarBase(t)
+	pistas := aplicacion.NuevoPistas(repo)
+	ctx := context.Background()
+	const n = 20
+
+	var wg sync.WaitGroup
+	asignados := make([]bool, n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, err := pistas.Asignar(ctx, domain.PedidoDeSlot{
+				VueloID: fmt.Sprintf("D%02d", i), TipoOperacion: domain.Despegue,
+				PistaID: []string{"05-23", "18-36"}[i%2], InicioBloque: manana.Add(time.Duration(i) * domain.DuracionBloque),
+			})
+			switch {
+			case err == nil:
+				asignados[i] = true
+			case !errors.Is(err, domain.ErrPistaCerrada) && !errors.Is(err, ports.ErrConflicto):
+				t.Errorf("error inesperado: %v", err)
+			}
+		}(i)
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			err := pistas.ProcesarEvento(ctx, eventoDeClima("6b0f1c2e-3333-4c1b-9d2e-5f4a3b2c1d0e", false))
+			if !errors.Is(err, ports.ErrConflicto) {
+				if err != nil {
+					t.Errorf("no se esperaba error al cerrar: %v", err)
+				}
+				return
+			}
+		}
+	}()
+	wg.Wait()
+
+	if ocupados, _ := repo.SlotsOcupados(ctx, manana, manana.Add(n*domain.DuracionBloque)); len(ocupados) != 0 {
+		t.Fatalf("quedaron slots ocupados en pistas cerradas: %+v", ocupados)
+	}
+	conSlot := 0
+	for _, ok := range asignados {
+		if ok {
+			conSlot++
+		}
+	}
+	if liberados := len(pendientesPorTipo(t, repo)[domain.EventoSlotLiberado]); liberados != conSlot {
+		t.Fatalf("%d vuelos consiguieron slot pero se liberaron %d", conSlot, liberados)
 	}
 }

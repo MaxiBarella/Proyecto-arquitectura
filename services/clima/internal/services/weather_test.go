@@ -214,11 +214,34 @@ func TestLaCondicionForzadaMandaSobreElDatoReal(t *testing.T) {
 	}
 	assertEvents(t, h.eventTypes(), models.EventAptitudeChanged, models.EventAptitudeChanged)
 
-	// Al quitarla, vuelve el dato real, que ya es viejo.
+	// Al quitarla, si Open-Meteo no responde, vuelve el dato real, que ya es viejo.
+	h.source.err = errors.New("Open-Meteo no responde")
 	if err := h.svc.ClearForced(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	assertEvents(t, h.eventTypes(), models.EventAptitudeChanged, models.EventAptitudeChanged, models.EventNoData)
+}
+
+// Al quitar la condición forzada se consulta a Open-Meteo, así un dato viejo no deja
+// las pistas cerradas con "sin datos" hasta la próxima consulta.
+func TestQuitarElForzadoConsultaElDatoReal(t *testing.T) {
+	h := newHarness(true)
+	h.poll(t, calm)
+	thunder := true
+	if _, _, err := h.svc.SetForced(context.Background(), ForcedInput{Thunderstorm: &thunder}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pasa una hora sin consultas: el último dato guardado ya es viejo.
+	h.now = h.now.Add(time.Hour)
+	h.source.obs = models.Observation{Airport: "SACO", ObservedAt: h.now, Conditions: calm}
+	if err := h.svc.ClearForced(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	assertEvents(t, h.eventTypes(), models.EventAptitudeChanged, models.EventAptitudeChanged, models.EventAptitudeChanged)
+	if last := h.aptitude.state.Outbox[2]; last.Data.Operable == nil || !*last.Data.Operable {
+		t.Errorf("con el dato real nuevo se tendría que poder operar: %+v", last.Data)
+	}
 }
 
 func TestLaApiPublicaNoMuestraLaCondicionForzada(t *testing.T) {
