@@ -2,10 +2,14 @@
 # Uso: copiar .env.example como .env y correr `docker compose up --build`.
 
 services:
-  # Gateway y balanceador (15.1, 15.3): la entrada al sistema. Verifica el token, manda cada
-  # pedido a su servicio con la identidad en encabezados y limita el tráfico (nginx/README.md).
+  # Gateway y balanceador (15.1, 15.3): la entrada al sistema. Sirve el frontend, verifica el
+  # token, manda cada pedido a su servicio con la identidad en encabezados y limita el tráfico
+  # (nginx/README.md).
   nginx:
-    build: ./nginx
+    # Se construye desde la raíz porque también compila el frontend (frontend/).
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
     environment:
       JWT_SECRET: ${JWT_SECRET:?falta en .env}
       # Límite por IP (15.8). Para las pruebas de carga se sube en el .env.

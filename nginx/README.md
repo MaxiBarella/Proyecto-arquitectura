@@ -1,6 +1,6 @@
 # NGINX: gateway y balanceador
 
-Un solo NGINX hace las dos cosas, con un archivo para cada una (15.1, 15.3):
+Un solo NGINX hace las dos cosas, con un archivo para cada una (15.1, 15.3). Además sirve el frontend (15.7), que compila al construir la imagen (`Dockerfile`, desde la raíz del repo).
 
 | Archivo | Qué hace |
 |---|---|
@@ -22,7 +22,8 @@ Escucha en `http://localhost:8080`.
 | `GET /api/vuelos/board` | No | Vuelos, como `/board` |
 | `/api/pistas/internal/...` | | `404`: es solo entre servicios (15.19) |
 | `/api/vuelos/...`, `/api/pistas/...`, `/api/usuarios/...`, `/api/clima/...` | Sí | El servicio, sin el prefijo: `/api/vuelos/flights` llega como `/flights` |
-| Cualquier otra | | `404`. Acá se va a servir el frontend |
+| Cualquier otra de `/api/` | | `404` |
+| Todo lo demás | No | El frontend (`frontend/`). Si no es un archivo, devuelve `index.html` y la pantalla la elige React Router |
 
 **El token.** Va en `Authorization: Bearer <token>`. `jwt.js` verifica la firma HS256 con `JWT_SECRET` y el vencimiento, sin llamar a Usuarios (15.2). También rechaza un token con otro algoritmo, como `"alg": "none"`, un rol que no sea `airline` u `operator`, y una aerolínea sin código. Si algo falla, responde `401` con `INVALID_TOKEN` (15.18), y el log dice por qué en el campo `token`.
 
