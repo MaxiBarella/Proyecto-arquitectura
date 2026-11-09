@@ -144,12 +144,15 @@ casos=$((casos + 1))
 # Se espera a que se recupere el cupo que usaron los casos anteriores (20 por segundo).
 sleep 3
 # 80 pedidos de golpe desde la misma IP, en una sola conexión.
+# El cuerpo del último, que tiene que ser un 429, queda en un archivo.
+ultimo=$(mktemp)
 urls=()
-for _ in $(seq 80); do urls+=(-o /dev/null "$GATEWAY/api/vuelos/board"); done
+for _ in $(seq 79); do urls+=(-o /dev/null "$GATEWAY/api/vuelos/board"); done
+urls+=(-o "$ultimo" "$GATEWAY/api/vuelos/board")
 codigos=$(curl -s -w '%{http_code}\n' "${urls[@]}")
 ok=$(grep -c '^200$' <<<"$codigos")
 limitados=$(grep -c '^429$' <<<"$codigos")
-cuerpo=$(curl -s "$GATEWAY/api/vuelos/board")
+cuerpo=$(cat "$ultimo"); rm -f "$ultimo"
 if [[ $ok -ge 40 && $limitados -ge 1 && $((ok + limitados)) -eq 80 && "$cuerpo" == *RATE_LIMIT_EXCEEDED* ]]; then
     echo "ok    de 80 pedidos de golpe pasan $ok y $limitados reciben 429 con RATE_LIMIT_EXCEEDED"
 else

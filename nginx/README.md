@@ -5,7 +5,7 @@ Un solo NGINX hace las dos cosas, con un archivo para cada una (15.1, 15.3). Ade
 | Archivo | Qué hace |
 |---|---|
 | `gateway.conf.template` | Rutas, token y límite de tráfico (15). Al arrancar se convierte en `gateway.conf`. |
-| `balanceo.conf` | Las instancias de Vuelos (12, ADR-012). Hoy hay una; la segunda llega en otro pull request. |
+| `balanceo.conf` | Las dos instancias de Vuelos, `vuelos-1` y `vuelos-2` (12, ADR-012): reparte por turnos y, si una falla, la saca 10 segundos (12.4). |
 | `nginx.conf` | Lo común: carga njs, deja pasar `JWT_SECRET` y arma el log en JSON. |
 | `jwt.js` | El script que verifica el token (15.4). |
 | `verifica-jwt-secret.sh` | No deja arrancar a NGINX si `JWT_SECRET` tiene menos de 32 bytes (15.21). |
@@ -48,3 +48,19 @@ curl -i -H "Authorization: Bearer $TOKEN" localhost:8080/api/vuelos/flights # 20
 ```
 
 `token-de-prueba.sh` toma la clave de `JWT_SECRET` o del `.env`.
+
+## El balanceo
+
+NGINX reparte los pedidos de Vuelos por turnos entre `vuelos-1` y `vuelos-2`. Para verlo:
+
+```sh
+docker compose logs nginx | grep '"upstream"'   # qué instancia atendió cada pedido (por IP)
+docker compose stop vuelos-2                     # los pedidos siguen andando, todos a vuelos-1
+docker compose start vuelos-2                    # a los 10 segundos vuelve a recibir pedidos
+```
+
+En Grafana (`http://localhost:3001`, Explore, Prometheus):
+
+```
+sum by (service_instance_id) (rate(http_server_request_duration_seconds_count{service_name="vuelos"}[1m]))
+```

@@ -1,6 +1,30 @@
 # Arranque local del sistema: los cuatro servicios y sus dependencias.
 # Uso: copiar .env.example como .env y correr `docker compose up --build`.
 
+# Lo común de las dos instancias de Vuelos (12.1). Las usan vuelos-1 y vuelos-2.
+x-vuelos-entorno: &vuelos-entorno
+  PORT: "8080"
+  MYSQL_DSN: ${MYSQL_VUELOS_USER:?falta en .env}:${MYSQL_VUELOS_PASSWORD:?falta en .env}@tcp(mysql-vuelos:3306)/vuelos?parseTime=true&loc=UTC
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
+  PISTAS_URL: http://pistas:8080
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:?falta en .env}:${RABBITMQ_PASSWORD:?falta en .env}@rabbitmq:5672
+
+x-vuelos: &vuelos
+  build: ./services/vuelos
+  image: aeropuerto-vuelos
+  depends_on:
+    # Vuelos arranca recién cuando MySQL acepta conexiones.
+    mysql-vuelos:
+      condition: service_healthy
+    rabbitmq-init:
+      condition: service_completed_successfully
+    solr:
+      condition: service_started
+    grafana:
+      condition: service_started
+    pistas:
+      condition: service_started
+
 services:
   # Gateway y balanceador (15.1, 15.3): la entrada al sistema. Sirve el frontend, verifica el
   # token, manda cada pedido a su servicio con la identidad en encabezados y limita el tráfico
@@ -18,33 +42,29 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - vuelos
+      - vuelos-1
+      - vuelos-2
       - pistas
       - usuarios
       - clima
 
-  vuelos:
-    build: ./services/vuelos
+  # Vuelos corre en dos instancias iguales detrás de NGINX (12.1, ADR-012). La configuración
+  # es la misma (x-vuelos, al principio del archivo); cambia solo el nombre de cada una, que
+  # Grafana usa para mostrar el reparto (service.instance.id).
+  vuelos-1:
+    <<: *vuelos
     environment:
-      PORT: "8080"
-      MYSQL_DSN: ${MYSQL_VUELOS_USER:?falta en .env}:${MYSQL_VUELOS_PASSWORD:?falta en .env}@tcp(mysql-vuelos:3306)/vuelos?parseTime=true&loc=UTC
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
-      PISTAS_URL: http://pistas:8080
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:?falta en .env}:${RABBITMQ_PASSWORD:?falta en .env}@rabbitmq:5672
+      <<: *vuelos-entorno
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=vuelos-1
+    # El puerto directo queda hasta que Usuarios emita tokens (15.20).
     ports:
       - "8081:8080"
-    depends_on:
-      # Vuelos arranca recién cuando MySQL acepta conexiones.
-      mysql-vuelos:
-        condition: service_healthy
-      rabbitmq-init:
-        condition: service_completed_successfully
-      solr:
-        condition: service_started
-      grafana:
-        condition: service_started
-      pistas:
-        condition: service_started
+
+  vuelos-2:
+    <<: *vuelos
+    environment:
+      <<: *vuelos-entorno
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=vuelos-2
 
   pistas:
     build: ./services/pistas
