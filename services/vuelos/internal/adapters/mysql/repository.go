@@ -202,6 +202,36 @@ func nullable(s string) *string {
 	return &s
 }
 
+// DueForCompletion devuelve hasta limit vuelos programados cuyo bloque terminó antes
+// de now: los que hay que dar por finalizados (RN-32, F-22).
+func (r *Repository) DueForCompletion(ctx context.Context, now time.Time, limit int) ([]string, error) {
+	var ids []string
+	err := r.db.WithContext(ctx).Model(&flightRow{}).
+		Where("status = ? AND block_start <= ?", string(domain.Scheduled), now.UTC().Add(-domain.BlockDuration)).
+		Order("block_start, id").Limit(limit).
+		Pluck("id", &ids).Error
+	if err != nil {
+		return nil, fmt.Errorf("buscar los vuelos para finalizar: %w", err)
+	}
+	return ids, nil
+}
+
+// ListAfter devuelve hasta limit vuelos con id mayor que afterID, ordenados por id. Con
+// el último id de cada tanda se pide la siguiente: así se recorren todos sin OFFSET,
+// para reconstruir el índice (14.3).
+func (r *Repository) ListAfter(ctx context.Context, afterID string, limit int) ([]domain.Flight, error) {
+	var rows []flightRow
+	err := r.db.WithContext(ctx).Where("id > ?", afterID).Order("id").Limit(limit).Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("listar los vuelos: %w", err)
+	}
+	flights := make([]domain.Flight, len(rows))
+	for i := range rows {
+		flights[i] = *rows[i].toDomain()
+	}
+	return flights, nil
+}
+
 // relayBatch es cuántos eventos toma el relay por vuelta.
 const relayBatch = 100
 
