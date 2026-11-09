@@ -4,7 +4,9 @@ name: gateway-prueba
 
 services:
   gateway:
-    build: ..
+    build:
+      context: ../..
+      dockerfile: nginx/Dockerfile
     environment:
       JWT_SECRET: clave-de-la-prueba-del-gateway-0123456789
     ports:
@@ -18,4 +20,4 @@ services:
       - ./servicio-falso.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       default:
-        aliases: [vuelos, pistas, usuarios, clima]
+        aliases: [vuelos-1, vuelos-2, pistas, usuarios, clima]

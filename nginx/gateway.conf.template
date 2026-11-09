@@ -47,6 +47,14 @@ server {
 
     proxy_http_version 1.1;
     proxy_set_header Connection "";
+
+    # Cuánto espera a un servicio (12.5). En la red de Docker conectar tarda milisegundos: si
+    # en 1 segundo no conecta, la instancia está colgada y, si es Vuelos, prueba con la otra.
+    # 10 segundos de respuesta cubren el peor caso del pedido de slot: 3 intentos de 2
+    # segundos a Pistas, más las esperas entre uno y otro (4.5).
+    proxy_connect_timeout 1s;
+    proxy_read_timeout    10s;
+    proxy_send_timeout    10s;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 
     # La identidad que leen los servicios (15.6). Se pisa siempre lo que mande el cliente con
@@ -85,9 +93,26 @@ server {
         proxy_pass http://$servicio;
     }
 
-    # Acá se va a servir el frontend (15.7, 22.1), en otro pull request.
-    location / {
+    # Cualquier otra ruta de la API no existe.
+    location /api/ {
         return 404 '{"type":"/problems/not-found","title":"Ruta inexistente","status":404,"code":"NOT_FOUND"}';
+    }
+
+    # El frontend (15.7, 22.1), compilado con Vite. Desde el mismo origen que la API, así no
+    # hace falta CORS. Las rutas de las pantallas (/aerolinea, /operador...) las resuelve
+    # React Router en el navegador: si no es un archivo, NGINX devuelve index.html.
+    root /usr/share/nginx/html;
+
+    location / {
+        try_files $uri /index.html;
+        # index.html se pide de nuevo cada vez, para que tome la última versión.
+        add_header Cache-Control "no-cache";
+    }
+
+    # Los archivos de Vite llevan un hash en el nombre: si cambian, cambia el nombre.
+    # Se pueden guardar en el navegador sin vencimiento.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
     location @limite {

@@ -1,0 +1,6 @@
+# La imagen de NGINX se construye desde la raíz del repo, pero solo necesita nginx/ y frontend/.
+*
+!nginx/
+!frontend/
+frontend/node_modules/
+frontend/dist/

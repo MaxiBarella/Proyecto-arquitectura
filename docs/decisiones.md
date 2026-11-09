@@ -291,6 +291,15 @@ Las decisiones 11.7 a 11.10 son los pendientes del ADR-011. Las propuso Male al 
 
 La 12.3 se actualizó el 23/10/2026 con la 4.21 y la 4.23, que cambiaron cómo se reparten el outbox y la cola entre las dos instancias. La decisión de fondo no cambió: un evento todavía puede salir dos veces, y se acepta.
 
+Las decisiones 12.4 a 12.7 las tomó Salvador el 9/11/2026, al armar las dos instancias de Vuelos (`nginx/balanceo.conf` y `docker-compose.yml`). Eran los pendientes del [ADR-012](adr/ADR-012.md). Las opciones y las recomendaciones las preparó el agente de IA. Quedan confirmadas al mergearse el pull request que las registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 12.4 | Cuándo NGINX da por caída una instancia | **Con 1 falla, y la vuelve a probar a los 10 segundos** | Es lo que trae NGINX (`max_fails=1`, `fail_timeout=10s`). En la demo se ve enseguida cómo la otra absorbe todo. Si la falla fue pasajera, la otra instancia aguanta 10 segundos sola. Se descartó pedir 3 fallas: más pedidos fallan antes de sacarla. |
+| 12.5 | Cuánto espera NGINX a un servicio | **1 segundo para conectar y 10 para responder** | En la red de Docker conectar tarda milisegundos: si no conecta en 1 segundo, la instancia está colgada y NGINX prueba con la otra. 10 segundos cubren el peor caso del pedido de slot, unos 6,6 segundos: 3 intentos de 2 segundos a Pistas, más las esperas (4.5). Vale para todos los servicios, porque NGINX lo configura en el gateway y no por instancia. Se descartaron los 60 segundos que trae NGINX: una instancia colgada haría esperar un minuto. |
+| 12.6 | Cómo se declaran las instancias | **Dos servicios, `vuelos-1` y `vuelos-2`** | La configuración se escribe una vez (`x-vuelos` en el `docker-compose.yml`) y cambia solo el nombre. Cada una se puede apagar por separado para el ensayo (`docker compose stop vuelos-2`). El servicio `vuelos` deja de existir: los comandos usan `vuelos-1` o `vuelos-2`. Se descartó un servicio con dos réplicas, que no se pueden nombrar ni apagar de a una. |
+| 12.7 | Cómo se distingue cada instancia en Grafana | **`OTEL_RESOURCE_ATTRIBUTES=service.instance.id=vuelos-1` en el compose** | OpenTelemetry lee esa variable solo, así que no se toca el código de Vuelos. En Prometheus aparece como la etiqueta `service_instance_id`. Se descartó copiar el cambio de Clima del #47, que usa el nombre de la máquina: tocaba el código de la pareja 1. |
+
 ## 13. Resiliencia (ADR D10)
 
 | # | Decisión | Elegido | Qué significa |
@@ -442,6 +451,15 @@ Las secciones 21 a 26, la fila 21 de la sección 18 y el uso de BMAD de "Forma d
 | 22.1 | Quién hace cada pantalla | **Cada uno, las de su parte** | Maxi: el tablero público y la pantalla de la aerolínea (publicar, pedir slot, cancelar y ver sus vuelos). Carola: la del operador (pistas, cerrar y reabrir, forzar clima y el aviso de Clima sin datos). Male: el ingreso. Salvador: arma el proyecto y lo sirve desde NGINX (15.7). Por qué: nadie carga con todo y cada uno conoce la API de su parte. |
 | 22.2 | Con qué se arma | **React con Vite** | React ya estaba elegido (7.2). Vite es la herramienta habitual hoy para arrancar un proyecto de React. |
 | 22.3 | Cómo se ven iguales las pantallas | **Una base común, mergeada primero** | El menú y los estilos entran antes que las pantallas, así las cuatro partes usan lo mismo. |
+
+Las decisiones 22.4 a 22.7 las tomó Salvador el 9/11/2026, al armar la base del frontend (`frontend/`). Las opciones y las recomendaciones las preparó el agente de IA. Quedan confirmadas al mergearse el pull request que las registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 22.4 | Dónde va y cómo se pasa de una pantalla a otra | **`frontend/` en la raíz, con React Router** | Cada pantalla tiene su dirección (`/`, `/ingreso`, `/aerolinea`, `/operador`), así se puede recargar y compartir el link, y cada uno trabaja en su archivo de `src/paginas/` sin pisarse. React Router es la librería de ruteo más usada con React. Se descartó elegir la pantalla con un estado de React: al recargar se volvía al inicio. |
+| 22.5 | Lenguaje | **JavaScript** | Quedan dos días y nadie del grupo programó el frontend todavía: sin tipos, cada uno arranca más rápido. Se descartó TypeScript, que ataja errores con los datos de la API pero suma tiempo. |
+| 22.6 | Estilos comunes | **CSS propio, sin librerías** | Un archivo, `src/estilos.css`, con los colores y medidas en variables y clases para botones, formularios, tablas, avisos y el estado de un vuelo. Sin dependencias y fácil de explicar. Se descartaron una librería de componentes (hay que aprenderla y pesa) y Tailwind (mete los estilos en cada elemento). |
+| 22.7 | Dónde guarda el frontend el token | **`sessionStorage`** | Sobrevive si se recarga la página y se borra al cerrar la pestaña; como el token dura 1 hora (15.2), queda poco tiempo expuesto. Un script malicioso en la página lo podría leer, igual que con `localStorage`, que además lo guardaría más tiempo. Se descartó tenerlo solo en memoria: al recargar había que volver a iniciar sesión. |
 
 ## 23. Contratos nuevos
 
