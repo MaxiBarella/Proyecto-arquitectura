@@ -5,6 +5,7 @@ Los escenarios del [ADR-013](../../docs/adr/ADR-013.md), escritos para k6 (16.1)
 | Escenario | Archivo | Qué hace | Cuánto dura |
 |---|---|---|---|
 | 1. Tablero | `tablero.js` | Rampa de 10 a 1000 pedidos por segundo al tablero público (16.2). Se corre sin caché y con caché. | 5 min |
+| Datos del tablero | `sembrar-tablero.js` | Publica 700 vuelos en los próximos 7 días y les pide slot a 3 de cada 4 (10.9). Se corre una vez antes del escenario 1. | 1,5 min |
 | 2. Pedido de slot | `slot.js` | Publica vuelos y pide slots distintos, a 5, 20 y 50 por segundo (16.3). Mide el objetivo de servicio (11.3). | 3 min |
 | 3. Mismo slot a la vez | `mismo-slot.js` | 50 vuelos piden la misma pista y el mismo bloque a la vez. Lo tiene que obtener uno solo (RN-10). | segundos |
 | 4. Caída durante la carga | `caida.js` y `caida.sh` | 100 pedidos por segundo durante 3 minutos. Apaga `vuelos-2` al minuto y la prende al segundo (ADR-012). | 3 min |
@@ -28,7 +29,13 @@ Los escenarios del [ADR-013](../../docs/adr/ADR-013.md), escritos para k6 (16.1)
    tests/carga/caida.sh
    ```
 
-   - **El tablero** se corre dos veces, sin caché y con caché. La mezcla de consultas se cambia con `-e PORCENTAJE_PORTADA=80`.
+   - **El tablero** se corre dos veces, sin caché y con caché, sobre los mismos datos (ADR-007):
+     1. Una sola vez, cargar los vuelos: `docker compose --profile carga run --rm k6 run /carga/sembrar-tablero.js`.
+     2. Sin caché: `CACHE_ENABLED=false` en el `.env`, `docker compose up -d vuelos-1 vuelos-2` y `docker compose restart memcached`. Correr `tablero.js` con `--summary-export /resultados/tablero-sin-cache.json`.
+     3. Con caché: sacar `CACHE_ENABLED` del `.env`, repetir los dos comandos del paso anterior y correr `tablero.js` con `--summary-export /resultados/tablero-con-cache.json`.
+     4. Los aciertos de la caché se leen de Memcached al terminar: `docker run --rm --network <proyecto>_default busybox:1.36 sh -c 'printf "stats\r\nquit\r\n" | nc memcached 11211' | grep get_`.
+
+     La mezcla de consultas se cambia con `-e PORCENTAJE_PORTADA=80`.
    - **La caída** se puede correr contra otra ruta de Vuelos con `RUTA=/api/vuelos/flights tests/carga/caida.sh`.
 
 3. **Mirar Grafana** (`http://localhost:3001`, Explore, Prometheus) mientras corre:

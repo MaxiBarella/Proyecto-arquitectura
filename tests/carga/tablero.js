@@ -5,9 +5,9 @@
 // (16.2). Es la medición del antes y el después de la caché, y muestra el reparto entre las
 // dos instancias de Vuelos (ADR-012).
 //
-// La mezcla de consultas se configura con PORCENTAJE_PORTADA (por defecto 80): ese porcentaje
-// pide la portada del tablero y el resto, filtros al azar. Tiene que ser la misma en las dos
-// corridas (ADR-007).
+// La mezcla de consultas se configura con PORCENTAJE_PORTADA (por defecto 80, 10.8): ese
+// porcentaje pide la portada del tablero y el resto, filtros al azar. Tiene que ser la misma
+// en las dos corridas (ADR-007). Antes de la primera se corre sembrar-tablero.js (10.9).
 
 import http from 'k6/http';
 import { check } from 'k6';
@@ -51,19 +51,43 @@ export const options = {
 const TIPOS = ['arrival', 'departure'];
 const ESTADOS = ['scheduled', 'delayed', 'pending_slot'];
 const AEROLINEAS = ['AR', 'LA'];
-const BUSQUEDAS = ['ar', 'la', 'cor', 'bue', 'men'];
+const ORDENES = ['scheduled_at', 'airline', 'scope'];
+// Comienzos de números de vuelo y de las ciudades de sembrar-tablero.js (RN-34).
+const BUSQUEDAS = [
+  'ar', 'la', 'ar1', 'ar2', 'ar3', 'ar4', 'ar5', 'ar6', 'ar7', 'ar8',
+  'la1', 'la2', 'la3', 'la4', 'la5', 'la6', 'la7', 'la8',
+  'cor', 'bue', 'men', 'sal', 'ros', 'bar', 'ush', 'tuc', 'neu',
+  'san', 'lim', 'mon', 'mad', 'mia', 'pan', 'asu',
+];
 
+function alAzar(lista) {
+  return lista[Math.floor(Math.random() * lista.length)];
+}
+
+// Un día de los próximos 7, en hora de Argentina (UTC−3), como lo filtra el tablero (RN-33).
+function diaAlAzar() {
+  const d = new Date(Date.now() - 3 * 60 * 60 * 1000 + Math.floor(Math.random() * 7) * 24 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+// El 20 % con filtros tiene que repetirse poco (10.10): con uno a tres filtros sobre tipo,
+// estado, aerolínea, fecha, búsqueda, orden y página son miles de consultas distintas.
 function filtrosAlAzar() {
   const filtros = [
-    `type=${TIPOS[Math.floor(Math.random() * TIPOS.length)]}`,
-    `status=${ESTADOS[Math.floor(Math.random() * ESTADOS.length)]}`,
-    `airline=${AEROLINEAS[Math.floor(Math.random() * AEROLINEAS.length)]}`,
-    `q=${BUSQUEDAS[Math.floor(Math.random() * BUSQUEDAS.length)]}`,
-    `page=${1 + Math.floor(Math.random() * 3)}`,
+    () => `type=${alAzar(TIPOS)}`,
+    () => `status=${alAzar(ESTADOS)}`,
+    () => `airline=${alAzar(AEROLINEAS)}`,
+    () => `date=${diaAlAzar()}`,
+    () => `q=${alAzar(BUSQUEDAS)}`,
+    () => `sort=${alAzar(ORDENES)}`,
+    () => `page=${1 + Math.floor(Math.random() * 5)}`,
   ];
-  // Uno o dos filtros, para que haya muchas combinaciones distintas.
-  const cuantos = 1 + Math.floor(Math.random() * 2);
-  return filtros.sort(() => Math.random() - 0.5).slice(0, cuantos).join('&');
+  const cuantos = 1 + Math.floor(Math.random() * 3);
+  return filtros
+    .sort(() => Math.random() - 0.5)
+    .slice(0, cuantos)
+    .map((filtro) => filtro())
+    .join('&');
 }
 
 export default function () {
