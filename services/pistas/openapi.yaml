@@ -213,10 +213,10 @@ paths:
       operationId: reopenRunway
       summary: Reabrir una pista (F-11)
       description: |
-        Reabre la pista, la haya cerrado el operador o el clima. El operador manda sobre
-        el clima: puede reabrir una pista cerrada por el clima aunque el clima siga sin
-        permitir la operación. La pista queda abierta hasta el próximo cambio de aptitud,
-        porque Clima avisa solo cuando cambia (9.14). Pistas publica
+        Reabre una pista cerrada por el operador. Una pista cerrada por el clima solo se
+        reabre a mano cuando Clima no tiene datos (RN-24, CA-20): mientras haya datos, la
+        reabre el clima, y se responde `409` con `RUNWAY_CLOSED_BY_WEATHER`. Para probar
+        el cierre y la reapertura se usa el clima forzado (F-12). Pistas publica
         `pistas.pista.reabierta`.
 
         Los vuelos que perdieron su slot al cerrarse no lo recuperan: un despegue
@@ -244,6 +244,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/RunwayNotFound'
+        '409':
+          $ref: '#/components/responses/ClosedByWeather'
         '500':
           $ref: '#/components/responses/InternalError'
         '503':
@@ -539,6 +541,7 @@ components:
             - FORBIDDEN_ROLE
             - RUNWAY_NOT_FOUND
             - RUNWAY_ALREADY_EXISTS
+            - RUNWAY_CLOSED_BY_WEATHER
             - ALTERNATE_NOT_FOUND
             - SLOT_TAKEN
             - RUNWAY_CLOSED
@@ -630,6 +633,22 @@ components:
             detail: Ya existe la pista 05-23.
             instance: /runways
             code: RUNWAY_ALREADY_EXISTS
+
+    ClosedByWeather:
+      description: |
+        La pista la cerró el clima y Clima tiene datos: la reabre el clima cuando vuelva a
+        permitir la operación (23.4). Para probar, se fuerza el clima (F-12).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/runway-closed-by-weather
+            title: La pista la cerró el clima
+            status: 409
+            detail: La pista 05-23 se reabre sola cuando el clima lo permita.
+            instance: /runways/05-23/reopen
+            code: RUNWAY_CLOSED_BY_WEATHER
 
     AlternateNotFound:
       description: El código no es de ningún aeropuerto de la lista de alternativos (RN-25).
