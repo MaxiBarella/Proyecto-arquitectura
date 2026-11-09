@@ -408,6 +408,12 @@ Las secciones 21 a 26, la fila 21 de la sección 18 y el uso de BMAD de "Forma d
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 23.1 | Cómo se definen el login, el tablero y las rutas del operador | **Como en la Entrega 2** | Quien programa el servicio propone su `openapi.yaml` en un pull request y lo revisa la otra pareja antes de programar. El frontend puede arrancar contra el contrato. |
+| 23.2 | Rutas del operador en Pistas | **Bajo `/runways` y `/alternate-airports`, fuera de `/internal`** | En inglés y en plural, como `/flights` en Vuelos. Van fuera de `/internal` porque el gateway la bloquea (15.19); desde afuera quedan como `/api/pistas/runways` (15.7). Cubren F-09, F-10, F-11, F-20 y F-21. Solo las acepta el rol `operator` (CA-19); sin identidad responden `401` con `MISSING_IDENTITY` y con otro rol `403` con `FORBIDDEN_ROLE`, como Vuelos. El contrato está en `services/pistas/openapi.yaml`, versión 0.4.0. |
+| 23.3 | Cómo se cierra y se reabre una pista | **`POST /runways/{id}/close` y `POST /runways/{id}/reopen`** | Una acción por ruta, fácil de leer. Los alternativos siguen la misma forma: `POST /alternate-airports/{icao}/disable` y `/enable`. Repetir una acción ya hecha responde `200` sin cambiar nada (agente). Se descartaron `PUT` y `DELETE` sobre `/closure`, como el forzado de Clima (9.13), y un `PATCH` sobre la pista. |
+| 23.4 | Si el operador puede reabrir una pista que cerró el clima | **Sí, siempre** | El operador manda sobre el clima, haya datos o no. La pista queda abierta hasta el próximo cambio de aptitud, porque Clima avisa solo cuando cambia (9.14). Es una regla nueva que el SPEC no tenía. Se descartó permitirlo solo cuando Clima no tiene datos (RN-24) y no permitirlo nunca, que contradecía CA-20. |
+| 23.5 | Detalles del contrato del operador | **Los propuso el agente** | Si el operador cierra una pista que cerró el clima, pasa a cerrada por el operador y no se reabre sola (RN-16). Una pista nueva nace cerrada por el clima si el clima no permite operar (RN-15). `GET /runways` trae también el estado del clima, con el aviso de "Clima sin datos" (F-21), para que la pantalla haga un solo pedido. Se suman los errores `RUNWAY_ALREADY_EXISTS` y `ALTERNATE_NOT_FOUND`. |
+
+Las decisiones 23.2 a 23.5 las tomó Carola el 9/11/2026, al proponer el contrato del operador (23.1). Las opciones y las recomendaciones las preparó el agente de IA. Quedan confirmadas al mergearse el pull request que las registra, que revisa la pareja 2.
 
 ## 24. Caída provocada
 
