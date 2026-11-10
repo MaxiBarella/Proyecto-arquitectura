@@ -306,7 +306,7 @@ La 12.8 la tomó Salvador el 10/11/2026, al cerrar los pendientes del [ADR-012](
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
-| 12.8 | Publicar un vuelo repetido | **Se acepta** | Si NGINX ya le pasó un `POST /flights` a una instancia que se cae antes de responder, no lo reintenta (ADR-012), y la aerolínea recibe un error. Si lo repite, el vuelo puede quedar publicado dos veces. Se acepta y se explica en la defensa. Se descartaron, para esta entrega, una restricción única por aerolínea, número de vuelo y fecha que responda `409`, que cambia el contrato y el código de Vuelos y suma una regla de negocio, y una `Idempotency-Key` en el `POST`, como la del proveedor (27.6), que además pide cambiar el frontend. La restricción única queda como mejora. |
+| 12.8 | Publicar un vuelo repetido | **Se acepta** | Si NGINX ya le pasó un `POST /flights` a una instancia que se cae antes de responder, no lo reintenta (ADR-012), y la aerolínea recibe un error. Lo mismo si NGINX deja de esperar a los 10 segundos (12.5) y responde `504`: el vuelo pudo haberse guardado igual. Si lo repite, el vuelo puede quedar publicado dos veces. Se acepta y se explica en la defensa. Se descartaron, para esta entrega, una restricción única por aerolínea, número de vuelo y fecha que responda `409`, que cambia el contrato y el código de Vuelos y suma una regla de negocio, y una `Idempotency-Key` en el `POST`, como la del proveedor (27.6), que además pide cambiar el frontend. La restricción única queda como mejora. |
 
 ## 13. Resiliencia (ADR D10)
 
@@ -392,7 +392,7 @@ La 16.6 la tomó Salvador el 10/11/2026, con los resultados del tablero (ADR-007
 
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
-| 16.6 | Qué se informa como principal límite (D13) | **Que el tablero aguanta al menos 1000 pedidos por segundo en esta computadora, sin encontrar el límite** | La rampa de la 16.2 llegó a 1000 pedidos por segundo sin errores, con caché y sin caché, así que la hipótesis de que Solr era el límite no se confirmó. Se informa así, con la máquina en la que se corrió. Se descartó correr antes de la presentación una rampa más alta, por ejemplo hasta 3000: lleva más tiempo y, con todo el sistema y k6 en la misma computadora, probablemente mida la computadora más que el sistema. Queda como prueba pendiente. |
+| 16.6 | Qué se informa como principal límite (D13) | **Que el tablero aguanta al menos 1000 pedidos por segundo en esta computadora, sin encontrar el límite** | La rampa de la 16.2 llegó a 1000 pedidos por segundo sin errores, con caché y sin caché, así que la hipótesis de que Solr era el límite no se confirmó. Se informa así, con la máquina en la que se corrió. Con caché, lo que más CPU usó a 1000 pedidos por segundo fueron las dos instancias de Vuelos (unos 25 % cada una) y NGINX (19 %), según la medición de Maxi del ADR-007. Se descartó correr antes de la presentación una rampa más alta, por ejemplo hasta 3000: lleva más tiempo y, con todo el sistema y k6 en la misma computadora, probablemente mida la computadora más que el sistema. Queda como prueba pendiente. |
 
 ## 17. Bonus
 
