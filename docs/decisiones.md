@@ -634,7 +634,7 @@ Sin respuesta registrada:
 | D3 | Persistencia | 5.1 a 5.5, 7.2 | Entrega 1, versión inicial; se valida en la 2 |
 | D5 | Comunicación entre servicios | 4.1 a 4.9, 25.1 | Entrega 1, versión inicial; se valida en la 2 |
 | D2 | Arquitectura interna | 7.3, 7.5, 7.6, 20 | Entrega 2 |
-| D4 | Consistencia y concurrencia | 2.3, 2.7, 4.4, 4.6, 4.9, 5.7, 23.6 | Presentación (ADR-004, #63) |
+| D4 | Consistencia y concurrencia | 2.3, 2.7, 4.4, 4.6, 4.9, 5.7 | Presentación (ADR-004, #63) |
 | D6 | Búsqueda | 3.2, 7.2, 10.4, 14.1 a 14.12, 20.5 | Entrega 2 |
 | D7 | Caché | 10.1 a 10.8 | Entrega 2 |
 | D9 | Consumo del proveedor | 27.1 | Entrega 2; se completa para la presentación |
