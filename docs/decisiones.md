@@ -300,7 +300,13 @@ Las decisiones 12.4 a 12.7 las tomó Salvador el 9/11/2026, al armar las dos ins
 | 12.4 | Cuándo NGINX da por caída una instancia | **Con 1 falla, y la vuelve a probar a los 10 segundos** | Es lo que trae NGINX (`max_fails=1`, `fail_timeout=10s`). En la demo se ve enseguida cómo la otra absorbe todo. Si la falla fue pasajera, la otra instancia aguanta 10 segundos sola. Se descartó pedir 3 fallas: más pedidos fallan antes de sacarla. |
 | 12.5 | Cuánto espera NGINX a un servicio | **1 segundo para conectar y 10 para responder** | En la red de Docker conectar tarda milisegundos: si no conecta en 1 segundo, la instancia está colgada y NGINX prueba con la otra. 10 segundos cubren el peor caso del pedido de slot, unos 6,6 segundos: 3 intentos de 2 segundos a Pistas, más las esperas (4.5). Vale para todos los servicios, porque NGINX lo configura en el gateway y no por instancia. Se descartaron los 60 segundos que trae NGINX: una instancia colgada haría esperar un minuto. |
 | 12.6 | Cómo se declaran las instancias | **Dos servicios, `vuelos-1` y `vuelos-2`** | La configuración se escribe una vez (`x-vuelos` en el `docker-compose.yml`) y cambia solo el nombre. Cada una se puede apagar por separado para el ensayo (`docker compose stop vuelos-2`). El servicio `vuelos` deja de existir: los comandos usan `vuelos-1` o `vuelos-2`. Se descartó un servicio con dos réplicas, que no se pueden nombrar ni apagar de a una. |
-| 12.7 | Cómo se distingue cada instancia en Grafana | **`OTEL_RESOURCE_ATTRIBUTES=service.instance.id=vuelos-1` en el compose** | OpenTelemetry lee esa variable solo, así que no se toca el código de Vuelos. En Prometheus aparece como la etiqueta `service_instance_id`. Se descartó copiar el cambio de Clima del #47, que usa el nombre de la máquina: tocaba el código de la pareja 1. |
+| 12.7 | Cómo se distingue cada instancia en Grafana | **`OTEL_RESOURCE_ATTRIBUTES=service.instance.id=vuelos-1` en el compose** | OpenTelemetry lee esa variable solo, así que no se toca el código de Vuelos. En Prometheus aparece en dos etiquetas con el mismo valor, `instance` y `service_instance_id`: cualquiera de las dos separa las instancias. Se descartó copiar el cambio de Clima del #47, que usa el nombre de la máquina: tocaba el código de la pareja 1. |
+
+La 12.8 la tomó Salvador el 10/11/2026, al cerrar los pendientes del [ADR-012](adr/ADR-012.md). Las opciones y la recomendación las preparó el agente de IA. Queda confirmada al mergearse el pull request que la registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 12.8 | Publicar un vuelo repetido | **Se acepta** | Si NGINX ya le pasó un `POST /flights` a una instancia que se cae antes de responder, no lo reintenta (ADR-012), y la aerolínea recibe un error. Si lo repite, el vuelo puede quedar publicado dos veces. Se acepta y se explica en la defensa. Se descartaron, para esta entrega, una restricción única por aerolínea, número de vuelo y fecha que responda `409`, que cambia el contrato y el código de Vuelos y suma una regla de negocio, y una `Idempotency-Key` en el `POST`, como la del proveedor (27.6), que además pide cambiar el frontend. La restricción única queda como mejora. |
 
 ## 13. Resiliencia (ADR D10)
 
@@ -381,6 +387,12 @@ Las decisiones 16.2 a 16.5 las tomó Salvador el 9/11/2026, al escribir los esce
 | 16.3 | Rampa del pedido de slot | **5, 20 y 50 pedidos por segundo, un minuto cada uno** | Las aerolíneas piden slots mucho menos que lo que se consulta el tablero, y cada pedido ocupa un slot real. Se descartó llegar a 200: llenaba bloques y los rechazos ensuciaban la medición. |
 | 16.4 | Cómo se corre k6 | **Con Docker, desde el compose** | Un servicio `k6` con la imagen oficial que solo arranca si se lo pide (`--profile carga`). Nadie instala nada y le pega a NGINX por la red interna, igual en todas las computadoras. Se descartó instalar k6 en cada una. |
 | 16.5 | Si los resultados de k6 van a Grafana | **Sí, por OpenTelemetry** | k6 manda sus métricas al mismo `grafana:4318` que los servicios, con `service_name="k6"`. Se ven los pedidos de k6 al lado del reparto entre instancias y la latencia de cada servicio. Además queda el resumen de k6 en un archivo. |
+
+La 16.6 la tomó Salvador el 10/11/2026, con los resultados del tablero (ADR-007) y de la caída. Era un pendiente del [ADR-013](adr/ADR-013.md). Las opciones y la recomendación las preparó el agente de IA. Queda confirmada al mergearse el pull request que la registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 16.6 | Qué se informa como principal límite (D13) | **Que el tablero aguanta al menos 1000 pedidos por segundo en esta computadora, sin encontrar el límite** | La rampa de la 16.2 llegó a 1000 pedidos por segundo sin errores, con caché y sin caché, así que la hipótesis de que Solr era el límite no se confirmó. Se informa así, con la máquina en la que se corrió. Se descartó correr antes de la presentación una rampa más alta, por ejemplo hasta 3000: lleva más tiempo y, con todo el sistema y k6 en la misma computadora, probablemente mida la computadora más que el sistema. Queda como prueba pendiente. |
 
 ## 17. Bonus
 
@@ -642,6 +654,6 @@ Sin respuesta registrada:
 | D9 | Consumo del proveedor | 27.1 | Entrega 2; se completa para la presentación |
 | D10 | Resiliencia | 4.5, 13.1, 21.1, 24.1 | Entrega 2 |
 | D11 | Observabilidad | 11.1 a 11.5 | Entrega 2, primera versión |
-| D12 | Balanceo de carga | 12.1 a 12.3, 15.3 | Entrega 2 |
-| D13 | Capacidad y costos | 11.3, 16.1 | Entrega 2 |
+| D12 | Balanceo de carga | 12.1 a 12.8, 15.3 | Entrega 2 |
+| D13 | Capacidad y costos | 11.3, 16.1 a 16.6 | Entrega 2 |
 | ADR-014 | API gateway (adicional, agente) | 15.1 a 15.8 | Presentación |
