@@ -29,6 +29,8 @@ Los escenarios del [ADR-013](../../docs/adr/ADR-013.md), escritos para k6 (16.1)
    tests/carga/caida.sh
    ```
 
+   En Git Bash de Windows hay que poner `MSYS_NO_PATHCONV=1` adelante de cada `docker compose run`, por ejemplo `MSYS_NO_PATHCONV=1 docker compose --profile carga run --rm k6 run /carga/slot.js`. Si no, Git Bash convierte `/carga` en una ruta de Windows y k6 no encuentra el archivo. `caida.sh` ya la pone.
+
    - **El tablero** se corre dos veces, sin caché y con caché, sobre los mismos datos (ADR-007):
      1. Una sola vez, cargar los vuelos: `docker compose --profile carga run --rm k6 run /carga/sembrar-tablero.js`.
      2. Sin caché: `CACHE_ENABLED=false` en el `.env`, `docker compose up -d vuelos-1 vuelos-2` y `docker compose restart memcached`. Correr `tablero.js` con `--summary-export /resultados/tablero-sin-cache.json`.
@@ -43,7 +45,7 @@ Los escenarios del [ADR-013](../../docs/adr/ADR-013.md), escritos para k6 (16.1)
    | Qué | Consulta |
    |---|---|
    | Pedidos por segundo que manda k6 | `sum(rate(http_reqs_total{service_name="k6"}[1m]))` |
-   | Reparto entre las instancias de Vuelos | `sum by (service_instance_id) (rate(http_server_request_duration_seconds_count{service_name="vuelos"}[2m]))` |
+   | Reparto entre las instancias de Vuelos | `sum by (instance) (rate(http_server_request_duration_seconds_count{service_name="vuelos"}[2m]))` |
 
    Los servicios mandan sus métricas una vez por minuto, así que conviene ventanas de 2 minutos o más.
 

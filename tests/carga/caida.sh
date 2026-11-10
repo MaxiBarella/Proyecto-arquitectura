@@ -5,6 +5,9 @@
 #   RUTA=/api/vuelos/flights tests/carga/caida.sh   (otra ruta de Vuelos, con token)
 set -eu
 
+# En Git Bash de Windows, que no convierta /carga y /resultados en rutas de Windows.
+export MSYS_NO_PATHCONV=1
+
 docker compose --profile carga run --rm \
     -e TASA="${TASA:-100}" -e RUTA="${RUTA:-/api/vuelos/board}" \
     k6 run --summary-export /resultados/caida.json /carga/caida.js &
