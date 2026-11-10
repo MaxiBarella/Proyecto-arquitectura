@@ -160,7 +160,7 @@ Son consecuencias de lo que se eligió. El equipo las aceptó a sabiendas, y cad
 | Si no hay ningún aeropuerto alternativo disponible, el arribo se desvía igual al primero de la lista. | El SPEC asume que siempre hay uno disponible. | 18 (pendiente 16) |
 | La copia de Clima en Render se duerme sin uso: el primer pedido tarda cerca de un minuto y puede traer un `503`. | Es el plan gratuito. Está avisado en la guía del contrato. | 9.4, ADR-015 |
 | NGINX se entera de que una instancia de Vuelos cayó cuando le falla un pedido. Si está colgada, ese pedido espera 10 segundos. | La verificación activa es de la versión paga de NGINX. | 12.2, 12.4, 12.5, ADR-012 |
-| Si una instancia no responde un `POST`, NGINX no lo reintenta en la otra: la aerolínea recibe un error. Publicar el vuelo de nuevo puede dejarlo duplicado. | NGINX no sabe si el pedido se aplicó. Pedir un slot es idempotente; publicar no. | ADR-012 (pendiente) |
+| Si una instancia no responde un `POST`, NGINX no lo reintenta en la otra: la aerolínea recibe un error. Lo mismo si NGINX deja de esperar a los 10 segundos. Publicar el vuelo de nuevo puede dejarlo duplicado. | NGINX no sabe si el pedido se aplicó. Pedir un slot es idempotente; publicar no. Evitarlo con una restricción única queda como mejora. | 12.8, ADR-012 |
 
 **Seguridad**
 

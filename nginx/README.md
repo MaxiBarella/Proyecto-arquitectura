@@ -64,5 +64,7 @@ docker compose start vuelos-2                    # a los 10 segundos vuelve a re
 En Grafana (`http://localhost:3001`, Explore, Prometheus):
 
 ```
-sum by (service_instance_id) (rate(http_server_request_duration_seconds_count{service_name="vuelos"}[1m]))
+sum by (instance) (rate(http_server_request_duration_seconds_count{service_name="vuelos"}[2m]))
 ```
+
+La instancia está en dos etiquetas con el mismo valor, `instance` y `service_instance_id` (12.7): anda con cualquiera. Los servicios mandan sus métricas una vez por minuto, así que la ventana tiene que ser de 2 minutos o más.

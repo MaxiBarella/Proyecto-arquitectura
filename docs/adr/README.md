@@ -36,8 +36,8 @@ No se inventan decisiones al escribir un ADR. Si falta algo por decidir, se llev
 | [ADR-009](ADR-009.md) | D9. Consumo del proveedor | Cómo se incorpora la capacidad externa, adaptación al contrato y comportamiento ante errores, cambios o indisponibilidad. | Depende de la asignación de la cátedra | Male y Salvador | Entrega 2 | Versión inicial |
 | [ADR-010](ADR-010.md) | D10. Resiliencia | Comportamiento ante fallas y mecanismos para limitar su propagación o degradar de forma controlada. | 4.5, 13.1 | Carola | Entrega 2 | Aceptado |
 | [ADR-011](ADR-011.md) | D11. Observabilidad | Estrategia de logs, métricas, trazas y tableros, objetivo de servicio y criterios de alerta. | 11.1 a 11.5 | Male y Salvador | Entrega 2, primera versión | Versión inicial |
-| [ADR-012](ADR-012.md) | D12. Balanceo de carga | Servicio elegido, estrategia de distribución, verificación de disponibilidad y caída de una instancia. | 12.1 a 12.3, 15.3 | Male y Salvador | Entrega 2 | Aceptado |
-| [ADR-013](ADR-013.md) | D13. Capacidad y costos | Resultados de las pruebas de carga, principal límite, alternativa de escalado y estimación de costos. | 11.3, 16.1 | Male y Salvador | Entrega 2 | Versión inicial |
+| [ADR-012](ADR-012.md) | D12. Balanceo de carga | Servicio elegido, estrategia de distribución, verificación de disponibilidad y caída de una instancia. | 12.1 a 12.8, 15.3 | Male y Salvador | Entrega 2 | Aceptado |
+| [ADR-013](ADR-013.md) | D13. Capacidad y costos | Resultados de las pruebas de carga, principal límite, alternativa de escalado y estimación de costos. | 11.3, 16.1 a 16.6 | Male y Salvador | Entrega 2 | Aceptado |
 | [ADR-014](ADR-014.md) | API gateway (adicional) | Herramienta, separación de los roles de gateway y balanceador, validación del token, rutas y control de tráfico. | 15.1 a 15.23, 12.5 | Salvador | Presentación | Aceptado |
 | [ADR-015](ADR-015.md) | D8. Contrato propio, reemplaza al ADR-008 | Estrategia de versionado sin versión en la ruta y publicación de Clima en la nube. | 6.1 a 6.19, 9.1 a 9.11 | Male | Entrega 2 | Aceptado |
 
