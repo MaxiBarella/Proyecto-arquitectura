@@ -45,6 +45,12 @@ server {
     limit_req_status 429;
     error_page 429 @limite;
 
+    # Si el servicio está caído o no contesta, NGINX arma la respuesta (15.23): en Problem
+    # Details, como el resto de los errores, y no con su página en HTML. 502: no hay a quién
+    # mandarle el pedido. 504: no conectó o no respondió a tiempo (12.5).
+    error_page 502 @caido;
+    error_page 504 @demorado;
+
     proxy_http_version 1.1;
     proxy_set_header Connection "";
 
@@ -113,6 +119,14 @@ server {
     # Se pueden guardar en el navegador sin vencimiento.
     location /assets/ {
         add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    location @caido {
+        return 502 '{"type":"/problems/service-unavailable","title":"Servicio no disponible","status":502,"detail":"El servicio no responde. Probá de nuevo en un momento.","code":"SERVICE_UNAVAILABLE"}';
+    }
+
+    location @demorado {
+        return 504 '{"type":"/problems/service-unavailable","title":"El servicio no respondió a tiempo","status":504,"detail":"El servicio no responde. Probá de nuevo en un momento.","code":"SERVICE_UNAVAILABLE"}';
     }
 
     location @limite {

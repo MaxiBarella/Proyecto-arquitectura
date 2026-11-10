@@ -181,6 +181,41 @@ else
     echo "FALLA NGINX arrancó con una clave corta: $salida"
 fi
 
+# Va al final porque apaga el servicio falso.
+echo "== Servicio caído (15.23)"
+docker compose stop servicio-falso >/dev/null 2>&1
+# Mientras NGINX todavía tiene la IP del contenedor, no conecta y responde 504 al segundo
+# (12.5). Cuando el nombre deja de existir, responde 502 al instante. Los dos en Problem Details.
+caido_primero=""
+caido_502=""
+for _ in $(seq 20); do
+    respuesta=$(curl -s -i -H "Authorization: Bearer $AEROLINEA" "$GATEWAY/api/vuelos/flights")
+    estado=$(head -n 1 <<<"$respuesta" | cut -d' ' -f2)
+    [[ -z "$caido_primero" ]] && caido_primero="$estado $respuesta"
+    if [[ "$estado" == 502 ]]; then
+        caido_502="$respuesta"
+        break
+    fi
+    sleep 0.5
+done
+casos=$((casos + 1))
+if [[ "$caido_primero" =~ ^50[24] && "$caido_primero" == *'application/problem+json'* \
+    && "$caido_primero" == *'"code":"SERVICE_UNAVAILABLE"'* ]]; then
+    echo "ok    recién caído: ${caido_primero%% *} en Problem Details con SERVICE_UNAVAILABLE"
+else
+    fallas=$((fallas + 1))
+    echo "FALLA recién caído, llegó: $caido_primero"
+fi
+casos=$((casos + 1))
+if [[ "$caido_502" == *'application/problem+json'* && "$caido_502" == *'"status":502'* \
+    && "$caido_502" == *'"code":"SERVICE_UNAVAILABLE"'* ]]; then
+    echo "ok    después: 502 en Problem Details con SERVICE_UNAVAILABLE"
+else
+    fallas=$((fallas + 1))
+    echo "FALLA no llegó un 502 en Problem Details en 10 segundos"
+fi
+caso "con los servicios caídos, el frontend se sigue viendo" 200 '<div id="root">' "$GATEWAY/"
+
 echo
 echo "$((casos - fallas)) de $casos casos bien."
 [[ $fallas -eq 0 ]]

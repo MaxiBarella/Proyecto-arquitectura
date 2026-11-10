@@ -367,6 +367,12 @@ Las decisiones 15.18 a 15.21 las tomó Salvador el 9/11/2026, al programar el ga
 | 15.20 | Cuándo dejan de exponer puerto los servicios | **Cuando Usuarios emita tokens** | La 15.7 dice que solo NGINX expone un puerto. Hoy Usuarios no entrega tokens, y la pareja 1 prueba contra los puertos directos con los encabezados a mano. Los puertos `8081` a `8084` se sacan en otro pull request, cuando Usuarios ande. Mientras tanto, `nginx/token-de-prueba.sh` arma tokens de prueba para el gateway y para k6. |
 | 15.21 | Largo mínimo de `JWT_SECRET` | **32 bytes** | Es lo que pide HS256: una clave de al menos 256 bits (RFC 7518). Con una clave corta, cualquiera puede adivinarla probando y armar tokens válidos. Si es más corta, NGINX no arranca. Se genera con `openssl rand -base64 32`. |
 
+La 15.23 la tomó Salvador el 10/11/2026, al escribir el [ADR-014](adr/ADR-014.md). Las opciones y las recomendaciones las preparó el agente de IA. Queda confirmada al mergearse el pull request que la registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 15.23 | Qué responde el gateway si un servicio está caído | **`502` o `504` en Problem Details, con `SERVICE_UNAVAILABLE`** | `502` cuando no hay a quién mandarle el pedido, y `504` cuando no conectó o no respondió a tiempo (12.5). Los dos con el mismo código, en el formato de los demás errores (15.18, 21.1), así el frontend muestra el detalle: "El servicio no responde. Probá de nuevo en un momento." Antes salía la página en HTML de NGINX. Se descartaron unificar todo en `503`, que borra la diferencia entre caído y colgado, y reusar el `UNAVAILABLE` de Pistas, que la pantalla del operador traduce como "Pistas no responde" aunque el caído sea otro. Los errores que arma cada servicio pasan sin cambios. |
+
 ## 16. Capacidad y costos (ADR D13)
 
 | # | Decisión | Elegido | Qué significa |
@@ -644,4 +650,4 @@ Sin respuesta registrada:
 | D11 | Observabilidad | 11.1 a 11.5 | Entrega 2, primera versión |
 | D12 | Balanceo de carga | 12.1 a 12.3, 15.3 | Entrega 2 |
 | D13 | Capacidad y costos | 11.3, 16.1 | Entrega 2 |
-| ADR-014 | API gateway (adicional, agente) | 15.1 a 15.21, 12.5 | Presentación |
+| ADR-014 | API gateway (adicional, agente) | 15.1 a 15.23, 12.5 | Presentación |

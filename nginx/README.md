@@ -31,6 +31,8 @@ Escucha en `http://localhost:8080`.
 
 **El límite.** 20 pedidos por segundo por IP, con ráfagas de hasta 40; al pasarlo, `429` con `RATE_LIMIT_EXCEEDED` (15.8). Se cambia con `GATEWAY_RATE_LIMIT` y `GATEWAY_RATE_BURST` en el `.env`.
 
+**Un servicio caído.** NGINX responde `502` si no hay a quién mandarle el pedido, o `504` si no conectó o no respondió a tiempo, los dos con `SERVICE_UNAVAILABLE` y en Problem Details (15.23). Los errores que arma cada servicio pasan sin cambios.
+
 ## Cómo probarlo
 
 Prueba automática, sin levantar el sistema: NGINX delante de un servicio falso que responde qué le llegó.
