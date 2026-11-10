@@ -50,7 +50,7 @@ go test ./...                                          # reglas, casos de uso y 
 go test -tags integration ./internal/adapters/mysql/   # pedidos simultáneos contra MySQL real; necesita Docker
 ```
 
-Puerto en el arranque local: `8082`.
+En el arranque local no expone puerto: las rutas del operador se llaman por el gateway, en `http://localhost:8080/api/pistas/…`, con un token (15.7, 15.20). El pedido de slot (`/internal/slots`) solo se alcanza desde la red de Docker, como `http://pistas:8080` (15.19).
 
 El contrato del pedido de slot que hace Vuelos está en [openapi.yaml](openapi.yaml) (4.15).
 4. El pedido lee la pista con `SELECT ... FOR SHARE`. Varios pedidos pueden leerla a la vez, pero un cierre, que la bloquea con `FOR UPDATE`, espera a que terminen, y un pedido que llega durante un cierre espera a que termine y ve la pista cerrada (RN-27, ADR-004).

@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Usuarios API
-  version: 0.1.0
+  version: 0.1.1
   summary: Inicio de sesión de aerolíneas y operadores.
   description: |
     API interna del servicio Usuarios. La usa el frontend, a través del gateway, para
@@ -20,8 +20,8 @@ info:
       (9.10). La ruta no lleva versión.
 
 servers:
-  - url: http://localhost:8084
-    description: Usuarios en el arranque local, sin gateway. Por el gateway, la ruta va con `/api/usuarios` adelante (15.7).
+  - url: http://localhost:8080/api/usuarios
+    description: Usuarios en el arranque local, por el gateway (15.7). El servicio no expone su propio puerto (15.20).
 
 # El inicio de sesión es lo único que pasa por el gateway sin token (15.7).
 security: []

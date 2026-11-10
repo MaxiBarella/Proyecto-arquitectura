@@ -85,7 +85,7 @@ Hace falta Docker instalado y en marcha.
    | RabbitMQ, la consola de las colas | <http://localhost:15672> |
    | Solr, el índice del tablero | <http://localhost:8983> |
 
-   Las cuentas de prueba son `aerolineas` (aerolínea AR), `latam` (aerolínea LA) y `operador`, con las contraseñas del `.env`. Los servicios también exponen su puerto directo (Vuelos 8081, Pistas 8082, Clima 8083 y Usuarios 8084), solo para depurar: ahí no hay token y la identidad va en los encabezados `X-User-Id`, `X-User-Role` y `X-Airline`.
+   Las cuentas de prueba son `aerolineas` (aerolínea AR), `latam` (aerolínea LA) y `operador`, con las contraseñas del `.env`. Los servicios no exponen su propio puerto: todo entra por el gateway (15.20). Para ver si uno está vivo, `docker compose exec vuelos-1 wget -qO- localhost:8080/health` (lo mismo con `vuelos-2`, `pistas`, `clima` o `usuarios`).
 
 ### Recorrido del flujo principal
 

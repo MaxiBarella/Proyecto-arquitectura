@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Vuelos API
-  version: 0.2.0
+  version: 0.2.1
   summary: Publicación de vuelos, pedido de slot, cancelación y tablero.
   description: |
     API interna del servicio Vuelos. La usan el frontend y, a través del gateway, las
@@ -21,8 +21,8 @@ info:
       (9.10). La ruta no lleva versión.
 
 servers:
-  - url: http://localhost:8081
-    description: Vuelos en el arranque local, sin gateway.
+  - url: http://localhost:8080/api/vuelos
+    description: Vuelos en el arranque local, por el gateway (15.7). El servicio no expone su propio puerto (15.20).
 
 # Vuelos no valida credenciales: el token lo verifica el gateway, que pasa la
 # identidad en los encabezados X-User-* (15.4, 15.6).
