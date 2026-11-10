@@ -644,4 +644,4 @@ Sin respuesta registrada:
 | D11 | Observabilidad | 11.1 a 11.5 | Entrega 2, primera versión |
 | D12 | Balanceo de carga | 12.1 a 12.3, 15.3 | Entrega 2 |
 | D13 | Capacidad y costos | 11.3, 16.1 | Entrega 2 |
-| ADR-014 | API gateway (adicional, agente) | 15.1 a 15.8 | Presentación |
+| ADR-014 | API gateway (adicional, agente) | 15.1 a 15.21, 12.5 | Presentación |
