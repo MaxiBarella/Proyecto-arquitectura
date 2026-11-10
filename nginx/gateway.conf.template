@@ -47,7 +47,8 @@ server {
 
     # Si el servicio está caído o no contesta, NGINX arma la respuesta (15.23): en Problem
     # Details, como el resto de los errores, y no con su página en HTML. 502: no hay a quién
-    # mandarle el pedido. 504: no conectó o no respondió a tiempo (12.5).
+    # mandarle el pedido, que no llegó y se puede repetir. 504: no conectó o no respondió a
+    # tiempo (12.5); si no respondió, el servicio pudo haberlo aplicado igual (12.8).
     error_page 502 @caido;
     error_page 504 @demorado;
 
@@ -126,7 +127,7 @@ server {
     }
 
     location @demorado {
-        return 504 '{"type":"/problems/service-unavailable","title":"El servicio no respondió a tiempo","status":504,"detail":"El servicio no responde. Probá de nuevo en un momento.","code":"SERVICE_UNAVAILABLE"}';
+        return 504 '{"type":"/problems/service-unavailable","title":"El servicio no respondió a tiempo","status":504,"detail":"El servicio no respondió a tiempo. Puede que el pedido se haya aplicado: revisá antes de repetirlo.","code":"SERVICE_UNAVAILABLE"}';
     }
 
     location @limite {

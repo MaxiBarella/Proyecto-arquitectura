@@ -186,6 +186,7 @@ echo "== Servicio caído (15.23)"
 docker compose stop servicio-falso >/dev/null 2>&1
 # Mientras NGINX todavía tiene la IP del contenedor, no conecta y responde 504 al segundo
 # (12.5). Cuando el nombre deja de existir, responde 502 al instante. Los dos en Problem Details.
+# Cada intento tarda hasta 1,5 segundos (1 de conexión y 0,5 de espera): 20 intentos, unos 30.
 caido_primero=""
 caido_502=""
 for _ in $(seq 20); do
@@ -200,8 +201,9 @@ for _ in $(seq 20); do
 done
 casos=$((casos + 1))
 if [[ "$caido_primero" =~ ^50[24] && "$caido_primero" == *'application/problem+json'* \
+    && "$caido_primero" == *"\"status\":${caido_primero%% *},"* \
     && "$caido_primero" == *'"code":"SERVICE_UNAVAILABLE"'* ]]; then
-    echo "ok    recién caído: ${caido_primero%% *} en Problem Details con SERVICE_UNAVAILABLE"
+    echo "ok    recién caído: ${caido_primero%% *} en Problem Details con SERVICE_UNAVAILABLE y el mismo estado en el cuerpo"
 else
     fallas=$((fallas + 1))
     echo "FALLA recién caído, llegó: $caido_primero"
@@ -212,7 +214,7 @@ if [[ "$caido_502" == *'application/problem+json'* && "$caido_502" == *'"status"
     echo "ok    después: 502 en Problem Details con SERVICE_UNAVAILABLE"
 else
     fallas=$((fallas + 1))
-    echo "FALLA no llegó un 502 en Problem Details en 10 segundos"
+    echo "FALLA no llegó un 502 en Problem Details en 20 intentos (unos 30 segundos)"
 fi
 caso "con los servicios caídos, el frontend se sigue viendo" 200 '<div id="root">' "$GATEWAY/"
 
