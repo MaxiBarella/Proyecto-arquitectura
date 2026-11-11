@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	driver "github.com/go-sql-driver/mysql"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -50,9 +51,46 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
+// conflictAttempts es cuántas veces se corre una transacción si MySQL la corta por un choque
+// con otra simultánea (ADR-004, 28.2): lo mismo que Pistas.
+const conflictAttempts = 3
+
+// Errores de MySQL por un choque entre transacciones. En los dos, la transacción se deshace
+// entera (gorm hace el rollback), así que correrla de nuevo no duplica nada.
+const (
+	errDeadlock        = 1213 // interbloqueo: MySQL corta una de las dos transacciones
+	errLockWaitTimeout = 1205 // se venció la espera de un bloqueo
+)
+
+// transaction corre fn en una transacción y la vuelve a correr entera, hasta
+// conflictAttempts veces, si choca con otra simultánea.
+func (r *Repository) transaction(ctx context.Context, fn func(tx *gorm.DB) error) error {
+	return retryOnConflict(ctx, func() error {
+		return r.db.WithContext(ctx).Transaction(fn)
+	})
+}
+
+// retryOnConflict corre run hasta conflictAttempts veces mientras falle por un choque entre
+// transacciones. Cualquier otro error, o el pedido cancelado, corta los intentos.
+func retryOnConflict(ctx context.Context, run func() error) error {
+	var err error
+	for attempt := 1; attempt <= conflictAttempts; attempt++ {
+		err = run()
+		if !isConflict(err) || ctx.Err() != nil {
+			return err
+		}
+	}
+	return err
+}
+
+func isConflict(err error) bool {
+	var e *driver.MySQLError
+	return errors.As(err, &e) && (e.Number == errDeadlock || e.Number == errLockWaitTimeout)
+}
+
 // Create guarda un vuelo nuevo y sus eventos en una sola transacción.
 func (r *Repository) Create(ctx context.Context, f *domain.Flight, events ...domain.Event) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.transaction(ctx, func(tx *gorm.DB) error {
 		if err := tx.Create(toRow(f)).Error; err != nil {
 			return fmt.Errorf("guardar el vuelo: %w", err)
 		}
@@ -108,10 +146,11 @@ type Change = domain.Change
 // Update aplica un cambio a un vuelo dentro de una transacción. Lee el vuelo con
 // SELECT ... FOR UPDATE: si otro pedido lo está cambiando, espera a que termine y
 // trabaja sobre el estado nuevo. Guarda el vuelo con la versión siguiente y los
-// eventos en la misma transacción.
+// eventos en la misma transacción. Si la transacción choca con otra, change se vuelve
+// a llamar sobre el vuelo leído de nuevo.
 func (r *Repository) Update(ctx context.Context, id string, change Change) (*domain.Flight, error) {
 	var updated *domain.Flight
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := r.transaction(ctx, func(tx *gorm.DB) error {
 		f, err := r.applyLocked(tx, id, change)
 		updated = f
 		return err
@@ -126,7 +165,7 @@ func (r *Repository) Update(ctx context.Context, id string, change Change) (*dom
 // identificador del mensaje en la misma transacción: si ya estaba, no aplica nada
 // y devuelve applied en false.
 func (r *Repository) ApplyMessage(ctx context.Context, messageID, flightID string, change Change) (applied bool, err error) {
-	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = r.transaction(ctx, func(tx *gorm.DB) error {
 		processed := processedRow{MessageID: messageID, ProcessedAt: r.now()}
 		if err := tx.Create(&processed).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -240,6 +279,10 @@ const relayBatch = 100
 // Vuelos está publicando unos, esta los saltea, así ninguno sale dos veces (4.21).
 // Si uno falla, se detiene ahí y lo deja para la próxima vuelta, con los que siguen;
 // los que ya salieron se borran igual.
+//
+// No se reintenta ante un choque con otra transacción: el relay vuelve a correr al
+// segundo siguiente, y los eventos que no se borraron salen de nuevo (los consumidores
+// son idempotentes, 4.9).
 func (r *Repository) PublishPending(ctx context.Context, publish func(context.Context, domain.Event) error) (published int, err error) {
 	var publishErr error
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

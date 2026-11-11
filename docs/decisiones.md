@@ -541,9 +541,12 @@ Las decisiones 10.5 a 10.8, 14.11, 14.12, 20.5, 26.2 y 28.1 salen de lo que qued
 
 Las 10.9 y 10.10 aparecieron al preparar la medición de la caché: hacían falta datos en el índice y el ensayo mostró que los filtros de k6 se repetían demasiado. Las opciones las preparó el agente de IA y Maxi eligió las recomendadas el 9/11/2026. Quedan confirmadas cuando el equipo apruebe el pull request que las registra.
 
+La 28.2 salió de un error que encontró Salvador en la prueba de carga del tablero. Las opciones las preparó el agente de IA y Maxi eligió la recomendada el 10/11/2026. Queda confirmada cuando el equipo apruebe el pull request que la registra.
+
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 28.1 | Cada cuánto se dan por finalizados los vuelos (RN-32, F-22) | **Cada 1 minuto** | Vuelos busca los vuelos programados cuyo bloque ya terminó y los pasa a finalizado, cada uno con su "vuelo actualizado" para el tablero (14.5). Con bloques de 15 minutos (RN-03), un minuto de atraso casi no se nota, y la consulta es liviana. |
+| 28.2 | Qué hace Vuelos si MySQL corta una transacción por un choque con otra | **La vuelve a correr entera, hasta 3 veces, como Pistas (ADR-004)** (Maxi, 10/11/2026) | Vale para el interbloqueo (error 1213) y la espera de bloqueo vencida (1205), al publicar un vuelo, al cambiarlo y al aplicar un evento. MySQL deshace la transacción entera, así que repetirla no duplica nada. Si los 3 intentos chocan, responde `500` como hasta ahora. Apareció al cargar 700 vuelos de golpe: 1 `POST /flights` respondió `500` (ADR-013). El relay del outbox no se reintenta: vuelve a correr al segundo siguiente. Se descartaron responder `503` sin reintentar, porque el frontend no reintenta solo, y dejarlo como limitación, porque Pistas sí reintenta. |
 
 ## Forma de trabajo
 
