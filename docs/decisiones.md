@@ -284,6 +284,7 @@ Las decisiones 11.7 a 11.10 son los pendientes del ADR-011. Las propuso Male al 
 | 11.8 | La alerta de fallidos se apaga sola | **Se acepta, como limitación** | La alerta de la 11.4 mira los últimos 5 minutos de logs: si nadie revisa el mensaje, deja de sonar aunque siga en la cola. Alertar por la cantidad de mensajes en las colas `.fallidos` necesita sacar métricas de RabbitMQ, y no entraba antes de la presentación. |
 | 11.9 | Alerta por el objetivo de servicio | **Si el p95 del pedido de slot pasa los 500 ms durante 5 minutos seguidos** | Está en `grafana/alerting/objetivo.yaml`. Usa la misma consulta que la 11.3. |
 | 11.10 | Si en 5 minutos no hubo pedidos de slot | **El tablero muestra "Sin datos", en gris, y la alerta no se dispara** | Sin pedidos no hay un p95 que medir: mostrar 0 diría que se cumple el objetivo, y disparar la alerta avisaría de un problema que no existe. |
+| 11.11 | Los datos de Grafana entre reinicios | **No se guardan; se acepta como limitación** (el grupo, 11/11/2026) | Grafana guarda los logs, las métricas y las trazas dentro de su contenedor, sin volumen (11.1). Si el contenedor se recrea, se pierden; el tablero y las alertas no, porque se cargan desde `grafana/` al arrancar (20.4). Los resultados de las pruebas de carga que importan quedan anotados en el ADR-013. Por qué: es un entorno para mostrar en una sola computadora, y guardar meses de datos no aporta para la presentación. |
 
 ## 12. Balanceo de carga (ADR D12)
 
@@ -658,7 +659,7 @@ Sin respuesta registrada:
 | D7 | Caché | 10.1 a 10.8 | Entrega 2 |
 | D9 | Consumo del proveedor | 27.1 | Entrega 2; se completa para la presentación |
 | D10 | Resiliencia | 4.5, 13.1, 21.1, 24.1 | Entrega 2 |
-| D11 | Observabilidad | 11.1 a 11.5 | Entrega 2, primera versión |
+| D11 | Observabilidad | 11.1 a 11.11 | Entrega 2, primera versión; aceptado el 11/11/2026 |
 | D12 | Balanceo de carga | 12.1 a 12.8, 15.3 | Entrega 2 |
 | D13 | Capacidad y costos | 11.3, 16.1 a 16.6 | Entrega 2 |
 | ADR-014 | API gateway (adicional, agente) | 15.1 a 15.8 | Presentación |
