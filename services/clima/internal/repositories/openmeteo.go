@@ -15,7 +15,10 @@ import (
 	"github.com/MaxiBarella/Proyecto-arquitectura/services/clima/internal/models"
 )
 
-const openMeteoURL = "https://api.open-meteo.com/v1/forecast"
+// DefaultOpenMeteoURL es la API pública de Open-Meteo. La copia de la nube usa un
+// Open-Meteo propio en Render, porque la pública cuenta el cupo diario por IP y
+// Render comparte la IP con otros usuarios (9.23).
+const DefaultOpenMeteoURL = "https://api.open-meteo.com/v1/forecast"
 
 // openMeteoTimeout es cuánto se espera a Open-Meteo. Si no responde, se vuelve a
 // intentar en la próxima consulta periódica.
@@ -30,8 +33,12 @@ type OpenMeteo struct {
 	baseURL string
 }
 
-func NewOpenMeteo() *OpenMeteo {
-	return &OpenMeteo{client: &http.Client{Timeout: openMeteoTimeout}, baseURL: openMeteoURL}
+// NewOpenMeteo consulta baseURL, o la API pública si viene vacía.
+func NewOpenMeteo(baseURL string) *OpenMeteo {
+	if baseURL == "" {
+		baseURL = DefaultOpenMeteoURL
+	}
+	return &OpenMeteo{client: &http.Client{Timeout: openMeteoTimeout}, baseURL: baseURL}
 }
 
 // Los valores son punteros para distinguir un dato que no vino de un 0: si falta
