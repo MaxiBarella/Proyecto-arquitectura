@@ -375,6 +375,12 @@ Las decisiones 15.18 a 15.21 las tomó Salvador el 9/11/2026, al programar el ga
 | 15.20 | Cuándo dejan de exponer puerto los servicios | **Cuando Usuarios emita tokens**; se sacan antes de la presentación (el grupo, 10/11/2026) | La 15.7 dice que solo NGINX expone un puerto. Al principio Usuarios no entregaba tokens, y la pareja 1 probaba contra los puertos directos con los encabezados a mano. Usuarios los entrega desde el #54, y el 10/11/2026 el grupo eligió sacar los puertos `8081` a `8084` antes de la presentación, en vez de dejarlo pendiente. Desde entonces los servicios solo se alcanzan por el gateway, y nadie puede mandarles una identidad falsa en los encabezados (15.6). El `/health` de cada uno se ve con `docker compose exec`, o por el gateway con un token. RabbitMQ, Solr y Grafana mantienen su consola. `nginx/token-de-prueba.sh` sigue armando tokens para k6. |
 | 15.21 | Largo mínimo de `JWT_SECRET` | **32 bytes** | Es lo que pide HS256: una clave de al menos 256 bits (RFC 7518). Con una clave corta, cualquiera puede adivinarla probando y armar tokens válidos. Si es más corta, NGINX no arranca. Se genera con `openssl rand -base64 32`. |
 
+La 15.23 la tomó Salvador el 10/11/2026, al escribir el [ADR-014](adr/ADR-014.md). Las opciones y las recomendaciones las preparó el agente de IA. Queda confirmada al mergearse el pull request que la registra, que revisa la pareja 1.
+
+| # | Decisión | Elegido | Qué significa |
+|---|---|---|---|
+| 15.23 | Qué responde el gateway si un servicio está caído | **`502` o `504` en Problem Details, con `SERVICE_UNAVAILABLE`** | `502` cuando no hay a quién mandarle el pedido, y `504` cuando no conectó o no respondió a tiempo (12.5). Los dos con el mismo código, en el formato de los demás errores (15.18, 21.1), así el frontend muestra el detalle. El del `502` dice "El servicio no responde. Probá de nuevo en un momento.", porque el pedido no llegó. El del `504` dice "El servicio no respondió a tiempo. Puede que el pedido se haya aplicado: revisá antes de repetirlo.", porque si NGINX dejó de esperar a los 10 segundos el servicio pudo haberlo aplicado, y repetir un `POST /flights` puede duplicar el vuelo (12.8). Antes salía la página en HTML de NGINX. Se descartaron unificar todo en `503`, que borra la diferencia entre caído y colgado, y reusar el `UNAVAILABLE` de Pistas, que la pantalla del operador traduce como "Pistas no responde" aunque el caído sea otro. Los errores que arma cada servicio pasan sin cambios. |
+
 ## 16. Capacidad y costos (ADR D13)
 
 | # | Decisión | Elegido | Qué significa |
@@ -661,4 +667,4 @@ Sin respuesta registrada:
 | D11 | Observabilidad | 11.1 a 11.5 | Entrega 2, primera versión |
 | D12 | Balanceo de carga | 12.1 a 12.8, 15.3 | Entrega 2 |
 | D13 | Capacidad y costos | 11.3, 16.1 a 16.6 | Entrega 2 |
-| ADR-014 | API gateway (adicional, agente) | 15.1 a 15.8 | Presentación |
+| ADR-014 | API gateway (adicional, agente) | 15.1 a 15.23, 12.5 | Presentación |
