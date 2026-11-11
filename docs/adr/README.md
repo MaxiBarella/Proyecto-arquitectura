@@ -39,7 +39,7 @@ No se inventan decisiones al escribir un ADR. Si falta algo por decidir, se llev
 | [ADR-012](ADR-012.md) | D12. Balanceo de carga | Servicio elegido, estrategia de distribución, verificación de disponibilidad y caída de una instancia. | 12.1 a 12.8, 15.3 | Male y Salvador | Entrega 2 | Aceptado |
 | [ADR-013](ADR-013.md) | D13. Capacidad y costos | Resultados de las pruebas de carga, principal límite, alternativa de escalado y estimación de costos. | 11.3, 16.1 a 16.6 | Male y Salvador | Entrega 2 | Aceptado |
 | ADR-014 | API gateway (adicional) | Herramienta, separación de los roles de gateway y balanceador, validación del token, rutas y control de tráfico. | 15.1 a 15.8 | A asignar | Presentación | Sin escribir |
-| [ADR-015](ADR-015.md) | D8. Contrato propio, reemplaza al ADR-008 | Estrategia de versionado sin versión en la ruta y publicación de Clima en la nube. | 6.1 a 6.19, 9.1 a 9.11, 9.22 | Male | Entrega 2 | Aceptado |
+| [ADR-015](ADR-015.md) | D8. Contrato propio, reemplaza al ADR-008 | Estrategia de versionado sin versión en la ruta y publicación de Clima en la nube. | 6.1 a 6.19, 9.1 a 9.11, 9.22, 9.23 | Male | Entrega 2 | Aceptado |
 
 La columna "Sale de" indica los números de [../decisiones.md](../decisiones.md) que alimentan cada ADR.
 

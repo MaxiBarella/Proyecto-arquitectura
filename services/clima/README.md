@@ -15,6 +15,7 @@ Consulta a Open-Meteo cada 15 minutos, guarda la observación en MongoDB y calcu
 |---|---|
 | `MONGO_URI` | Conexión a MongoDB. Obligatoria. |
 | `CLIMA_API_KEYS` | Claves de los consumidores, como `grupo1:clave1,grupo2:clave2`. Obligatoria. |
+| `OPEN_METEO_URL` | Dirección de Open-Meteo, terminada en `/v1/forecast`. Por defecto, la API pública. En la nube apunta al Open-Meteo propio de Render (9.23). |
 | `RABBITMQ_ENABLED` | `false` en la copia de la nube: no encola eventos ni expone el forzado. Por defecto `true`. |
 | `RABBITMQ_URL` | Conexión a RabbitMQ, si está habilitado. |
 | `PORT` | Puerto. Por defecto `8080`. |

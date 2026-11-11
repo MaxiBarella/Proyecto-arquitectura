@@ -77,7 +77,7 @@ func run(logger *slog.Logger) (err error) {
 	aptitude := repositories.NewAptitudeRepository(db)
 	weather := services.NewWeatherService(
 		models.Cordoba,
-		repositories.NewOpenMeteo(),
+		repositories.NewOpenMeteo(cfg.openMeteoURL),
 		repositories.NewObservationRepository(db),
 		aptitude,
 		cfg.rabbitEnabled,
