@@ -33,4 +33,4 @@ Tests: `go test ./...` desde esta carpeta. Los de integración levantan MongoDB 
 | `internal/models` | Define los datos que maneja el servicio. |
 | `internal/observability` | Logs en JSON, métricas y trazas con OpenTelemetry. Ver su [README](internal/observability/README.md). |
 
-Puerto en el arranque local: `8083`.
+En el arranque local no expone puerto: se llega por el gateway, en `http://localhost:8080/api/clima/…`, con un token y además la `X-API-Key` (9.5, 15.7, 15.20). La copia que usa el otro grupo es la de Render (9.3).

@@ -167,7 +167,7 @@ Son consecuencias de lo que se eligió. El equipo las aceptó a sabiendas, y cad
 | Limitación | Por qué se acepta | Dónde |
 |---|---|---|
 | Un token no se puede revocar: vale hasta que vence, 1 hora después. | Así el gateway lo verifica sin preguntarle a Usuarios, y la caída de Usuarios no corta las sesiones abiertas. | 15.2 |
-| Los servicios confían en los encabezados de identidad que pone el gateway. | Mientras los servicios expongan su puerto directo, cualquiera que llegue a él puede mandar esos encabezados. Se cierra cuando se saquen los puertos (15.20). | 15.6, 15.20 |
+| Los servicios confían en los encabezados de identidad que pone el gateway. | Desde afuera solo se llega a ellos por NGINX, que pisa siempre esos encabezados con los datos del token (15.20). Alguien que ya esté dentro de la red de Docker sí podría mandarlos. | 15.6, 15.20 |
 | Quien tenga `JWT_SECRET` puede firmar tokens válidos: la clave es la misma en Usuarios y en NGINX (HS256), y está en el `.env` de cada uno. | Es la forma más simple de verificar el token en el gateway sin llamar a Usuarios. NGINX no arranca con una clave de menos de 32 bytes. | 15.5, 15.21 |
 | El token se guarda en `sessionStorage`: un script inyectado en la página lo podría leer. | Sobrevive a una recarga y se borra al cerrar la pestaña; dura 1 hora. | 22.7 |
 | El límite de tráfico es por IP: los usuarios que salen por la misma IP comparten los 20 pedidos por segundo. | Con un solo NGINX no hay que coordinar el límite. Para las pruebas de carga se sube. | 15.8 |

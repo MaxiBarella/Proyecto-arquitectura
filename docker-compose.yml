@@ -53,6 +53,7 @@ services:
       # Límite por IP (15.8). Para las pruebas de carga se sube en el .env.
       GATEWAY_RATE_LIMIT: ${GATEWAY_RATE_LIMIT:-20}
       GATEWAY_RATE_BURST: ${GATEWAY_RATE_BURST:-40}
+    # Es el único de los servicios que expone un puerto: todo entra por acá (15.7, 15.20).
     ports:
       - "8080:80"
     depends_on:
@@ -70,9 +71,6 @@ services:
     environment:
       <<: *vuelos-entorno
       OTEL_RESOURCE_ATTRIBUTES: service.instance.id=vuelos-1
-    # El puerto directo queda hasta que Usuarios emita tokens (15.20).
-    ports:
-      - "8081:8080"
 
   vuelos-2:
     <<: *vuelos
@@ -87,8 +85,6 @@ services:
       MYSQL_DSN: ${MYSQL_PISTAS_USER:?falta en .env}:${MYSQL_PISTAS_PASSWORD:?falta en .env}@tcp(mysql-pistas:3306)/pistas?parseTime=true&loc=UTC
       OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana:4318
       RABBITMQ_URL: amqp://${RABBITMQ_USER:?falta en .env}:${RABBITMQ_PASSWORD:?falta en .env}@rabbitmq:5672
-    ports:
-      - "8082:8080"
     depends_on:
       # Pistas arranca recién cuando MySQL acepta conexiones.
       mysql-pistas:
@@ -107,8 +103,6 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
       RABBITMQ_ENABLED: "true"
       CLIMA_API_KEYS: ${CLIMA_API_KEYS:?falta en .env}
-    ports:
-      - "8083:8080"
     depends_on:
       mongo-clima:
         condition: service_started
@@ -129,8 +123,6 @@ services:
       USUARIOS_OPERADOR_PASSWORD: ${USUARIOS_OPERADOR_PASSWORD:?falta en .env}
       USUARIOS_AEROLINEAS_PASSWORD: ${USUARIOS_AEROLINEAS_PASSWORD:?falta en .env}
       USUARIOS_LATAM_PASSWORD: ${USUARIOS_LATAM_PASSWORD:?falta en .env}
-    ports:
-      - "8084:8080"
     depends_on:
       # Usuarios arranca recién cuando MySQL acepta conexiones.
       mysql-usuarios:

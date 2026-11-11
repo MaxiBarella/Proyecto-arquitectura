@@ -22,6 +22,6 @@ Tests: `go test ./...`. Los del adaptador de MySQL levantan un MySQL real con te
 | `internal/adapters/pistas` | Le pide los slots a Pistas, con timeout, reintentos y circuit breaker (4.5, 13.1). |
 | `internal/adapters/solr` | Mantiene y consulta el índice de búsqueda en Solr. |
 
-Puerto en el arranque local: `8081`.
+En el arranque local no expone puerto: se llega por el gateway, en `http://localhost:8080/api/vuelos/…`, con un token (15.7, 15.20). El tablero (`/api/vuelos/board`) no lo pide.
 
 Los endpoints están en [openapi.yaml](openapi.yaml).

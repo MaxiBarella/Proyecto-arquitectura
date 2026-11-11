@@ -68,9 +68,9 @@ En Grafana (<http://localhost:3001>, Explore, Loki) se ven con `{service_name="v
 
 ## Cómo repetirla
 
-1. `docker compose up -d --build vuelos-1 vuelos-2 pistas`
-2. Publicar un vuelo con `POST /flights` en Vuelos (puerto 8081), con los encabezados `X-User-Id`, `X-User-Role: airline` y `X-Airline`.
+1. `docker compose up -d --build`
+2. Iniciar sesión como `aerolineas` con `POST http://localhost:8080/api/usuarios/login` y publicar un vuelo con `POST /api/vuelos/flights`, con el token en `Authorization: Bearer`. Los servicios no exponen su puerto: todo va por el gateway (15.20). La prueba del 22/10 se hizo contra el puerto directo de Vuelos, con los encabezados de identidad a mano.
 3. `docker compose stop pistas`
-4. Pedir slots con `POST /flights/{id}/slot-request` al menos 6 veces: los 5 primeros tardan, el sexto responde al instante.
+4. Pedir slots con `POST /api/vuelos/flights/{id}/slot-request` al menos 6 veces: los 5 primeros tardan, el sexto responde al instante.
 5. `docker compose start pistas`, esperar 30 segundos y volver a pedir: responde `202`.
 6. `docker compose logs vuelos-1 vuelos-2 | grep "circuit breaker"`

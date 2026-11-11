@@ -25,12 +25,12 @@ Organización interna: **capas** (decisión 7.5 de [docs/decisiones.md](../../do
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Dirección de Grafana para logs, métricas y trazas. Si falta, solo escribe los logs. |
 | `PORT` | Puerto. Por defecto `8080`. |
 
-Puerto en el arranque local: `8084`.
+En el arranque local no expone puerto: se llega por el gateway, en `http://localhost:8080/api/usuarios/…` (15.7, 15.20). El inicio de sesión no pide token.
 
 ```sh
 curl -X POST -H "content-type: application/json" \
   -d '{"username":"aerolineas","password":"<USUARIOS_AEROLINEAS_PASSWORD>"}' \
-  http://localhost:8084/login
+  http://localhost:8080/api/usuarios/login
 ```
 
 Tests: `go test ./...` desde esta carpeta. Los de integración levantan MySQL con Docker (testcontainers-go); `go test -short ./...` los saltea.

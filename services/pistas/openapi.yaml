@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Pistas API
-  version: 0.4.0
+  version: 0.4.1
   summary: Asignación de slots de pista y administración de las pistas.
   description: |
     API del servicio Pistas. Tiene dos partes:
@@ -27,8 +27,8 @@ info:
       (9.10).
 
 servers:
-  - url: http://localhost:8082
-    description: Pistas en el arranque local.
+  - url: http://localhost:8080/api/pistas
+    description: Las operaciones del operador en el arranque local, por el gateway (15.7). El servicio no expone su propio puerto (15.20).
 
 # Por defecto no lleva credenciales: la identidad la pone el gateway en encabezados
 # (15.6), declarados en cada operación del operador.
@@ -36,6 +36,9 @@ security: []
 
 paths:
   /internal/slots:
+    servers:
+      - url: http://pistas:8080
+        description: Solo desde la red de Docker. El gateway no la expone (15.19).
     post:
       operationId: assignSlot
       summary: Pedir un slot para un vuelo (4.1, 4.15)
