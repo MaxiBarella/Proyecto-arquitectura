@@ -14,6 +14,8 @@ type config struct {
 	mongoURI  string
 	apiKeys   map[string]string // clave → consumidor
 	rabbitURL string
+	// openMeteoURL es la dirección de Open-Meteo; vacía, la API pública (9.23).
+	openMeteoURL string
 	// rabbitEnabled es false en la copia de la nube (9.3): no publica eventos ni
 	// expone la ruta interna del forzado.
 	rabbitEnabled bool
@@ -24,6 +26,8 @@ func loadConfig() (config, error) {
 		port:      os.Getenv("PORT"),
 		mongoURI:  os.Getenv("MONGO_URI"),
 		rabbitURL: os.Getenv("RABBITMQ_URL"),
+
+		openMeteoURL: os.Getenv("OPEN_METEO_URL"),
 	}
 	if cfg.port == "" {
 		cfg.port = "8080"
