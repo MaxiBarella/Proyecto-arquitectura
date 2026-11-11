@@ -631,12 +631,12 @@ Sin respuesta registrada:
 - Si el mock tiene que estar publicado en internet para el 9/10.
 - Si hay que agregar a los profes como colaboradores del repo, ahora que es público.
 - Cuándo es la jornada de fallas controladas.
-
-Ya no hace falta preguntar en qué entrega vence la decisión D4: el ADR se escribió para la presentación (ADR-004, #63).
 - Qué porcentaje de cobertura de tests unitarios esperan. Mientras tanto, se usa el de la 20.3.
 - Si la API pública de Clima puede no pasar por nuestro gateway (9.9).
 - Si el Clima de la nube puede ser una copia separada del que usa nuestro sistema (9.3).
 - Cuándo es la clase de observabilidad.
+
+Ya no hace falta preguntar en qué entrega vence la decisión D4: el ADR se escribió para la presentación (ADR-004, #63).
 
 ## A qué ADR va cada decisión
 
