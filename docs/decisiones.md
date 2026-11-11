@@ -247,6 +247,7 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 | 9.19 | Si falla una consulta a Open-Meteo | **Se reintenta al minuto** | En vez de esperar los 15 minutos. Como el dato ya puede tener hasta 15 minutos, una sola falla no llega a dejarlo viejo. Surgió en la revisión del pull request #20; lo eligió Male el 20/10/2026. |
 | 9.20 | Plazo de cada tarea periódica de Clima | **30 segundos** | La consulta, la revisión de la aptitud y el relay se cortan a los 30 segundos y vuelven a intentar. Así, si MongoDB o RabbitMQ se cuelgan, la tarea no queda trabada. Un mismo error se registra como mucho una vez por minuto. Surgió en la revisión del pull request #20; lo eligió Male el 20/10/2026. |
 | 9.21 | Qué revisa `/health` de Clima | **Solo que el servicio esté vivo; no mira MongoDB** | Clima no está detrás del balanceador (el que se balancea es Vuelos, 12.1). Si mirara MongoDB, una caída de Atlas haría que Render reiniciara Clima una y otra vez, cuando Clima igual puede responder `503` con un error claro. Surgió en la revisión del pull request #20; lo eligió Male el 20/10/2026. |
+| 9.22 | Si Open-Meteo agota el cupo diario de la IP de Render | **E. No se cambia nada; se explica en la presentación** | Open-Meteo gratis cuenta los pedidos por día y por IP, y Render gratis usa la misma IP de salida para muchos usuarios: entre todos agotan el cupo aunque Clima haga unas 96 consultas por día. Entonces Open-Meteo le responde `429` ("Daily API request limit exceeded") a cada consulta hasta la medianoche UTC (21:00 de Argentina), y Clima, cuando el dato pasa los 30 minutos, responde `503` con `Retry-After` (9.2, 6.19). Se acepta como la degradación prevista: en la presentación se explica, y lo que depende de Open-Meteo se muestra en el Docker Compose, que sale por otra IP. Se descartaron pagar la API comercial de Open-Meteo, que cuenta el cupo por clave (A); cambiar a otro proveedor gratis con clave (B), que cambia campos y la 6.8 la víspera; Open-Meteo con otro proveedor de respaldo (C), que no llegaba para la presentación; y mudar Clima a un hosting con IP propia (D), que cambia la 9.4 y la dirección del consumidor. Pasó el 10/11/2026, desde las 13:14 UTC; lo decidió el equipo ese día. |
 
 ## 10. Caché (ADR D7)
 
@@ -644,7 +645,7 @@ Sin respuesta registrada:
 | ADR | Tema | Decisiones que lo alimentan | Vence |
 |---|---|---|---|
 | D1 | Límites de los servicios | 3.1, 3.2, 3.3 | Entrega 1 |
-| D8 | Contrato propio | 6.1 a 6.19; se actualiza con 9.2, 9.4 y 9.6; la 9.10 lo reemplaza por el ADR-015 | Entrega 1; se actualiza en la 2 |
+| D8 | Contrato propio | 6.1 a 6.19; se actualiza con 9.2, 9.4 y 9.6; la 9.10 lo reemplaza por el ADR-015, que suma la 9.22 | Entrega 1; se actualiza en la 2 |
 | D3 | Persistencia | 5.1 a 5.5, 7.2 | Entrega 1, versión inicial; se valida en la 2 |
 | D5 | Comunicación entre servicios | 4.1 a 4.9, 25.1 | Entrega 1, versión inicial; se valida en la 2 |
 | D2 | Arquitectura interna | 7.3, 7.5, 7.6, 20 | Entrega 2 |
