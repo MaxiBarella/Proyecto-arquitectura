@@ -247,6 +247,8 @@ Las decisiones 9.12 a 9.18 surgieron al programar Clima. Las tomó Male el 19/10
 | 9.19 | Si falla una consulta a Open-Meteo | **Se reintenta al minuto** | En vez de esperar los 15 minutos. Como el dato ya puede tener hasta 15 minutos, una sola falla no llega a dejarlo viejo. Surgió en la revisión del pull request #20; lo eligió Male el 20/10/2026. |
 | 9.20 | Plazo de cada tarea periódica de Clima | **30 segundos** | La consulta, la revisión de la aptitud y el relay se cortan a los 30 segundos y vuelven a intentar. Así, si MongoDB o RabbitMQ se cuelgan, la tarea no queda trabada. Un mismo error se registra como mucho una vez por minuto. Surgió en la revisión del pull request #20; lo eligió Male el 20/10/2026. |
 | 9.21 | Qué revisa `/health` de Clima | **Solo que el servicio esté vivo; no mira MongoDB** | Clima no está detrás del balanceador (el que se balancea es Vuelos, 12.1). Si mirara MongoDB, una caída de Atlas haría que Render reiniciara Clima una y otra vez, cuando Clima igual puede responder `503` con un error claro. Surgió en la revisión del pull request #20; lo eligió Male el 20/10/2026. |
+| 9.22 | Si Open-Meteo agota el cupo diario de la IP de Render | **E. No se cambia nada; se explica en la presentación.** Reemplazada por la 9.23 | Open-Meteo gratis cuenta los pedidos por día y por IP, y Render gratis usa la misma IP de salida para muchos usuarios: entre todos agotan el cupo aunque Clima haga unas 96 consultas por día. Entonces Open-Meteo le responde `429` ("Daily API request limit exceeded") a cada consulta hasta que se reinicia el cupo (Open-Meteo no documenta a qué hora), y Clima, cuando el dato pasa los 30 minutos, responde `503` con `Retry-After` (9.2, 6.19). Se acepta como la degradación prevista: en la presentación se explica, y lo que depende de Open-Meteo se muestra en el Docker Compose, que sale por otra IP. Se descartaron pagar la API comercial de Open-Meteo, que cuenta el cupo por clave (A); cambiar a otro proveedor gratis con clave (B), que cambia campos y la 6.8 la víspera; Open-Meteo con otro proveedor de respaldo (C), que no llegaba para la presentación; y mudar Clima a un hosting con IP propia (D), que cambia la 9.4 y la dirección del consumidor. Pasó el 10/11/2026, desde las 13:14 UTC; lo decidió el equipo ese día. |
+| 9.23 | De dónde saca el clima la copia de la nube | **Un Open-Meteo propio en Render** (el grupo, 10/11/2026, por sugerencia del profe) | Reemplaza a la 9.22. Se despliega en Render gratis la imagen oficial `ghcr.io/open-meteo/open-meteo`, que baja los datos del almacenamiento público de Open-Meteo en AWS y no tiene cupo por IP. Variables: `REMOTE_DATA_DIRECTORY=https://openmeteo.s3.amazonaws.com/data/` (sin ella responde todo en `null`), `CACHE_SIZE=200MB` y `PORT=8080`, porque la imagen escucha siempre en ese puerto. Clima lo consulta con la variable `OPEN_METEO_URL`; si no está, usa la API pública, como en el Docker Compose. Probado en local con 512 MB: usa unos 230 MB, y en frío con 0,1 de CPU el primer pedido tardó 150 segundos y los siguientes, milisegundos. Clima corta a los 10 segundos y reintenta cada minuto (9.19), así que después de un arranque en frío el dato llega en unos minutos. Los valores pueden diferir un poco de la API pública, que combina más modelos. Se usa la dirección pública del servicio, no la interna de Render. |
 
 ## 10. Caché (ADR D7)
 
@@ -547,9 +549,12 @@ Las decisiones 10.5 a 10.8, 14.11, 14.12, 20.5, 26.2 y 28.1 salen de lo que qued
 
 Las 10.9 y 10.10 aparecieron al preparar la medición de la caché: hacían falta datos en el índice y el ensayo mostró que los filtros de k6 se repetían demasiado. Las opciones las preparó el agente de IA y Maxi eligió las recomendadas el 9/11/2026. Quedan confirmadas cuando el equipo apruebe el pull request que las registra.
 
+La 28.2 salió de un error que encontró Salvador en la prueba de carga del tablero. Las opciones las preparó el agente de IA y Maxi eligió la recomendada el 10/11/2026. Queda confirmada cuando el equipo apruebe el pull request que la registra.
+
 | # | Decisión | Elegido | Qué significa |
 |---|---|---|---|
 | 28.1 | Cada cuánto se dan por finalizados los vuelos (RN-32, F-22) | **Cada 1 minuto** | Vuelos busca los vuelos programados cuyo bloque ya terminó y los pasa a finalizado, cada uno con su "vuelo actualizado" para el tablero (14.5). Con bloques de 15 minutos (RN-03), un minuto de atraso casi no se nota, y la consulta es liviana. |
+| 28.2 | Qué hace Vuelos si MySQL corta una transacción por un choque con otra | **La vuelve a correr entera, hasta 3 veces, como Pistas (ADR-004)** (Maxi, 10/11/2026) | Vale para el interbloqueo (error 1213) y la espera de bloqueo vencida (1205), al publicar un vuelo, al cambiarlo y al aplicar un evento. MySQL deshace la transacción entera, así que repetirla no duplica nada. Si los 3 intentos chocan, responde `500` como hasta ahora. Apareció al cargar 700 vuelos de golpe: 1 `POST /flights` respondió `500` (ADR-013). El relay del outbox no se reintenta: vuelve a correr al segundo siguiente. Se descartaron responder `503` sin reintentar, porque el frontend no reintenta solo, y dejarlo como limitación, porque Pistas sí reintenta. |
 
 ## Forma de trabajo
 
@@ -650,7 +655,7 @@ Sin respuesta registrada:
 | ADR | Tema | Decisiones que lo alimentan | Vence |
 |---|---|---|---|
 | D1 | Límites de los servicios | 3.1, 3.2, 3.3 | Entrega 1 |
-| D8 | Contrato propio | 6.1 a 6.19; se actualiza con 9.2, 9.4 y 9.6; la 9.10 lo reemplaza por el ADR-015 | Entrega 1; se actualiza en la 2 |
+| D8 | Contrato propio | 6.1 a 6.19; se actualiza con 9.2, 9.4 y 9.6; la 9.10 lo reemplaza por el ADR-015, que suma la 9.22 y la 9.23 | Entrega 1; se actualiza en la 2 |
 | D3 | Persistencia | 5.1 a 5.5, 7.2 | Entrega 1, versión inicial; se valida en la 2 |
 | D5 | Comunicación entre servicios | 4.1 a 4.9, 25.1 | Entrega 1, versión inicial; se valida en la 2 |
 | D2 | Arquitectura interna | 7.3, 7.5, 7.6, 20 | Entrega 2 |
