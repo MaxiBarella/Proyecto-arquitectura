@@ -598,7 +598,7 @@ Lo primero, porque traba a otros: el gateway, Usuarios, la base del frontend (22
 
 Los nueve puntos que había dejado abiertos la Entrega 1 se cerraron en la Entrega 2: caché (10.2), hosting y mock (9.4, 9.7 y 9.8), gateway (15), Clima sin datos y aeropuertos alternativos (18), valores (18, 10.3 y 14.2), límite de pedidos de Clima (9.6), mensajes fallidos (11.4) y los temas de la Entrega 2 (secciones 10 a 17).
 
-El ADR D4, que no tenía entrega asignada, se escribió para la presentación: es el [ADR-004](adr/ADR-004.md) (#63). No queda nada abierto.
+El ADR D4, que no tenía entrega asignada, se escribió para la presentación: es el [ADR-004](adr/ADR-004.md) (#63). Queda abierto cuándo se sacan los puertos directos de los servicios (15.20).
 
 Lo que se consume del proveedor quedó en la 27.1; el resto se define en el ADR-009.
 
@@ -628,10 +628,11 @@ Sin respuesta registrada:
 
 - Cuál es el formato de ADR: el enunciado remite a una sección 8 que no existe.
 - Si el servicio que publica la capacidad (Clima) cuenta entre los tres microservicios mínimos.
-- En qué entrega vence la decisión D4.
 - Si el mock tiene que estar publicado en internet para el 9/10.
 - Si hay que agregar a los profes como colaboradores del repo, ahora que es público.
 - Cuándo es la jornada de fallas controladas.
+
+Ya no hace falta preguntar en qué entrega vence la decisión D4: el ADR se escribió para la presentación (ADR-004, #63).
 - Qué porcentaje de cobertura de tests unitarios esperan. Mientras tanto, se usa el de la 20.3.
 - Si la API pública de Clima puede no pasar por nuestro gateway (9.9).
 - Si el Clima de la nube puede ser una copia separada del que usa nuestro sistema (9.3).
